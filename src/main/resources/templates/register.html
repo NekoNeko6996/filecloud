@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html class="dark" lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title th:text="#{auth.register.title}">Create Account</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3b83f7",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#101722",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex flex-col overflow-x-hidden">
+<div class="fixed inset-0 z-0 w-full h-full">
+    <div class="absolute inset-0 bg-cover bg-center bg-no-repeat transform scale-105" style="background-image: url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop');"></div>
+    <div class="absolute inset-0 bg-background-dark/80 backdrop-blur-sm"></div>
+</div>
+
+<div class="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
+    <div class="w-full max-w-md bg-white/5 dark:bg-slate-900/50 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.36)] rounded-[2rem] p-8 sm:p-10 flex flex-col gap-6 animate-fade-in-up">
+
+        <div class="text-center flex flex-col items-center gap-2">
+            <div class="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary mb-2">
+                <span class="material-symbols-outlined text-3xl">cloud_circle</span>
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight text-white" th:text="#{auth.register.header}">Create Account</h1>
+            <p class="text-slate-400 text-base font-normal" th:text="#{auth.register.subheader}">Start managing your media today</p>
+        </div>
+
+        <form class="flex flex-col gap-4 w-full" th:action="@{/register}" method="post" th:object="${user}">
+
+            <div class="flex flex-col gap-2">
+                <label class="text-sm font-medium text-slate-200 ml-1" th:text="#{auth.username}">Username</label>
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-primary transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">person</span>
+                    </div>
+                    <input th:field="*{username}" class="w-full h-12 pl-11 pr-4 bg-slate-950/50 border border-slate-700 text-white placeholder:text-slate-500 rounded-full focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-300" placeholder="johndoe" type="text" required/>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label class="text-sm font-medium text-slate-200 ml-1" th:text="#{auth.email}">Email Address</label>
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-primary transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">mail</span>
+                    </div>
+                    <input th:field="*{email}" class="w-full h-12 pl-11 pr-4 bg-slate-950/50 border border-slate-700 text-white placeholder:text-slate-500 rounded-full focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-300" placeholder="name@example.com" type="email" required/>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label class="text-sm font-medium text-slate-200 ml-1" th:text="#{auth.password}">Password</label>
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-primary transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">lock</span>
+                    </div>
+                    <input th:field="*{password}" class="w-full h-12 pl-11 pr-12 bg-slate-950/50 border border-slate-700 text-white placeholder:text-slate-500 rounded-full focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-300" placeholder="Min. 8 characters" type="password" required/>
+                </div>
+            </div>
+
+            <button class="mt-2 w-full h-12 bg-primary hover:bg-blue-600 text-white font-bold rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.6)] transition-all duration-300 transform hover:-translate-y-0.5" type="submit" th:text="#{auth.button.register}">
+                Register Account
+            </button>
+        </form>
+
+        <div class="text-center mt-2">
+            <p class="text-slate-400 text-sm">
+                <span th:text="#{auth.text.has_account}">Already have an account?</span>
+                <a class="text-primary font-medium hover:text-blue-400 transition-colors" th:href="@{/login}" th:text="#{auth.button.login}">Sign in</a>
+            </p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

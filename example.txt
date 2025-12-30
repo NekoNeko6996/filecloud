@@ -1,0 +1,13 @@
+I. GET CONFIG ON DB USING SystemConfigService:
+
+@Autowired
+private SystemConfigService configService;
+
+public void logicExample() {
+    // Get Config on DB
+    boolean allowGuest = configService.getBoolean("ALLOW_GUEST_VIEW", true);
+
+    if (allowGuest) {
+        // ...
+    }
+}
