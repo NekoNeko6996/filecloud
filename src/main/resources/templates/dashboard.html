@@ -101,6 +101,13 @@
                             <span class="material-symbols-outlined text-[#a79cba] group-hover:text-white transition-colors" style="font-variation-settings: 'FILL' 1;">home</span>
                             <p class="text-sm font-medium" th:text="#{sidebar.nav.home}">Home</p>
                         </a>
+                        <div class="flex flex-col gap-1">
+                            <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50 transition-colors group" 
+                               th:href="@{/subjects}">
+                                <span class="material-symbols-outlined">group</span>
+                                <p class="text-sm font-medium">People / Subjects</p>
+                            </a>
+                        </div>
                         <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50 transition-colors group" href="#">
                             <span class="material-symbols-outlined">schedule</span>
                             <p class="text-sm font-medium" th:text="#{sidebar.nav.recents}">Recents</p>

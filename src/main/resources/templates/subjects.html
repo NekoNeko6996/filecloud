@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html class="dark" lang="en" xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8"/>
+        <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+        <title>MediaVault - Subjects</title>
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+        <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+        <script>
+            tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary": "#833cf6", "background-dark": "#171022"}, fontFamily: {"display": ["Space Grotesk", "sans-serif"]}}}}
+        </script>
+        <style>
+            .glass-panel {
+                background: rgba(23, 16, 34, 0.95);
+                backdrop-filter: blur(16px);
+                border-right: 1px solid rgba(255, 255, 255, 0.08);
+            }
+            .subject-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 10px 25px -5px rgba(131, 60, 246, 0.3);
+            }
+        </style>
+    </head>
+    <body class="bg-background-dark text-white font-display overflow-hidden antialiased">
+        <div class="flex h-screen w-full">
+
+            <aside class="glass-panel flex w-72 flex-col justify-between overflow-y-auto z-20 shrink-0 border-r border-white/10">
+                <div class="flex flex-col p-4 gap-6">
+                    <div class="flex items-center gap-3 px-2">
+                        <span class="material-symbols-outlined text-primary text-3xl">cloud_circle</span>
+                        <h1 class="text-white text-lg font-bold">MediaVault</h1>
+                    </div>
+
+                    <button onclick="document.getElementById('createSubjectModal').showModal()" 
+                            class="flex w-full items-center justify-center gap-2 rounded-xl h-12 bg-white/5 hover:bg-white/10 transition-colors font-bold border border-white/10">
+                        <span class="material-symbols-outlined">person_add</span> New Subject
+                    </button>
+
+                    <div class="flex flex-col gap-1">
+                        <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a79cba] hover:text-white hover:bg-[#2e2839] transition-colors" th:href="@{/}">
+                            <span class="material-symbols-outlined">home</span> Home
+                        </a>
+                        <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/20 text-white border border-primary/20 transition-colors" th:href="@{/subjects}">
+                            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group</span> People / Subjects
+                        </a>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
+                <header class="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-background-dark/80 backdrop-blur sticky top-0 z-10">
+                    <h2 class="text-xl font-bold text-white">Subjects Library</h2>
+                    <div class="relative group">
+                        <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-500">search</span>
+                        <input type="text" placeholder="Search people..." class="bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-primary outline-none w-64">
+                    </div>
+                </header>
+
+                <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+
+                        <div th:each="sub : ${subjects}" class="subject-card group flex flex-col items-center gap-3 p-4 rounded-2xl bg-[#2e2839]/40 border border-white/5 hover:border-primary/50 transition-all cursor-pointer">
+                            <div class="relative w-24 h-24 rounded-full p-1 border-2 border-dashed border-white/20 group-hover:border-primary transition-colors">
+                                <div class="w-full h-full rounded-full overflow-hidden bg-gray-800">
+                                    <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover">
+                                    <div th:unless="${sub.avatarUrl != null}" class="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-600 text-white font-bold text-2xl">
+                                        <span th:text="${#strings.substring(sub.mainName,0,1)}">A</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-center">
+                                <h3 class="text-white font-bold text-sm truncate w-32" th:text="${sub.mainName}">Name</h3>
+                                <p class="text-[#a79cba] text-[10px] mt-0.5 truncate w-32" 
+                                   th:text="${sub.aliasName1 != null} ? ${sub.aliasName1} : 'No alias'">Alias</p>
+                            </div>
+
+                            <button class="opacity-0 group-hover:opacity-100 transition-opacity bg-white/10 hover:bg-primary text-white text-xs px-3 py-1 rounded-full mt-1">
+                                View Profile
+                            </button>
+                        </div>
+
+                    </div>
+
+                    <div th:if="${subjects.isEmpty()}" class="flex flex-col items-center justify-center h-full text-gray-500 opacity-50 pb-20">
+                        <span class="material-symbols-outlined text-6xl mb-4">person_off</span>
+                        <p>No subjects found. Create one!</p>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <dialog id="createSubjectModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/50">
+            <h3 class="text-lg font-bold mb-4">Add New Subject</h3>
+            <form th:action="@{/subjects/create}" method="post" class="flex flex-col gap-4 w-80">
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Main Name</label>
+                    <input type="text" name="name" required class="w-full bg-black/50 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-primary">
+                </div>
+                <div class="flex gap-2 justify-end mt-2">
+                    <button type="button" onclick="this.closest('dialog').close()" class="px-4 py-2 text-sm hover:text-gray-300">Cancel</button>
+                    <button type="submit" class="bg-primary hover:bg-primary-dark px-4 py-2 rounded text-sm font-bold">Create</button>
+                </div>
+            </form>
+        </dialog>
+
+    </body>
+</html>
