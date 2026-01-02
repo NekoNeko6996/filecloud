@@ -1,321 +1,115 @@
 <!DOCTYPE html>
-<html class="dark" lang="en" xmlns:th="http://www.thymeleaf.org">
-    <head>
-        <meta charset="utf-8"/>
-        <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-        <title th:text="#{app.title.dashboard}">MediaVault - File Browser</title>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(#{app.title.dashboard}, 'dashboard', ~{::section}, ~{::script})}">
+    <body>
 
-        <link href="https://fonts.googleapis.com" rel="preconnect"/>
-        <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-
-        <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-        <script id="tailwind-config">
-            tailwind.config = {
-                darkMode: "class",
-                theme: {
-                    extend: {
-                        colors: {
-                            "primary": "#833cf6",
-                            "primary-dark": "#6a2bc4",
-                            "background-light": "#f7f5f8",
-                            "background-dark": "#171022",
-                            "surface": "#1e1e1e",
-                            "surface-highlight": "#2a2a2a",
-                        },
-                        fontFamily: {
-                            "display": ["Space Grotesk", "sans-serif"]
-                        },
-                        borderRadius: {"DEFAULT": "0.25rem", "md": "0.375rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px"},
-                    },
-                },
-            }
-        </script>
-        <style>
-            ::-webkit-scrollbar {
-                width: 6px;
-                height: 6px;
-            }
-            ::-webkit-scrollbar-track {
-                background: transparent;
-            }
-            ::-webkit-scrollbar-thumb {
-                background: #443b54;
-                border-radius: 3px;
-            }
-            ::-webkit-scrollbar-thumb:hover {
-                background: #833cf6;
-            }
-            .no-scrollbar::-webkit-scrollbar {
-                display: none;
-            }
-            .no-scrollbar {
-                -ms-overflow-style: none;
-                scrollbar-width: none;
-            }
-            .glass-panel {
-                background: rgba(23, 16, 34, 0.75);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
-                border-right: 1px solid rgba(255, 255, 255, 0.08);
-            }
-            .glass-header {
-                background: rgba(23, 16, 34, 0.6);
-                backdrop-filter: blur(12px);
-                -webkit-backdrop-filter: blur(12px);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            }
-            .folder-card-gradient {
-                background: linear-gradient(180deg, rgba(46,40,57,1) 0%, rgba(30,24,37,1) 100%);
-            }
-        </style>
-    </head>
-    <body class="bg-background-dark text-white font-display overflow-hidden antialiased">
-        <div class="flex h-screen w-full">
-
-            <aside class="glass-panel flex w-72 flex-col justify-between overflow-y-auto no-scrollbar z-20 shrink-0">
-                <div class="flex flex-col p-4 gap-6">
-                    <div class="flex items-center gap-3 px-2">
-                        <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-white">
-                            <span class="material-symbols-outlined text-[20px]">cloud_circle</span>
-                        </div>
-                        <div>
-                            <h1 class="text-white text-lg font-bold leading-none tracking-tight">MediaVault</h1>
-                            <p class="text-[#a79cba] text-xs font-normal mt-0.5">v2.4.0 • Enterprise</p>
-                        </div>
-                    </div>
-
-                    <button onclick="triggerUpload()" class="...">
-                        <span class="material-symbols-outlined text-[20px]">cloud_upload</span>
-                        <span th:text="#{dashboard.btn.upload}">New Upload</span>
-                    </button>
-                    <button onclick="openCreateFolder()" class="mt-2 text-xs text-gray-400 hover:text-white flex items-center gap-1 justify-center w-full">
-                        <span class="material-symbols-outlined text-[16px]">create_new_folder</span> Create Folder
-                    </button>
-
-                    <div class="flex flex-col gap-1">
-                        <p class="px-3 text-[#a79cba] text-xs font-bold uppercase tracking-wider mb-2" th:text="#{sidebar.section.browse}">Browse</p>
-
-                        <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[#2e2839]/50 text-white border border-white/5 hover:bg-[#2e2839] transition-colors group" href="#">
-                            <span class="material-symbols-outlined text-[#a79cba] group-hover:text-white transition-colors" style="font-variation-settings: 'FILL' 1;">home</span>
-                            <p class="text-sm font-medium" th:text="#{sidebar.nav.home}">Home</p>
-                        </a>
-                        <div class="flex flex-col gap-1">
-                            <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50 transition-colors group" 
-                               th:href="@{/subjects}">
-                                <span class="material-symbols-outlined">group</span>
-                                <p class="text-sm font-medium">People / Subjects</p>
-                            </a>
-                        </div>
-                        <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50 transition-colors group" href="#">
-                            <span class="material-symbols-outlined">schedule</span>
-                            <p class="text-sm font-medium" th:text="#{sidebar.nav.recents}">Recents</p>
-                        </a>
-                        <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50 transition-colors group" href="#">
-                            <span class="material-symbols-outlined">star</span>
-                            <p class="text-sm font-medium" th:text="#{sidebar.nav.favorites}">Favorites</p>
-                        </a>
-                        <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50 transition-colors group" href="#">
-                            <span class="material-symbols-outlined">folder_open</span>
-                            <p class="text-sm font-medium" th:text="#{sidebar.nav.collections}">Collections</p>
-                        </a>
-                        <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50 transition-colors group" href="#">
-                            <span class="material-symbols-outlined">delete</span>
-                            <p class="text-sm font-medium" th:text="#{sidebar.nav.trash}">Trash</p>
-                        </a>
-                    </div>
-
-                    <div class="h-px bg-white/10 w-full"></div>
-
-                    <div class="flex flex-col gap-4">
-                        <p class="px-3 text-[#a79cba] text-xs font-bold uppercase tracking-wider" th:text="#{sidebar.section.drives}">Storage Volumes</p>
-                        <div class="flex flex-col gap-2 px-3">
-                            <div class="flex justify-between items-end">
-                                <div class="flex items-center gap-2">
-                                    <span class="material-symbols-outlined text-[#a79cba] text-[18px]">hard_drive</span>
-                                    <span class="text-white text-sm font-medium">HDD Red 4TB</span>
-                                </div>
-                                <span class="text-primary text-xs font-bold">75%</span>
-                            </div>
-                            <div class="h-1.5 w-full rounded-full bg-[#2e2839] overflow-hidden">
-                                <div class="h-full bg-primary rounded-full" style="width: 75%;"></div>
-                            </div>
-                            <p class="text-[#a79cba] text-xs">3TB / 4TB used</p>
-                        </div>
-                    </div>
-
-                    <div class="h-px bg-white/10 w-full"></div>
-
-                    <div class="flex flex-col gap-2">
-                        <p class="px-3 text-[#a79cba] text-xs font-bold uppercase tracking-wider mb-1" th:text="#{sidebar.section.library}">Library</p>
-
-                        <details class="group px-3">
-                            <summary class="flex cursor-pointer items-center justify-between py-2 list-none text-[#a79cba] hover:text-white transition-colors">
-                                <div class="flex items-center gap-3">
-                                    <span class="material-symbols-outlined text-[20px]">sell</span>
-                                    <span class="text-sm font-medium" th:text="#{sidebar.lib.tags}">Tags</span>
-                                </div>
-                                <span class="material-symbols-outlined text-[16px] group-open:rotate-180 transition-transform">expand_more</span>
-                            </summary>
-                            <div class="pl-9 pr-2 pb-2 pt-1 flex flex-wrap gap-2">
-                                <span class="text-[10px] bg-primary/20 text-primary-200 px-2 py-0.5 rounded-full border border-primary/20">#Summer</span>
-                                <span class="text-[10px] bg-[#2e2839] text-[#a79cba] px-2 py-0.5 rounded-full border border-white/5">#Work</span>
-                            </div>
-                        </details>
-
-                        <details class="group px-3" open>
-                            <summary class="flex cursor-pointer items-center justify-between py-2 list-none text-[#a79cba] hover:text-white transition-colors">
-                                <div class="flex items-center gap-3">
-                                    <span class="material-symbols-outlined text-[20px]">group</span>
-                                    <span class="text-sm font-medium" th:text="#{sidebar.lib.people}">People</span>
-                                </div>
-                                <span class="material-symbols-outlined text-[16px] group-open:rotate-180 transition-transform">expand_more</span>
-                            </summary>
-                            <div class="pl-9 pr-2 pb-2 pt-1 flex flex-col gap-2">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-5 h-5 rounded-full bg-gray-500"></div>
-                                    <span class="text-xs text-[#a79cba]">Taylor Swift</span>
-                                </div>
-                            </div>
-                        </details>
+        <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
+            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="text-[#a79cba]">Home</span>
+                    <span class="material-symbols-outlined text-[#a79cba] text-[16px]">chevron_right</span>
+                    <span class="font-bold text-white bg-[#2e2839] px-2 py-1 rounded" th:text="${currentFolder != null ? currentFolder.name : 'Root'}">Root</span>
+                </div>
+                <div class="flex items-center gap-4 flex-1 justify-center max-w-lg mx-4">
+                    <div class="relative w-full group">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#a79cba]">search</span>
+                        <input class="w-full bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-10 py-2 text-sm text-white placeholder-[#a79cba] focus:outline-none focus:ring-2 focus:ring-primary/50" 
+                               th:placeholder="#{dashboard.search.placeholder}" type="text"/>
                     </div>
                 </div>
-            </aside>
+            </header>
 
-            <main class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
-                <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
-                    <div class="flex items-center gap-2 text-sm">
-                        <span class="text-[#a79cba] cursor-pointer hover:text-white" th:text="#{sidebar.nav.home}">Home</span>
-                        <span class="material-symbols-outlined text-[#a79cba] text-[16px]">chevron_right</span>
-                        <span class="text-[#a79cba] cursor-pointer hover:text-white" th:text="#{dashboard.header.photos}">Photos</span>
-                        <span class="material-symbols-outlined text-[#a79cba] text-[16px]">chevron_right</span>
-                        <span class="font-bold text-white bg-[#2e2839] px-2 py-1 rounded">2024</span>
+            <div class="flex-1 overflow-y-auto p-6 scroll-smooth" onclick="closeContextMenu()">
+
+                <div class="mb-8">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-white text-lg font-bold">Folders</h2>
+                        <button onclick="openCreateFolder()" class="text-xs flex items-center gap-1 text-gray-400 hover:text-white transition-colors">
+                            <span class="material-symbols-outlined text-sm">create_new_folder</span> New Folder
+                        </button>
                     </div>
 
-                    <div class="flex items-center gap-4 flex-1 justify-center max-w-lg mx-4">
-                        <div class="relative w-full group">
-                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#a79cba] group-focus-within:text-primary transition-colors">search</span>
-                            <input class="w-full bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-10 py-2 text-sm text-white placeholder-[#a79cba] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                                   th:placeholder="#{dashboard.search.placeholder}" type="text"/>
-                            <button class="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-[#2e2839] rounded-full text-[#a79cba] hover:text-white transition-colors">
-                                <span class="material-symbols-outlined text-[18px]">tune</span>
-                            </button>
-                        </div>
-                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        <a th:if="${currentFolder != null}" th:href="@{/(folderId=${currentFolder.parentId})}"
+                           class="flex items-center justify-center bg-white/5 rounded-xl p-4 border border-dashed border-gray-600 hover:bg-white/10 cursor-pointer transition-colors">
+                            <span class="material-symbols-outlined text-gray-400">arrow_back</span>
+                        </a>
 
-                    <div class="flex items-center gap-3 text-xs text-[#a79cba]">
-                        <a th:href="@{''(lang='vi')}" class="hover:text-white font-bold">VI</a>
-                        <span class="opacity-50">|</span>
-                        <a th:href="@{''(lang='en')}" class="hover:text-white font-bold">EN</a>
-                    </div>
-                </header>
-
-                <div class="flex-1 overflow-y-auto p-6 scroll-smooth">
-
-                    <div class="mb-8">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-white text-lg font-bold">Folders</h2>
-                        </div>
-
-                        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                            <a th:if="${currentFolder != null}" 
-                               th:href="@{/(folderId=${currentFolder.parentId})}"
-                               class="flex items-center justify-center bg-white/5 rounded-xl p-4 border border-dashed border-gray-600 hover:bg-white/10 cursor-pointer">
-                                <span class="material-symbols-outlined text-gray-400">arrow_back</span>
-                            </a>
-
-                            <button th:if="${!#lists.isEmpty(items)}" 
-                                    onclick="openCreateFolder()" 
-                                    class="flex items-center justify-center bg-white/5 rounded-xl p-4 border border-dashed border-gray-600 hover:bg-white/10 cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px] mr-1">create_new_folder</span> Create Folder Here
-                            </button>
-
-                            <a th:each="item : ${items}" th:if="${item.isFolder()}" 
-                               th:href="@{/(folderId=${item.id})}"
-                               class="folder-card-gradient rounded-xl p-4 border border-white/5 hover:border-primary/50 cursor-pointer group transition-all duration-200">
-                                <div class="flex justify-between items-start mb-3">
-                                    <span class="material-symbols-outlined text-[#a79cba] text-[32px] group-hover:text-primary transition-colors" style="font-variation-settings: 'FILL' 1;">folder</span>
-                                </div>
-                                <p class="text-white text-sm font-medium truncate" th:text="${item.name}">FolderName</p>
-                            </a>
-                        </div>
-                    </div>
-
-                    <div class="mb-8">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-white text-lg font-bold flex items-center gap-2">
-                                <span class="material-symbols-outlined text-purple-400">photo_library</span> Photos
-                            </h2>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                            <div th:each="item : ${items}" th:if="${item.isImage()}" 
-                                 class="group relative aspect-square rounded-xl bg-[#2e2839] border border-white/5 hover:border-primary/50 overflow-hidden cursor-pointer shadow-lg transition-all"
-                                 th:attr="data-id=${item.id}, data-has-thumb='true'"
-                                 oncontextmenu="openContextMenu(event, this)">
-
-                                <img th:src="@{/api/file/thumbnail/{id}(id=${item.id})}" 
-                                     class="w-full h-full object-cover transition-transform duration-500"
-                                     loading="lazy"
-                                     onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
-
-                                <div class="w-full h-full flex items-center justify-center bg-gray-800 hidden">
-                                    <span class="material-symbols-outlined text-4xl text-gray-500">image</span>
-                                </div>
-
-                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 pt-8 pointer-events-none">
-                                    <p class="text-white text-xs font-medium truncate" th:text="${item.name}">img.jpg</p>
-                                    <p class="text-gray-400 text-[10px]" th:text="${item.readableSize}">2 MB</p>
-                                </div>
+                        <a th:each="item : ${items}" th:if="${item.isFolder()}" 
+                           th:href="@{/(folderId=${item.id})}"
+                           class="folder-card-gradient rounded-xl p-4 border border-white/5 hover:border-primary/50 cursor-pointer group transition-all duration-200">
+                            <div class="flex justify-between items-start mb-3">
+                                <span class="material-symbols-outlined text-[#a79cba] text-[32px] group-hover:text-primary transition-colors" style="font-variation-settings: 'FILL' 1;">folder</span>
                             </div>
-                        </div>
+                            <p class="text-white text-sm font-medium truncate" th:text="${item.name}">Name</p>
+                        </a>
                     </div>
+                </div>
 
-                    <div class="mb-8">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-white text-lg font-bold flex items-center gap-2">
-                                <span class="material-symbols-outlined text-blue-400">movie</span> Videos
-                            </h2>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                            <div th:each="item : ${items}" th:if="${item.isVideo()}" 
-                                 class="group relative aspect-video rounded-xl bg-[#2e2839] border border-white/5 hover:border-blue-500/50 overflow-hidden cursor-pointer shadow-lg transition-all"
-                                 th:attr="data-id=${item.id}, data-has-thumb='true'"
-                                 oncontextmenu="openContextMenu(event, this)">
+                <div class="mb-8">
+                    <h2 class="text-white text-lg font-bold mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-purple-400">photo_library</span> Photos
+                    </h2>
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                        <div th:each="item : ${items}" th:if="${item.isImage()}" 
+                             class="group relative aspect-square rounded-xl bg-[#2e2839] border border-white/5 hover:border-primary/50 overflow-hidden cursor-pointer shadow-lg transition-all"
+                             th:attr="data-id=${item.id}, data-has-thumb='true'" 
+                             oncontextmenu="openContextMenu(event, this)">
 
-                                <img th:src="@{/api/file/thumbnail/{id}(id=${item.id})}" 
-                                     class="w-full h-full object-cover transition-transform duration-500 opacity-80 group-hover:opacity-100"
-                                     loading="lazy"
-                                     onerror="this.style.display='none';">
+                            <img th:src="@{/api/file/thumbnail/{id}(id=${item.id})}" 
+                                 class="w-full h-full object-cover transition-transform duration-500" loading="lazy"
+                                 onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
 
-                                <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                                    <div class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20 group-hover:bg-primary/80 transition-colors">
-                                        <span class="material-symbols-outlined text-white text-3xl drop-shadow-md">play_arrow</span>
-                                    </div>
-                                </div>
+                            <div class="w-full h-full flex items-center justify-center bg-gray-800 hidden">
+                                <span class="material-symbols-outlined text-4xl text-gray-500">image</span>
+                            </div>
 
-                                <div class="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-white/10 z-20">
-                                    <span class="video-duration-tag" th:data-id="${item.id}">...</span>
-                                </div>
-
-                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-6 pointer-events-none z-20">
-                                    <p class="text-white text-xs font-medium truncate" th:text="${item.name}">video.mp4</p>
-                                    <div class="flex justify-between items-center mt-0.5">
-                                        <p class="text-gray-400 text-[10px]" th:text="${item.readableSize}">Size</p>
-                                    </div>
-                                </div>
+                            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 pt-8 pointer-events-none">
+                                <p class="text-white text-xs font-medium truncate" th:text="${item.name}">Name</p>
+                                <p class="text-gray-400 text-[10px]" th:text="${item.readableSize}">Size</p>
                             </div>
                         </div>
                     </div>
                 </div>
-            </main>
+
+                <div class="mb-8">
+                    <h2 class="text-white text-lg font-bold mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-blue-400">movie</span> Videos
+                    </h2>
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                        <div th:each="item : ${items}" th:if="${item.isVideo()}" 
+                             class="group relative aspect-video rounded-xl bg-[#2e2839] border border-white/5 hover:border-blue-500/50 overflow-hidden cursor-pointer shadow-lg transition-all"
+                             th:attr="data-id=${item.id}, data-has-thumb='true'" 
+                             oncontextmenu="openContextMenu(event, this)">
+
+                            <img th:src="@{/api/file/thumbnail/{id}(id=${item.id})}" 
+                                 class="w-full h-full object-cover transition-transform duration-500 opacity-80 group-hover:opacity-100" loading="lazy"
+                                 onerror="this.style.display='none';">
+
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                                <div class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20 group-hover:bg-primary/80 transition-colors">
+                                    <span class="material-symbols-outlined text-white text-3xl drop-shadow-md">play_arrow</span>
+                                </div>
+                            </div>
+
+                            <div class="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-white/10 z-20">
+                                <span class="video-duration-tag" th:data-id="${item.id}">...</span>
+                            </div>
+
+                            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-6 pointer-events-none z-20">
+                                <p class="text-white text-xs font-medium truncate" th:text="${item.name}">Name</p>
+                                <p class="text-gray-400 text-[10px]" th:text="${item.readableSize}">Size</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-80 flex flex-col border-l border-white/10 overflow-y-auto no-scrollbar z-40 bg-[#171022] shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
-                <div class="p-6 flex flex-col gap-6 pt-20"> <div class="flex items-center justify-between">
+                <div class="p-6 flex flex-col gap-6 pt-20">
+                    <div class="flex items-center justify-between">
                         <h3 class="text-white font-bold text-base" th:text="#{dashboard.details.title}">Details</h3>
-                        <button onclick="closeDetails()" class="text-[#a79cba] hover:text-white transition-colors">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
+                        <button onclick="closeDetails()" class="text-[#a79cba] hover:text-white transition-colors"><span class="material-symbols-outlined">close</span></button>
                     </div>
 
                     <div class="flex flex-col gap-3">
@@ -328,9 +122,7 @@
                             <p id="detailSize" class="text-[#a79cba] text-sm mt-1">Size</p>
                         </div>
                     </div>
-
                     <div class="h-px bg-white/10 w-full"></div>
-
                     <div class="flex flex-col gap-4">
                         <h4 class="text-white text-sm font-bold" th:text="#{dashboard.details.info}">Information</h4>
                         <div class="flex flex-col gap-3" id="metaContainer">
@@ -339,98 +131,88 @@
                     </div>
                 </div>
             </aside>
-        </div>
 
-        <dialog id="createFolderModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/50">
-            <h3 class="text-lg font-bold mb-4">Create New Folder</h3>
-            <form th:action="@{/folder/create}" method="post" class="flex flex-col gap-4">
+            <div id="contextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl overflow-hidden">
+                <button onclick="alert('Preview')" class="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-[#833cf6] hover:text-white flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">visibility</span> Preview
+                </button>
+                <button onclick="viewProperties()" class="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-[#833cf6] hover:text-white flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">info</span> Properties
+                </button>
+                <div class="h-px bg-white/10 mx-2 my-1"></div>
+                <button class="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">delete</span> Delete
+                </button>
+            </div>
+
+            <dialog id="createFolderModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/50">
+                <h3 class="text-lg font-bold mb-4">Create Folder</h3>
+                <form th:action="@{/folder/create}" method="post" class="flex flex-col gap-4">
+                    <input type="hidden" name="parentId" th:value="${currentFolderId}">
+                    <input type="text" name="name" placeholder="Name" class="bg-black/50 border border-gray-600 rounded px-3 py-2 text-white">
+                    <div class="flex gap-2 justify-end">
+                        <button type="button" onclick="this.closest('dialog').close()" class="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
+                        <button type="submit" class="bg-primary px-4 py-2 rounded text-sm font-bold">Create</button>
+                    </div>
+                </form>
+            </dialog>
+            <form id="uploadForm" th:action="@{/file/upload}" method="post" enctype="multipart/form-data" class="hidden">
                 <input type="hidden" name="parentId" th:value="${currentFolderId}">
-                <input type="text" name="name" placeholder="Folder Name" class="bg-black/50 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-primary">
-                <div class="flex gap-2 justify-end">
-                    <button type="button" onclick="document.getElementById('createFolderModal').close()" class="px-4 py-2 text-sm hover:text-gray-300">Cancel</button>
-                    <button type="submit" class="bg-primary hover:bg-primary-dark px-4 py-2 rounded text-sm font-bold">Create</button>
-                </div>
+                <input type="file" name="file" id="fileInput" onchange="document.getElementById('uploadForm').submit()">
             </form>
-        </dialog>
 
-        <div id="contextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl overflow-hidden">
-            <button onclick="alert('Preview')" class="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-[#833cf6] hover:text-white flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">visibility</span> Preview
-            </button>
-            <button onclick="alert('Download')" class="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-[#833cf6] hover:text-white flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">download</span> Download
-            </button>
-            <div class="h-px bg-white/10 mx-2 my-1"></div>
-            <button onclick="viewProperties()" class="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-[#833cf6] hover:text-white flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">info</span> Properties
-            </button>
-            <div class="h-px bg-white/10 mx-2 my-1"></div>
-            <button class="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">delete</span> Delete
-            </button>
-        </div>
-
-        <form id="uploadForm" th:action="@{/file/upload}" method="post" enctype="multipart/form-data" class="hidden">
-            <input type="hidden" name="parentId" th:value="${currentFolderId}">
-            <input type="file" name="file" id="fileInput" onchange="document.getElementById('uploadForm').submit()">
-        </form>
+        </section>
 
         <script>
-            // Hàm kích hoạt upload khi bấm nút "New Upload" ở sidebar
-            function triggerUpload() {
+            // --- GLOBAL FUNCTIONS FOR LAYOUT ---
+            window.triggerUpload = function () {
                 document.getElementById('fileInput').click();
             }
-            // Hàm mở modal tạo folder
+
+            // --- LOCAL FUNCTIONS ---
             function openCreateFolder() {
                 document.getElementById('createFolderModal').showModal();
             }
-        </script>
-        <script>
-            // --- KHAI BÁO BIẾN TOÀN CỤC ---
+
+            // Context Menu Logic
             let selectedFileId = null;
-            let isSelectedImage = false;
+            let hasThumb = false;
             const contextMenu = document.getElementById('contextMenu');
             const detailsPanel = document.getElementById('detailsPanel');
 
-            // --- HÀM MỞ MENU (Được gọi từ HTML oncontextmenu) ---
-            // Gán vào window để đảm bảo HTML gọi được
             window.openContextMenu = function (e, element) {
-                // 1. QUAN TRỌNG: Chặn menu mặc định của trình duyệt
                 e.preventDefault();
-
-                // Ngăn sự kiện click lan ra cha (tránh conflict)
                 e.stopPropagation();
-
-                // 2. Lấy dữ liệu từ thẻ HTML (data-id, data-image)
                 selectedFileId = element.getAttribute('data-id');
-                isSelectedImage = element.getAttribute('data-image') === 'true';
+                hasThumb = element.getAttribute('data-has-thumb') === 'true';
 
-                console.log("Right clicked on:", selectedFileId); // Debug xem đã nhận ID chưa
+                // Điều chỉnh vị trí menu nếu sát lề
+                let x = e.pageX;
+                let y = e.pageY;
+                if (window.innerWidth - x < 200)
+                    x -= 200;
 
-                // 3. Tính toán vị trí hiển thị menu
-                // (Có thể thêm logic kiểm tra nếu menu bị tràn màn hình thì đẩy ngược lại)
-                contextMenu.style.top = `${e.pageY}px`;
-                contextMenu.style.left = `${e.pageX}px`;
-
-                // 4. Hiển thị menu
+                contextMenu.style.top = `${y}px`;
+                contextMenu.style.left = `${x}px`;
                 contextMenu.classList.remove('hidden');
             }
 
-            // --- ĐÓNG MENU KHI CLICK RA NGOÀI ---
+            function closeContextMenu() {
+                contextMenu.classList.add('hidden');
+            }
+
             document.addEventListener('click', function (e) {
-                // Nếu click không trúng menu thì ẩn đi
-                if (!contextMenu.contains(e.target)) {
-                    contextMenu.classList.add('hidden');
-                }
+                if (!contextMenu.contains(e.target))
+                    closeContextMenu();
             });
 
-            // --- CÁC HÀM XỬ LÝ SIDEBAR ---
+            // Sidebar Details Logic
             function closeDetails() {
                 detailsPanel.classList.remove('translate-x-0');
                 detailsPanel.classList.add('translate-x-full');
             }
 
-            // --- Helper: Format thời lượng giây -> MM:SS ---
+            // Format giây -> MM:SS
             function formatDuration(seconds) {
                 if (!seconds)
                     return "";
@@ -440,131 +222,81 @@
             }
 
             function viewProperties() {
-                // 1. Ẩn menu chuột phải & Mở Sidebar
-                contextMenu.classList.add('hidden');
+                closeContextMenu();
                 detailsPanel.classList.remove('translate-x-full');
                 detailsPanel.classList.add('translate-x-0');
 
-                // 2. Reset dữ liệu cũ
                 document.getElementById('detailName').innerText = "Loading...";
-                document.getElementById('detailSize').innerText = "";
-                document.getElementById('metaContainer').innerHTML = '<p class="text-gray-500 text-xs italic">Loading metadata...</p>';
+                document.getElementById('metaContainer').innerHTML = '<p class="text-gray-500 text-xs">Loading metadata...</p>';
 
-                // 3. Gọi API lấy dữ liệu mới
+                const img = document.getElementById('detailPreview');
+                const icon = document.getElementById('detailIcon');
+
+                if (hasThumb) {
+                    img.src = `/api/file/thumbnail/${selectedFileId}`;
+                    img.classList.remove('hidden');
+                    icon.classList.add('hidden');
+                } else {
+                    img.classList.add('hidden');
+                    icon.classList.remove('hidden');
+                    icon.innerText = 'description';
+                }
+
                 fetch(`/api/file/metadata/${selectedFileId}`)
                         .then(res => res.json())
                         .then(data => {
-                            // --- A. Thông tin cơ bản ---
                             document.getElementById('detailName').innerText = data.name;
                             document.getElementById('detailSize').innerText = data.size;
 
-                            // Xử lý ảnh Preview
-                            const img = document.getElementById('detailPreview');
-                            const icon = document.getElementById('detailIcon');
-
-                            if (isSelectedImage) {
-                                // Nếu là ảnh -> Load thumbnail
-                                img.src = `/api/file/thumbnail/${selectedFileId}`;
-                                img.classList.remove('hidden');
-                                icon.classList.add('hidden');
-                            } else {
-                                // Nếu là Video/File -> Hiện icon
-                                img.classList.add('hidden');
-                                icon.classList.remove('hidden');
-                                // Tùy chỉnh icon dựa trên loại file
+                            if (!hasThumb)
                                 icon.innerText = data.type.startsWith('video') ? 'movie' : 'description';
-                            }
 
-                            // --- B. Xử lý Metadata chi tiết ---
                             const container = document.getElementById('metaContainer');
-                            container.innerHTML = ''; // Xóa text loading
-
-                            // Hàm tạo dòng hiển thị (Chỉ hiện nếu có giá trị)
+                            container.innerHTML = '';
                             const addRow = (label, value) => {
                                 if (value == null || value === '')
                                     return;
-                                container.innerHTML += `
-                    <div class="flex justify-between items-center text-sm py-1 border-b border-white/5 last:border-0">
-                        <span class="text-[#a79cba]">${label}</span>
-                        <span class="text-white font-medium truncate max-w-[160px]" title="${value}">${value}</span>
-                    </div>`;
+                                container.innerHTML += `<div class="flex justify-between items-center text-sm py-1 border-b border-white/5 last:border-0"><span class="text-[#a79cba]">${label}</span><span class="text-white font-medium truncate max-w-[160px]" title="${value}">${value}</span></div>`;
                             };
 
-                            // 1. Thông tin chung
-                            addRow("Type", data.type); // Mime Type
-                            // Format ngày tạo (bỏ phần giờ phút cho gọn)
-                            const createdDate = data.created ? new Date(data.created).toLocaleDateString() : "";
-                            addRow("Uploaded", createdDate);
+                            addRow("Type", data.type);
+                            addRow("Uploaded", data.created ? new Date(data.created).toLocaleDateString() : "");
 
-                            // 2. Thông tin chuyên sâu (từ bảng media_metadata)
                             if (data.meta && data.meta !== "N/A") {
                                 const m = data.meta;
-
-                                // Kích thước (Chung cho Ảnh & Video)
-                                if (m.width && m.height) {
+                                if (m.width && m.height)
                                     addRow("Dimensions", `${m.width} x ${m.height}`);
-                                }
-
-                                // Dành cho Video
-                                if (m.durationSeconds) {
+                                if (m.durationSeconds)
                                     addRow("Duration", formatDuration(m.durationSeconds));
-                                }
-                                if (m.videoCodec) {
+                                if (m.videoCodec)
                                     addRow("Codec", m.videoCodec.toUpperCase());
-                                }
-                                if (m.frameRate) {
-                                    addRow("Frame Rate", `${Math.round(m.frameRate)} fps`);
-                                }
-
-                                // Dành cho Ảnh (EXIF)
-                                if (m.takenAt) {
-                                    addRow("Taken Date", new Date(m.takenAt).toLocaleDateString());
-                                }
-                                if (m.locationName) {
+                                if (m.takenAt)
+                                    addRow("Taken", new Date(m.takenAt).toLocaleDateString());
+                                if (m.locationName)
                                     addRow("Location", m.locationName);
-                                }
-                                // Nếu có tọa độ GPS
-                                if (m.gpsLat && m.gpsLng) {
-                                    addRow("GPS", `${m.gpsLat.toFixed(4)}, ${m.gpsLng.toFixed(4)}`);
-                                }
                             }
                         })
-                        .catch(err => {
-                            console.error(err);
-                            document.getElementById('metaContainer').innerHTML = '<p class="text-red-400 text-xs">Error loading details</p>';
-                        });
+                        .catch(err => console.error(err));
             }
 
+            // Load Video Durations on Load
             document.addEventListener('DOMContentLoaded', () => {
-                const durationTags = document.querySelectorAll('.video-duration-tag');
-
-                // Hàm helper format giây thành MM:SS (Tái sử dụng)
-                const fmtDuration = (seconds) => {
-                    if (!seconds)
-                        return "";
-                    const min = Math.floor(seconds / 60);
-                    const sec = seconds % 60;
-                    return `${min}:${sec.toString().padStart(2, '0')}`;
-                };
-
-                // Duyệt qua từng thẻ video để lấy duration
-                // (Lưu ý: Với danh sách lớn, nên tối ưu bằng cách gọi 1 API lấy list metadata thay vì gọi từng cái)
-                durationTags.forEach(tag => {
+                document.querySelectorAll('.video-duration-tag').forEach(tag => {
                     const fileId = tag.getAttribute('data-id');
                     if (fileId) {
                         fetch(`/api/file/metadata/${fileId}`)
                                 .then(res => res.json())
                                 .then(data => {
-                                    if (data.meta && data.meta.durationSeconds) {
-                                        tag.innerText = fmtDuration(data.meta.durationSeconds);
-                                    } else {
-                                        tag.parentElement.style.display = 'none'; // Ẩn nếu không có info
-                                    }
-                                })
-                                .catch(() => tag.innerText = "");
+                                    if (data.meta && data.meta.durationSeconds)
+                                        tag.innerText = formatDuration(data.meta.durationSeconds);
+                                    else
+                                        tag.parentElement.style.display = 'none';
+                                }).catch(() => {
+                        });
                     }
                 });
             });
         </script>
+
     </body>
 </html>

@@ -37,6 +37,9 @@ public class ContentSubject {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @OneToMany(mappedBy = "subject", fetch = FetchType.LAZY)
+    private java.util.List<SubjectSocialLink> socialLinks;
+    
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

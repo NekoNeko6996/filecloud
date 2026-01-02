@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -23,15 +24,19 @@ public class SubjectController {
     public String subjectsPage(Model model) {
         List<ContentSubject> subjects = subjectRepository.findAll();
         model.addAttribute("subjects", subjects);
-        return "subjects"; // Trả về file subjects.html
+        return "subjects";
+    }
+    
+    // --- MỚI: Trang Profile (Static Demo) ---
+    @GetMapping("/profile")
+    public String subjectProfilePage() {
+        return "subject-profile";
     }
 
-    // API đơn giản để tạo nhanh Subject (Demo)
+    // API tạo nhanh Subject
     @PostMapping("/create")
     public String createSubject(@RequestParam("name") String name) {
-        ContentSubject subject = ContentSubject.builder()
-                .mainName(name)
-                .build();
+        ContentSubject subject = ContentSubject.builder().mainName(name).build();
         subjectRepository.save(subject);
         return "redirect:/subjects";
     }
