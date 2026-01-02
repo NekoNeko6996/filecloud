@@ -1,0 +1,45 @@
+package com.app.filecloud.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "media_metadata")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class MediaMetadata {
+
+    @Id
+    @Column(name = "file_id")
+    private String fileId; // Khóa chính cũng là FK trỏ tới FileNode
+
+    private Integer width;
+    private Integer height;
+    private Integer orientation;
+    
+    @Column(name = "taken_at")
+    private LocalDateTime takenAt;
+
+    // --- CÁC TRƯỜNG VIDEO (MỚI THÊM) ---
+    @Column(name = "duration_seconds")
+    private Integer durationSeconds;
+
+    @Column(name = "video_codec", length = 20)
+    private String videoCodec;
+
+    @Column(name = "frame_rate")
+    private Double frameRate;
+    // ------------------------------------
+    
+    @Column(name = "gps_lat")
+    private Double gpsLat;
+    
+    @Column(name = "gps_lng")
+    private Double gpsLng;
+    
+    @Column(name = "location_name")
+    private String locationName;
+}

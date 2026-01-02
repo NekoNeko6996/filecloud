@@ -1,7 +1,7 @@
 package com.app.filecloud.controller;
 
 import com.app.filecloud.dto.UserDto;
-import com.app.filecloud.service.UserService;
+import com.app.filecloud.service.impl.UserServiceImpl; // Import Impl để dùng hàm hasOwner hoặc cast từ interface
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -13,15 +13,24 @@ import org.springframework.web.bind.annotation.PostMapping;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final UserService userService;
+    private final UserServiceImpl userService; // Inject trực tiếp Impl hoặc thêm method vào Interface
 
     @GetMapping("/login")
-    public String loginPage() {
+    public String loginPage(Model model) {
+        // Nếu chưa có user nào (Lần chạy đầu tiên) -> Gợi ý sang trang register
+        if (!userService.hasOwner()) {
+            return "redirect:/register";
+        }
         return "login";
     }
 
     @GetMapping("/register")
     public String registerPage(Model model) {
+        // Nếu ĐÃ có chủ sở hữu -> Không cho vào trang đăng ký nữa
+        if (userService.hasOwner()) {
+            return "redirect:/login";
+        }
+        
         model.addAttribute("user", new UserDto());
         return "register";
     }
@@ -32,7 +41,6 @@ public class AuthController {
             userService.registerNewUser(userDto);
             return "redirect:/login?registered=true";
         } catch (RuntimeException e) {
-            // Error
             return "redirect:/register?error=" + e.getMessage();
         }
     }

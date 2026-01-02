@@ -41,8 +41,8 @@
             <div class="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary mb-2">
                 <span class="material-symbols-outlined text-3xl">cloud_circle</span>
             </div>
-            <h1 class="text-3xl font-bold tracking-tight text-white" th:text="#{auth.register.header}">Create Account</h1>
-            <p class="text-slate-400 text-base font-normal" th:text="#{auth.register.subheader}">Start managing your media today</p>
+            <h1 class="text-3xl font-bold tracking-tight text-white" th:text="#{auth.register.header}">System Setup</h1>
+            <p class="text-slate-400 text-base font-normal" th:text="#{auth.register.subheader}">Create the Owner Account to initialize your Vault.</p>
         </div>
 
         <form class="flex flex-col gap-4 w-full" th:action="@{/register}" method="post" th:object="${user}">
