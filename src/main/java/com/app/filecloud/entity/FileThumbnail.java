@@ -2,6 +2,8 @@ package com.app.filecloud.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "file_thumbnails")
@@ -16,6 +18,7 @@ public class FileThumbnail {
     private Long id;
 
     @Column(name = "file_id", nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     private String fileId;
 
     @Enumerated(EnumType.STRING)

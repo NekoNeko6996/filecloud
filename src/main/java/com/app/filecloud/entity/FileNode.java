@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
+import org.springframework.data.domain.Persistable;
 
 @Entity
 @Table(name = "file_nodes")
@@ -13,10 +14,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class FileNode {
+public class FileNode implements Persistable<String> {
 
     @Id
-    @UuidGenerator
+//    @UuidGenerator
     @Column(columnDefinition = "CHAR(36)")
     private String id;
 
@@ -29,6 +30,14 @@ public class FileNode {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Type type; // FILE, FOLDER
+    
+    @Column(name = "subject_mapping_id")
+    private Integer subjectMappingId;
+    
+    @Transient
+    @Builder.Default
+    private boolean isNew = true;
+    
 
     private long size; // Bytes
 
@@ -68,5 +77,15 @@ public class FileNode {
         // Tính ra MB, format 2 số thập phân
         double sizeInMb = this.size / 1048576.0;
         return new DecimalFormat("#.##").format(sizeInMb) + " MB";
+    }
+    
+    public boolean isNew() {
+        return isNew;
+    }
+    
+    @PostLoad
+    @PostPersist
+    void markNotNew() {
+        this.isNew = false;
     }
 }

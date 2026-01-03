@@ -3,6 +3,8 @@ package com.app.filecloud.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "media_metadata")
@@ -14,6 +16,7 @@ public class MediaMetadata {
 
     @Id
     @Column(name = "file_id")
+    @JdbcTypeCode(SqlTypes.CHAR)
     private String fileId; // Khóa chính cũng là FK trỏ tới FileNode
 
     private Integer width;
@@ -42,4 +45,23 @@ public class MediaMetadata {
     
     @Column(name = "location_name")
     private String locationName;
+    
+    
+    @Transient
+    @Builder.Default
+    private boolean isNew = true;
+
+    public String getId() {
+        return fileId;
+    }
+
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostLoad
+    @PostPersist
+    void markNotNew() {
+        this.isNew = false;
+    }
 }

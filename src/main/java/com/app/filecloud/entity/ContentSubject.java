@@ -30,6 +30,9 @@ public class ContentSubject {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+    
+    @Column(name = "storage_path")
+    private String storagePath;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

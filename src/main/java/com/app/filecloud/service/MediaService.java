@@ -11,8 +11,6 @@ import com.drew.metadata.exif.ExifSubIFDDirectory;
 import com.drew.metadata.jpeg.JpegDirectory;
 import com.drew.metadata.png.PngDirectory;
 import com.drew.metadata.webp.WebpDirectory;
-import com.drew.metadata.bmp.BmpHeaderDirectory;
-import com.drew.metadata.gif.GifHeaderDirectory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.bramp.ffmpeg.FFmpeg;
@@ -34,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.ZoneId;
 import java.util.Date;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +48,7 @@ public class MediaService {
     private String rootUploadDir;
 
     @Async
+    @Transactional
     public void processMedia(FileNode fileNode, Path physicalPath) {
         try {
             File file = physicalPath.toFile();
@@ -90,8 +90,7 @@ public class MediaService {
                         .videoCodec(videoStream.codec_name)
                         .frameRate(videoStream.avg_frame_rate.doubleValue())
                         .build();
-
-                metadataRepository.save(meta);
+                metadataRepository.saveAndFlush(meta);
                 log.info("Đã lưu metadata Video: " + fileNode.getName());
 
                 // 2. Tạo Thumbnail từ Video
@@ -224,7 +223,7 @@ public class MediaService {
                         .width(targetSize)
                         .height(targetSize)
                         .build();
-                thumbnailRepository.save(thumb);
+                thumbnailRepository.saveAndFlush(thumb);
             }
         } catch (Exception e) {
             log.error("Lỗi tạo thumbnail " + type + ": " + e.getMessage());

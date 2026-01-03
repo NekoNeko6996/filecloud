@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface FileNodeRepository extends JpaRepository<FileNode, String> {
@@ -15,5 +16,9 @@ public interface FileNodeRepository extends JpaRepository<FileNode, String> {
     
     // Tìm root folder (parent_id is null)
     List<FileNode> findByParentIdIsNullOrderByTypeDescNameAsc();
+    
+    Optional<FileNode> findByRelativePath(String relativePath);
+    
+    Optional<FileNode> findByVolumeIdAndRelativePath(Integer volumeId, String relativePath);
 }
 

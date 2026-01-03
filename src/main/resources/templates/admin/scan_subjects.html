@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html class="dark" lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Scan Subjects', 'settings', ~{::section}, ~{::script})}">
+    <body>
+        <section class="flex-1 flex flex-col relative overflow-y-auto bg-background-dark p-8 scroll-smooth">
+            <div class="max-w-6xl mx-auto w-full">
+                <div class="mb-8">
+                    <h1 class="text-2xl font-bold text-white mb-2">Subject Media Scanner</h1>
+                    <p class="text-gray-400">Scan physical folders (e.g. [Name][Alias]) and map them to Subjects.</p>
+                </div>
+
+                <div class="bg-[#2e2839] p-6 rounded-xl border border-white/5 mb-8">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Root Directory Path</label>
+                    <div class="flex gap-4">
+                        <input type="text" id="rootPath" value="F:/TESTFOLDER" 
+                               class="flex-1 bg-[#1e1926] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary font-mono"
+                               placeholder="E.g: F:/VIDEO">
+                        <button onclick="scanPreview()" class="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2">
+                            <span class="material-symbols-outlined">search</span> Scan
+                        </button>
+                    </div>
+                </div>
+
+                <div id="resultArea" class="hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-white">Found <span id="countFound" class="text-primary">0</span> folders</h3>
+                        <button onclick="executeImport()" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2">
+                            <span class="material-symbols-outlined">save_alt</span> Import Selected
+                        </button>
+                    </div>
+
+                    <div class="bg-[#2e2839] rounded-xl border border-white/5 overflow-hidden">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-[#1e1926] text-xs uppercase font-bold text-gray-400">
+                                <tr>
+                                    <th class="px-6 py-4 w-10">
+                                        <input type="checkbox" onchange="toggleAll(this)" class="rounded bg-gray-700 border-gray-600 text-primary focus:ring-0">
+                                    </th>
+                                    <th class="px-6 py-4">Status</th>
+                                    <th class="px-6 py-4">Folder Name</th>
+                                    <th class="px-6 py-4">Parsed Name</th>
+                                    <th class="px-6 py-4 text-center">Media Files</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scanTableBody" class="divide-y divide-white/5">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <script>
+            let scanResults = [];
+
+            async function scanPreview() {
+                const path = document.getElementById('rootPath').value;
+                const btn = document.querySelector('button[onclick="scanPreview()"]');
+
+                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+                btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Scanning...';
+
+                try {
+                    const res = await fetch('/admin/scan-subjects/preview', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            [csrfHeader]: csrfToken
+                        },
+                        body: JSON.stringify({path: path})
+                    });
+
+                    if (res.ok) {
+                        scanResults = await res.json();
+                        renderTable(scanResults);
+                        document.getElementById('resultArea').classList.remove('hidden');
+                    } else {
+                        alert("Error scanning directory");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Connection error");
+                } finally {
+                    btn.innerHTML = '<span class="material-symbols-outlined">search</span> Scan';
+                }
+            }
+
+            function renderTable(data) {
+                const tbody = document.getElementById('scanTableBody');
+                document.getElementById('countFound').innerText = data.length;
+                tbody.innerHTML = '';
+
+                data.forEach((item, index) => {
+                    const statusBadge = item.existsInDb
+                            ? '<span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs border border-yellow-500/30">Update</span>'
+                            : '<span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs border border-green-500/30">New</span>';
+
+                    const row = `
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="px-6 py-4">
+                                <input type="checkbox" value="${index}" class="item-check rounded bg-gray-700 border-gray-600 text-primary focus:ring-0" checked>
+                            </td>
+                            <td class="px-6 py-4">${statusBadge}</td>
+                            <td class="px-6 py-4 font-mono text-white">${item.folderName}</td>
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-white">${item.parsedMainName}</div>
+                                <div class="text-xs text-gray-500">${item.parsedAliases.join(', ')}</div>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs font-bold">${item.mediaCount}</span>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            }
+
+            function toggleAll(source) {
+                document.querySelectorAll('.item-check').forEach(cb => cb.checked = source.checked);
+            }
+
+            async function executeImport() {
+                const selectedIndices = Array.from(document.querySelectorAll('.item-check:checked')).map(cb => cb.value);
+                if (selectedIndices.length === 0)
+                    return alert("Select at least one folder!");
+
+                const pathsToImport = selectedIndices.map(i => scanResults[i].fullPath);
+                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+                if (!confirm(`Importing ${pathsToImport.length} subjects. This might take a while. Continue?`))
+                    return;
+
+                try {
+                    const res = await fetch('/admin/scan-subjects/execute', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            [csrfHeader]: csrfToken
+                        },
+                        body: JSON.stringify(pathsToImport)
+                    });
+
+                    if (res.ok) {
+                        alert("Import successful!");
+                        window.location.href = "/subjects";
+                    } else {
+                        alert("Import failed. Check logs.");
+                    }
+                } catch (e) {
+                    alert("Error sending request");
+                }
+            }
+        </script>
+
+    </body>
+</html>
