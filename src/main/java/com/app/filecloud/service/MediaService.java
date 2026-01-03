@@ -11,6 +11,7 @@ import com.drew.metadata.exif.ExifSubIFDDirectory;
 import com.drew.metadata.jpeg.JpegDirectory;
 import com.drew.metadata.png.PngDirectory;
 import com.drew.metadata.webp.WebpDirectory;
+import static jakarta.persistence.GenerationType.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.bramp.ffmpeg.FFmpeg;
@@ -27,12 +28,16 @@ import org.springframework.stereotype.Service;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.ZoneId;
 import java.util.Date;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -227,6 +232,37 @@ public class MediaService {
             }
         } catch (Exception e) {
             log.error("Lỗi tạo thumbnail " + type + ": " + e.getMessage());
+        }
+    }
+    
+    // === THÊM HÀM LƯU AVATAR ===
+    public String saveAvatar(MultipartFile file) {
+        try {
+            // 1. Tạo thư mục nếu chưa có
+            Path avatarDir = Paths.get(rootUploadDir, "avatars");
+            if (!Files.exists(avatarDir)) {
+                Files.createDirectories(avatarDir);
+            }
+
+            // 2. Tạo tên file ngẫu nhiên để tránh trùng
+            String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
+            String extension = "";
+            if (originalFilename.contains(".")) {
+                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            }
+            String fileName = java.util.UUID.randomUUID().toString() + extension;
+
+            // 3. Lưu file
+            Path targetLocation = avatarDir.resolve(fileName);
+            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+
+            // 4. Trả về đường dẫn (Quy ước: /uploads/avatars/...)
+            // Lưu ý: Bạn cần cấu hình ResourceHandler để serve đường dẫn này, 
+            // hoặc tạo API đọc file. Ở đây mình sẽ trả về đường dẫn tương đối để Controller xử lý.
+            return "/avatars/" + fileName;
+
+        } catch (IOException e) {
+            throw new RuntimeException("Could not store avatar file. Error: " + e.getMessage());
         }
     }
 }

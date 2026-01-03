@@ -46,6 +46,12 @@ public class MediaMetadata {
     @Column(name = "location_name")
     private String locationName;
     
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "file_id", insertable = false, updatable = false)
+    @ToString.Exclude // Tránh vòng lặp vô tận khi in log
+    @EqualsAndHashCode.Exclude
+    private FileNode fileNode;
+    
     
     @Transient
     @Builder.Default

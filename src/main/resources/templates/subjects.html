@@ -13,11 +13,9 @@
             </header>
 
             <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
-
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                    <div th:each="sub : ${subjects}" class="group relative h-40 rounded-xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20">
-
+                    <div th:each="sub : ${subjects}" class="group relative h-40 rounded-xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20"
+                         th:onclick="'window.location.href = \'' + @{/subjects/{id}(id=${sub.id})} + '\''">
                         <div class="absolute inset-0 z-0">
                             <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover opacity-60 blur-sm scale-110 transition-transform duration-700">
                             <div class="absolute inset-0 bg-gradient-to-r from-[#171022] via-[#171022]/80 to-transparent"></div>

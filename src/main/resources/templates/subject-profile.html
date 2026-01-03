@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{fragments/layout :: layout('Elena Fisher - Profile', 'subjects', ~{::section}, ~{::script})}">
+      th:replace="~{fragments/layout :: layout(${subject.mainName} + ' - Profile', 'subjects', ~{::section}, ~{::script})}">
     <body>
 
         <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
@@ -9,13 +9,15 @@
                 <div class="flex items-center gap-2 text-sm">
                     <a th:href="@{/subjects}" class="text-[#a79cba] hover:text-white transition-colors">Subjects</a>
                     <span class="material-symbols-outlined text-[#a79cba] text-[16px]">chevron_right</span>
-                    <span class="font-bold text-white bg-[#2e2839] px-2 py-1 rounded">Elena Fisher</span>
+                    <span class="font-bold text-white bg-[#2e2839] px-2 py-1 rounded" th:text="${subject.mainName}">Name</span>
                 </div>
+
                 <div class="flex items-center gap-4 flex-1 justify-center max-w-lg mx-4">
                     <div class="relative w-full group">
                         <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#a79cba]">search</span>
-                        <input class="w-full bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-10 py-2 text-sm text-white placeholder-[#a79cba] focus:outline-none focus:ring-2 focus:ring-primary/50" 
-                               placeholder="Search in profile..." type="text"/>
+                        <input id="fileSearchInput" 
+                               class="w-full bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-10 py-2 text-sm text-white placeholder-[#a79cba] focus:outline-none focus:ring-2 focus:ring-primary/50" 
+                               placeholder="Search files..." type="text"/>
                     </div>
                 </div>
             </header>
@@ -26,33 +28,37 @@
                     <div class="flex flex-col md:flex-row gap-8 items-start">
                         <div class="relative shrink-0">
                             <div class="w-32 h-32 md:w-40 md:h-40 rounded-full p-1 bg-gradient-to-tr from-primary to-purple-400">
-                                <div class="w-full h-full rounded-full border-4 border-[#171022] bg-center bg-cover bg-gray-700" 
-                                     style="background-image: url('https://ui-avatars.com/api/?name=Elena+Fisher&background=random&size=256');"></div>
+                                <img th:if="${subject.avatarUrl != null and subject.avatarUrl != ''}" th:src="${subject.avatarUrl}" class="w-full h-full rounded-full border-4 border-[#171022] object-cover">
+                                <div th:unless="${subject.avatarUrl != null and subject.avatarUrl != ''}" class="w-full h-full rounded-full border-4 border-[#171022] bg-gray-700 flex items-center justify-center text-4xl font-bold text-white">
+                                    <span th:text="${#strings.substring(subject.mainName,0,1)}">A</span>
+                                </div>
                             </div>
-                            <div class="absolute bottom-2 right-2 md:bottom-3 md:right-3 size-6 bg-green-500 rounded-full border-4 border-[#171022]" title="Online"></div>
                         </div>
 
                         <div class="flex flex-col flex-1 gap-4 w-full">
                             <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                                 <div>
-                                    <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-white mb-1">Elena Fisher</h1>
-                                    <p class="text-gray-400 text-sm font-medium">aka <span class="text-primary">LensQueen</span>, E-Fish</p>
+                                    <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-white mb-1" th:text="${subject.mainName}">Name</h1>
+                                    <p class="text-gray-400 text-sm font-medium">
+                                        aka <span class="text-primary" th:text="${subject.aliasName1}">Alias 1</span>
+                                        <span th:if="${subject.aliasName2}">, <span th:text="${subject.aliasName2}">Alias 2</span></span>
+                                    </p>
                                 </div>
-                                <button class="flex items-center gap-2 bg-[#2e2839] hover:bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors w-fit border border-white/5">
+                                <button onclick="document.getElementById('editProfileModal').showModal()" 
+                                        class="flex items-center gap-2 bg-[#2e2839] hover:bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors w-fit border border-white/5">
                                     <span class="material-symbols-outlined text-[18px]">edit</span> Edit Profile
                                 </button>
                             </div>
-                            <p class="text-gray-300 max-w-2xl leading-relaxed text-base">
-                                Digital artist and photographer based in Seattle. Capturing urban landscapes and neon nights. Documenting the evolution of city lights through high-resolution captures.
-                            </p>
+
+                            <p class="text-gray-300 max-w-2xl leading-relaxed text-base" th:text="${subject.description ?: 'No description available.'}"></p>
 
                             <div class="flex flex-wrap gap-3 mt-1">
-                                <a class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#2e2839] border border-white/5 hover:border-primary/50 hover:bg-primary/10 transition-all group" href="#">
-                                    <span class="text-gray-400 group-hover:text-[#E1306C] transition-colors material-symbols-outlined text-[18px]">photo_camera</span>
-                                    <span class="text-xs font-medium text-gray-300 group-hover:text-primary">@elenafisher</span>
-                                </a>
-                                <a class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#2e2839] border border-white/5 hover:border-primary/50 hover:bg-primary/10 transition-all group" href="#">
-                                    <span class="text-gray-400 group-hover:text-[#1DA1F2] transition-colors material-symbols-outlined text-[18px]">flutter</span> <span class="text-xs font-medium text-gray-300 group-hover:text-primary">@efish_art</span>
+                                <a th:each="link : ${subject.socialLinks}" th:href="${link.fullUrlOverride != null ? link.fullUrlOverride : link.platform.baseUrl + link.profilePath}" 
+                                   target="_blank"
+                                   class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#2e2839] border border-white/5 hover:border-primary/50 hover:bg-primary/10 transition-all group">
+                                    <img th:if="${link.platform.iconUrl}" th:src="${link.platform.iconUrl}" class="w-4 h-4 rounded-full">
+                                    <span th:unless="${link.platform.iconUrl}" class="material-symbols-outlined text-[18px] text-gray-400">link</span>
+                                    <span class="text-xs font-medium text-gray-300 group-hover:text-primary" th:text="${link.platform.name}">Platform</span>
                                 </a>
                             </div>
                         </div>
@@ -63,84 +69,200 @@
                             <div class="flex items-center gap-2 text-gray-400 text-sm font-medium">
                                 <span class="material-symbols-outlined text-[20px]">folder_open</span> Total Files
                             </div>
-                            <p class="text-2xl font-bold text-white">1,240</p>
+                            <p class="text-2xl font-bold text-white" th:text="${totalFiles}">0</p>
                         </div>
                         <div class="bg-[#2e2839]/40 border border-white/5 p-5 rounded-xl flex flex-col gap-1 hover:border-primary/30 transition-colors">
                             <div class="flex items-center gap-2 text-gray-400 text-sm font-medium">
                                 <span class="material-symbols-outlined text-[20px]">hard_drive</span> Total Size
                             </div>
-                            <p class="text-2xl font-bold text-white"><span class="text-primary">45.2</span> GB</p>
+                            <p class="text-2xl font-bold text-white text-primary" th:text="${totalSize}">0 MB</p>
                         </div>
                         <div class="bg-[#2e2839]/40 border border-white/5 p-5 rounded-xl flex flex-col gap-1 hover:border-primary/30 transition-colors">
                             <div class="flex items-center gap-2 text-gray-400 text-sm font-medium">
                                 <span class="material-symbols-outlined text-[20px]">schedule</span> Last Updated
                             </div>
-                            <p class="text-2xl font-bold text-white">2h ago</p>
+                            <p class="text-2xl font-bold text-white" th:text="${#temporals.format(subject.updatedAt, 'dd/MM/yyyy')}">Date</p>
                         </div>
                     </div>
 
-                    <div class="sticky top-0 z-30 bg-[#171022]/95 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 border-b border-transparent">
-                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <div class="flex items-center w-full sm:w-auto overflow-x-auto no-scrollbar border-b border-white/10">
-                                <button class="px-4 py-3 text-sm font-bold text-primary border-b-2 border-primary whitespace-nowrap">All Files</button>
-                                <button class="px-4 py-3 text-sm font-medium text-gray-400 hover:text-white border-b-2 border-transparent hover:border-gray-600 transition-all whitespace-nowrap">Photos</button>
-                                <button class="px-4 py-3 text-sm font-medium text-gray-400 hover:text-white border-b-2 border-transparent hover:border-gray-600 transition-all whitespace-nowrap">Videos</button>
+                    <div class="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4 pb-20" id="fileGrid">
+                        <a th:each="file : ${files}" target="_blank" 
+                           th:href="${file.isVideo()} ? @{/video/{id}(id=${file.id})} : '#'"
+                           class="file-item break-inside-avoid group relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5 block hover:border-primary/50 transition-colors">
+
+                            <img loading="lazy"
+                                 th:src="@{/api/file/thumbnail/{id}(id=${file.id})}" 
+                                 class="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500 min-h-[150px] bg-black/50"
+                                 onerror="this.src='https://placehold.co/400x300/1e1e1e/FFF?text=No+Thumb'">
+
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4">
+                                <p class="file-name text-white font-medium text-sm truncate" th:text="${file.name}">Name</p>
+                                <p class="text-gray-400 text-xs" th:text="${file.readableSize}">Size</p>
                             </div>
 
-                            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-                                <button class="p-2 rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition-colors" title="Filter"><span class="material-symbols-outlined">tune</span></button>
-                                <button class="p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors shadow-lg shadow-primary/20" style="height: 40px; aspect-ratio: 1/1"><span class="material-symbols-outlined">add</span></button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4 pb-20">
-                        <div class="break-inside-avoid group relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5">
-                            <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=500&q=80" class="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-                                <p class="text-white font-medium text-sm truncate">Retro_Setup.jpg</p>
-                                <p class="text-gray-400 text-xs">JPG • 4MB</p>
-                            </div>
-                            <div class="absolute top-2 right-2 bg-black/50 backdrop-blur rounded px-1.5 py-0.5 text-[10px] font-bold text-white uppercase">RAW</div>
-                        </div>
-
-                        <div class="break-inside-avoid group relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5">
-                            <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=500&q=80" class="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500">
-                            <div class="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                                <div class="size-12 rounded-full bg-white/20 backdrop-blur border border-white/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
-                                    <span class="material-symbols-outlined text-white">play_arrow</span>
+                            <div th:if="${file.isVideo()}">
+                                <div class="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center pointer-events-none">
+                                    <div class="size-12 rounded-full bg-white/20 backdrop-blur border border-white/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
+                                        <span class="material-symbols-outlined text-white">play_arrow</span>
+                                    </div>
+                                </div>
+                                <div th:if="${file.durationFormatted != null}" 
+                                     class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-white font-mono tracking-wide shadow-sm">
+                                    <span th:text="${file.durationFormatted}">04:20</span>
                                 </div>
                             </div>
-                            <div class="absolute bottom-3 right-3 bg-black/70 rounded px-1.5 text-xs text-white font-mono">04:20</div>
-                        </div>
 
-                        <div class="break-inside-avoid group relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5">
-                            <img src="https://images.unsplash.com/photo-1574169208507-84376194878f?auto=format&fit=crop&w=500&q=80" class="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-                                <p class="text-white font-medium text-sm truncate">Blue_Abstract.png</p>
-                            </div>
-                        </div>
+                            <div class="absolute top-2 right-2 bg-black/50 backdrop-blur rounded px-1.5 py-0.5 text-[10px] font-bold text-white uppercase"
+                                 th:text="${#strings.substringAfter(file.name, '.')}">EXT</div>
+                        </a>
+                    </div>
 
-                        <div class="break-inside-avoid group relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5">
-                            <img src="https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?auto=format&fit=crop&w=500&q=80" class="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-                                <p class="text-white font-medium text-sm truncate">Pink_Fluid.jpg</p>
-                            </div>
-                        </div>
-
-                        <div class="break-inside-avoid group relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5">
-                            <img src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=500&q=80" class="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-                                <p class="text-white font-medium text-sm truncate">City_Night.jpg</p>
-                            </div>
-                        </div>
+                    <div th:if="${files.isEmpty()}" class="flex flex-col items-center justify-center py-20 text-gray-500">
+                        <span class="material-symbols-outlined text-6xl mb-4">perm_media</span>
+                        <p>No media files found for this subject.</p>
                     </div>
 
                 </div>
             </div>
+
+            <dialog id="editProfileModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-lg">
+                <form th:action="@{/subjects/update}" method="post" enctype="multipart/form-data" class="flex flex-col gap-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-bold text-xl">Edit Profile</h3>
+                        <button type="button" onclick="this.closest('dialog').close()" class="text-gray-400 hover:text-white">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+
+                    <input type="hidden" name="id" th:value="${subject.id}">
+
+                    <div>
+                        <label class="text-xs text-gray-400 mb-2 block uppercase font-bold tracking-wide">Avatar Image</label>
+
+                        <div class="flex gap-4 items-start">
+                            <div class="shrink-0 w-20 h-20 rounded-full border-2 border-white/20 overflow-hidden bg-black/50">
+                                <img id="avatarPreview" th:src="${subject.avatarUrl}" 
+                                     class="w-full h-full object-cover"
+                                     onerror="this.src='https://ui-avatars.com/api/?name=User&background=random'">
+                            </div>
+
+                            <div class="flex-1">
+                                <div class="flex gap-4 mb-2 text-sm border-b border-white/10 pb-1">
+                                    <label class="cursor-pointer font-bold text-primary hover:text-primary-light">
+                                        <input type="radio" name="avatarType" value="url" checked onchange="toggleAvatarInput('url')" class="hidden peer">
+                                        <span class="peer-checked:underline">Paste Link</span>
+                                    </label>
+                                    <label class="cursor-pointer font-bold text-gray-400 hover:text-white">
+                                        <input type="radio" name="avatarType" value="file" onchange="toggleAvatarInput('file')" class="hidden peer">
+                                        <span class="peer-checked:text-primary peer-checked:underline">Upload File</span>
+                                    </label>
+                                </div>
+
+                                <div id="inputUrlGroup">
+                                    <input type="text" name="avatarUrl" id="avatarUrlInput" th:value="${subject.avatarUrl}" 
+                                           placeholder="https://example.com/image.jpg"
+                                           oninput="updatePreviewFromUrl(this.value)"
+                                           class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary">
+                                </div>
+
+                                <div id="inputFileGroup" class="hidden">
+                                    <input type="file" name="avatarFile" id="avatarFileInput" accept="image/*"
+                                           onchange="updatePreviewFromFile(this)"
+                                           class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/20 file:text-primary hover:file:bg-primary/30">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold tracking-wide">Main Name</label>
+                        <input type="text" name="mainName" th:value="${subject.mainName}" required 
+                               class="w-full bg-black/30 border border-white/10 rounded px-4 py-2 text-white focus:outline-none focus:border-primary">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block uppercase font-bold tracking-wide">Alias 1</label>
+                            <input type="text" name="aliasName1" th:value="${subject.aliasName1}" 
+                                   class="w-full bg-black/30 border border-white/10 rounded px-4 py-2 text-white focus:outline-none focus:border-primary">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block uppercase font-bold tracking-wide">Alias 2</label>
+                            <input type="text" name="aliasName2" th:value="${subject.aliasName2}" 
+                                   class="w-full bg-black/30 border border-white/10 rounded px-4 py-2 text-white focus:outline-none focus:border-primary">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold tracking-wide">Description</label>
+                        <textarea name="description" rows="3" th:text="${subject.description}"
+                                  class="w-full bg-black/30 border border-white/10 rounded px-4 py-2 text-white focus:outline-none focus:border-primary"></textarea>
+                    </div>
+
+                    <div class="flex gap-3 justify-end mt-4 pt-4 border-t border-white/5">
+                        <button type="button" onclick="this.closest('dialog').close()" class="px-4 py-2 text-sm text-gray-400 hover:text-white font-medium">Cancel</button>
+                        <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-primary/20">Save Changes</button>
+                    </div>
+                </form>
+            </dialog>
+
         </section>
 
-        <script></script>
+        <script>
+            // --- JS TÌM KIẾM FILE (CLIENT SIDE) ---
+            document.getElementById('fileSearchInput').addEventListener('keyup', function (e) {
+                const term = e.target.value.toLowerCase();
+                const items = document.querySelectorAll('.file-item');
+
+                items.forEach(item => {
+                    const name = item.querySelector('.file-name').innerText.toLowerCase();
+                    if (name.includes(term)) {
+                        item.style.display = ''; // Hiện lại (theo layout flex/grid)
+                    } else {
+                        item.style.display = 'none'; // Ẩn đi
+                    }
+                });
+            });
+
+            // --- LOGIC AVATAR PREVIEW ---
+            function toggleAvatarInput(type) {
+                const urlGroup = document.getElementById('inputUrlGroup');
+                const fileGroup = document.getElementById('inputFileGroup');
+                const urlInput = document.getElementById('avatarUrlInput');
+                const fileInput = document.getElementById('avatarFileInput');
+
+                if (type === 'url') {
+                    urlGroup.classList.remove('hidden');
+                    fileGroup.classList.add('hidden');
+                    fileInput.value = ''; // Reset file input
+                    updatePreviewFromUrl(urlInput.value); // Khôi phục preview từ URL
+                } else {
+                    urlGroup.classList.add('hidden');
+                    fileGroup.classList.remove('hidden');
+                    // Không reset URL input để user có thể quay lại nếu muốn
+                }
+            }
+
+            function updatePreviewFromUrl(url) {
+                const preview = document.getElementById('avatarPreview');
+                if (url && url.trim() !== '') {
+                    preview.src = url;
+                } else {
+                    preview.src = 'https://ui-avatars.com/api/?name=User&background=random'; // Fallback
+                }
+            }
+
+            function updatePreviewFromFile(input) {
+                const preview = document.getElementById('avatarPreview');
+                if (input.files && input.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        preview.src = e.target.result;
+                    }
+                    reader.readAsDataURL(input.files[0]);
+                }
+            }
+        </script>
 
     </body>
 </html>
