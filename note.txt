@@ -1,3 +1,0 @@
-- phần scan file
-	+ khi check trùng mà chọn new locate thì file đã xóa nhưng db vẫn còn dữ liệu file cũ đó và thum vẫn còn.
-	+ progress chưa chạy, và chỉnh lại để chổ check dup không hiển thị dialog progress mà hiển thị 1 dialog check dup.

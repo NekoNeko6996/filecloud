@@ -2,8 +2,16 @@
 <html class="dark" lang="en" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{fragments/layout :: layout('Scan Subjects', 'settings', ~{::section}, ~{::script})}">
     <body>
-        <section class="flex-1 flex flex-col relative overflow-y-auto bg-background-dark p-8 scroll-smooth">
-            <div class="max-w-6xl mx-auto w-full">
+        <section class="flex-1 flex flex-col relative overflow-y-auto bg-background-dark scroll-smooth">
+            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
+                <a th:href="@{/subjects}">
+                    <h2 class="text-xl font-bold text-white flex items-center">
+                    <span class="material-symbols-outlined">keyboard_backspace</span> Return to Subject
+                </h2>
+                </a>
+            </header>
+
+            <div class="max-w-6xl mx-auto w-full p-8">
                 <div class="mb-8">
                     <h1 class="text-2xl font-bold text-white mb-2">Subject Media Scanner</h1>
                     <p class="text-gray-400">Scan physical folders (e.g. [Name][Alias]) and map them to Subjects.</p>

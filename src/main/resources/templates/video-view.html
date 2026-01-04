@@ -1,20 +1,101 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{fragments/video_layout :: layout(${file.name}, ~{::div.grid-container})}">
+      th:replace="~{fragments/video_layout :: layout(${file.name}, ~{::div.grid-container}, ~{::#page-scripts})}">
     <body>
 
-        <div class="grid-container grid grid-cols-1 lg:grid-cols-4 gap-8 p-5">
-
+        <div class="grid-container grid grid-cols-1 lg:grid-cols-4 gap-8 p-5 pl-10">
             <div class="lg:col-span-3 flex flex-col gap-6">
 
-                <div class="relative group w-full bg-black rounded-xl overflow-hidden shadow-2xl shadow-black/50 ring-1 ring-white/10">
-                    <video id="mainPlayer" class="w-full aspect-video object-contain" controls autoplay>
-                        <source th:src="@{/api/media/stream/{id}(id=${file.id})}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                </div>
+                <div id="videoWrapper" class="relative w-full group select-none isolate">
 
-                <div class="flex flex-col gap-4">
+                    <canvas id="ambientCanvas" 
+                            class="absolute top-1/2 left-1/2 w-full h-full -z-10 transition-opacity duration-1000 opacity-0 pointer-events-none"
+                            style="filter: blur(60px) saturate(200%); transform: translate(-50%, -50%) scale(1.05); mix-blend-mode: screen;"
+                            width="100" height="60"></canvas>
+                    <div class="relative w-full bg-transparent rounded-xl overflow-hidden z-10">
+
+                        <video id="mainPlayer" class="w-full aspect-video object-contain cursor-pointer"
+                               style="-webkit-mask-image: radial-gradient(ellipse at center, black 75%, transparent 100%);
+                               mask-image: radial-gradient(ellipse at center, black 75%, transparent 100%);">
+                            <source th:src="@{/api/media/stream/{id}(id=${file.id})}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
+
+                        <div id="centerPlayBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-16 bg-black/50 rounded-full flex items-center justify-center opacity-0 pointer-events-none transition-transform scale-150 z-20 backdrop-blur-sm ring-1 ring-white/20">
+                            <span class="material-symbols-outlined text-white text-[40px]">play_arrow</span>
+                        </div>
+
+                        <div id="settingsMenu" class="absolute bottom-16 right-4 w-64 bg-surface-dark/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl transform translate-y-4 opacity-0 invisible transition-all duration-200 z-30 overflow-hidden">
+                            <div class="p-2">
+                                <div class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/5 mb-1">Settings</div>
+
+                                <button id="toggleAmbientBtn" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
+                                    <div class="flex items-center gap-3">
+                                        <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">light_mode</span>
+                                        <span class="text-white text-sm font-medium">Ambient Mode</span>
+                                    </div>
+                                    <div class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-600 transition-colors" id="ambientSwitchBg">
+                                        <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform" id="ambientSwitchKnob"></span>
+                                    </div>
+                                </button>
+
+                                <button class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
+                                    <div class="flex items-center gap-3">
+                                        <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">speed</span>
+                                        <span class="text-white text-sm font-medium">Playback Speed</span>
+                                    </div>
+                                    <span class="text-xs text-gray-400">Normal</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="absolute bottom-0 left-0 w-full px-4 pb-4 pt-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col gap-2">
+
+                            <div class="relative h-1.5 w-full bg-white/20 rounded-full cursor-pointer group/progress" id="progressContainer">
+                                <div id="bufferBar" class="absolute top-0 left-0 h-full bg-white/30 rounded-full w-0 transition-all duration-300"></div>
+                                <div id="progressBar" class="absolute top-0 left-0 h-full bg-primary rounded-full w-0 relative">
+                                    <div class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 size-3 bg-white rounded-full scale-0 group-hover/progress:scale-100 transition-transform shadow-md"></div>
+                                </div>
+                                <input type="range" min="0" max="100" value="0" step="0.1" id="seekSlider" 
+                                       class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                            </div>
+
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-4">
+                                    <button id="playBtn" class="text-white hover:text-primary transition-colors">
+                                        <span class="material-symbols-outlined text-[32px]" id="playIcon">play_arrow</span>
+                                    </button>
+
+                                    <div class="flex items-center gap-2 group/vol">
+                                        <button id="muteBtn" class="text-white hover:text-primary transition-colors">
+                                            <span class="material-symbols-outlined text-[24px]" id="volumeIcon">volume_up</span>
+                                        </button>
+                                        <div class="w-0 overflow-hidden group-hover/vol:w-20 transition-all duration-300 flex items-center">
+                                            <input type="range" min="0" max="1" step="0.05" value="1" id="volumeSlider"
+                                                   class="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer accent-primary hover:bg-white/50">
+                                        </div>
+                                    </div>
+
+                                    <div class="text-xs font-medium font-mono text-gray-300">
+                                        <span id="currentTime">00:00</span> / <span id="duration">00:00</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-3">
+                                    <button id="settingsBtn" class="text-white hover:text-primary transition-colors rotate-0 transition-transform duration-300">
+                                        <span class="material-symbols-outlined text-[24px]">settings</span>
+                                    </button>
+                                    <button id="fullscreenBtn" class="text-white hover:text-primary transition-colors">
+                                        <span class="material-symbols-outlined text-[28px]">fullscreen</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-4 mt-7">
                     <h1 class="text-white text-2xl md:text-3xl lg:text-[2rem] font-bold leading-tight tracking-tight" 
                         th:text="${file.name}">Video Title</h1>
 
@@ -84,7 +165,7 @@
 
             <div class="lg:col-span-1 flex flex-col gap-6 relative">
 
-                <div class="sticky top-20 z-10 -mx-4 px-4 md:mx-0 md:px-0 bg-background-dark/95 backdrop-blur py-2 border-b border-white/5 lg:border-none">
+                <div class="-mx-4 px-4 md:mx-0 md:px-0 backdrop-blur py-2 border-b border-white/5 lg:border-none">
                     <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-2">
                         <button class="whitespace-nowrap px-3 py-1.5 bg-white text-black text-sm font-bold rounded-lg transition-colors">All</button>
                         <button class="whitespace-nowrap px-3 py-1.5 bg-surface-dark hover:bg-surface-dark-hover border border-white/5 text-gray-300 hover:text-white text-sm font-medium rounded-lg transition-colors">Related</button>
@@ -126,7 +207,7 @@
                     </div>
                 </div>
 
-                <div class="bg-gradient-to-br from-primary/20 to-surface-dark border border-primary/10 rounded-xl p-4 mt-4">
+                <div class="bg-gradient-to-br from-primary/20 to-surface-dark rounded-xl p-4 mt-4">
                     <div class="flex items-start gap-3">
                         <span class="material-symbols-outlined text-primary text-[32px]">cloud_upload</span>
                         <div>
@@ -139,5 +220,237 @@
             </div>
         </div>
 
-    </body>
+    <th:block id="page-scripts">
+        <script>
+            document.addEventListener("DOMContentLoaded", () => {
+                const video = document.getElementById('mainPlayer');
+                const canvas = document.getElementById('ambientCanvas');
+                const playBtn = document.getElementById('playBtn');
+                const playIcon = document.getElementById('playIcon');
+                const centerPlayBtn = document.getElementById('centerPlayBtn');
+                const seekSlider = document.getElementById('seekSlider');
+                const progressBar = document.getElementById('progressBar');
+                const bufferBar = document.getElementById('bufferBar');
+                const currentTimeElem = document.getElementById('currentTime');
+                const durationElem = document.getElementById('duration');
+                const muteBtn = document.getElementById('muteBtn');
+                const volumeIcon = document.getElementById('volumeIcon');
+                const volumeSlider = document.getElementById('volumeSlider');
+                const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+                // QUAN TRỌNG: Fullscreen cần gọi trên Wrapper để bao gồm cả ánh sáng
+                const videoContainer = document.getElementById('videoWrapper');
+
+                // Settings Elements
+                const settingsBtn = document.getElementById('settingsBtn');
+                const settingsMenu = document.getElementById('settingsMenu');
+                const toggleAmbientBtn = document.getElementById('toggleAmbientBtn');
+                const ambientSwitchBg = document.getElementById('ambientSwitchBg');
+                const ambientSwitchKnob = document.getElementById('ambientSwitchKnob');
+
+                let isAmbientOn = true;
+
+                /* =========================================
+                 1. LOGIC AMBIENT LIGHT (CINEMATIC)
+                 ========================================= */
+                const ctx = canvas.getContext('2d', {alpha: false, desynchronized: true});
+                const FPS_LIMIT = 15;
+                const INTERVAL = 1000 / FPS_LIMIT;
+                let lastDrawTime = 0;
+                let animationFrameId;
+
+                function loop(timestamp) {
+                    if (!video.paused && !video.ended && isAmbientOn) {
+                        const elapsed = timestamp - lastDrawTime;
+                        if (elapsed > INTERVAL) {
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            lastDrawTime = timestamp - (elapsed % INTERVAL);
+                        }
+                        animationFrameId = requestAnimationFrame(loop);
+                    }
+                }
+
+                function startAmbient() {
+                    if (!isAmbientOn)
+                        return;
+                    canvas.classList.remove('opacity-0');
+                    canvas.classList.add('opacity-100');
+                    if (animationFrameId)
+                        cancelAnimationFrame(animationFrameId);
+                    loop(0);
+                }
+
+                function stopAmbient() {
+                    if (animationFrameId)
+                        cancelAnimationFrame(animationFrameId);
+                }
+
+                toggleAmbientBtn.addEventListener('click', () => {
+                    isAmbientOn = !isAmbientOn;
+
+                    if (isAmbientOn) {
+                        ambientSwitchBg.classList.replace('bg-gray-600', 'bg-primary');
+                        ambientSwitchKnob.classList.add('translate-x-5');
+                        ambientSwitchKnob.classList.remove('translate-x-1');
+                        canvas.style.display = 'block';
+                        if (!video.paused)
+                            startAmbient();
+                    } else {
+                        ambientSwitchBg.classList.replace('bg-primary', 'bg-gray-600');
+                        ambientSwitchKnob.classList.remove('translate-x-5');
+                        ambientSwitchKnob.classList.add('translate-x-1');
+                        canvas.style.display = 'none';
+                        stopAmbient();
+                    }
+                });
+
+                /* =========================================
+                 2. LOGIC VIDEO CONTROLS
+                 ========================================= */
+                function formatTime(time) {
+                    const minutes = Math.floor(time / 60);
+                    const seconds = Math.floor(time % 60);
+                    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                }
+
+                function togglePlay() {
+                    if (video.paused || video.ended) {
+                        video.play();
+                    } else {
+                        video.pause();
+                    }
+                }
+
+                function updatePlayButton() {
+                    if (video.paused) {
+                        playIcon.textContent = 'play_arrow';
+                        centerPlayBtn.classList.remove('scale-150', 'opacity-0');
+                        centerPlayBtn.classList.add('scale-100', 'opacity-100');
+                        setTimeout(() => {
+                            centerPlayBtn.classList.add('opacity-0', 'scale-150');
+                        }, 500);
+                        stopAmbient();
+                    } else {
+                        playIcon.textContent = 'pause';
+                        centerPlayBtn.classList.add('opacity-0', 'scale-150');
+                        startAmbient();
+                    }
+                }
+
+                playBtn.addEventListener('click', togglePlay);
+                video.addEventListener('click', togglePlay);
+                video.addEventListener('play', updatePlayButton);
+                video.addEventListener('pause', updatePlayButton);
+
+                video.addEventListener('timeupdate', () => {
+                    const currentTime = video.currentTime;
+                    const duration = video.duration;
+
+                    if (!isNaN(duration)) {
+                        const percentage = (currentTime / duration) * 100;
+                        seekSlider.value = percentage;
+                        progressBar.style.width = `${percentage}%`;
+                        currentTimeElem.textContent = formatTime(currentTime);
+                        durationElem.textContent = formatTime(duration);
+                    }
+                });
+
+                video.addEventListener('progress', () => {
+                    if (video.buffered.length > 0) {
+                        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+                        const duration = video.duration;
+                        if (duration > 0) {
+                            bufferBar.style.width = `${(bufferedEnd / duration) * 100}%`;
+                        }
+                    }
+                });
+
+                seekSlider.addEventListener('input', (e) => {
+                    const time = (video.duration / 100) * e.target.value;
+                    video.currentTime = time;
+                    if (isAmbientOn)
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                });
+
+                video.addEventListener('loadedmetadata', () => {
+                    durationElem.textContent = formatTime(video.duration);
+                });
+
+                volumeSlider.addEventListener('input', (e) => {
+                    video.volume = e.target.value;
+                    if (video.volume === 0) {
+                        video.muted = true;
+                        volumeIcon.textContent = 'volume_off';
+                    } else {
+                        video.muted = false;
+                        volumeIcon.textContent = video.volume < 0.5 ? 'volume_down' : 'volume_up';
+                    }
+                });
+
+                muteBtn.addEventListener('click', () => {
+                    video.muted = !video.muted;
+                    if (video.muted) {
+                        volumeIcon.textContent = 'volume_off';
+                        volumeSlider.value = 0;
+                    } else {
+                        volumeIcon.textContent = 'volume_up';
+                        volumeSlider.value = 1;
+                        video.volume = 1;
+                    }
+                });
+
+                // Fullscreen Logic
+                fullscreenBtn.addEventListener('click', () => {
+                    if (!document.fullscreenElement) {
+                        videoContainer.requestFullscreen().catch(err => {
+                            alert(`Error attempting to enable fullscreen mode: ${err.message}`);
+                        });
+                    } else {
+                        document.exitFullscreen();
+                    }
+                });
+
+                document.addEventListener('fullscreenchange', () => {
+                    if (document.fullscreenElement) {
+                        fullscreenBtn.querySelector('span').textContent = 'close_fullscreen';
+                        // Khi Fullscreen thì thêm background đen để tránh viền trắng (nếu có)
+                        videoContainer.classList.add('bg-black');
+                    } else {
+                        fullscreenBtn.querySelector('span').textContent = 'fullscreen';
+                        videoContainer.classList.remove('bg-black');
+                    }
+                });
+
+                settingsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isHidden = settingsMenu.classList.contains('invisible');
+
+                    if (isHidden) {
+                        settingsMenu.classList.remove('invisible', 'opacity-0', 'translate-y-4');
+                        settingsMenu.classList.add('opacity-100', 'translate-y-0');
+                        settingsBtn.classList.add('rotate-90', 'text-primary');
+                    } else {
+                        closeSettings();
+                    }
+                });
+
+                function closeSettings() {
+                    settingsMenu.classList.add('invisible', 'opacity-0', 'translate-y-4');
+                    settingsMenu.classList.remove('opacity-100', 'translate-y-0');
+                    settingsBtn.classList.remove('rotate-90', 'text-primary');
+                }
+
+                document.addEventListener('click', (e) => {
+                    if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+                        closeSettings();
+                    }
+                });
+
+                // Init
+                ambientSwitchBg.classList.replace('bg-gray-600', 'bg-primary');
+                ambientSwitchKnob.classList.add('translate-x-5');
+            });
+        </script>
+    </th:block>
+</body>
 </html>
