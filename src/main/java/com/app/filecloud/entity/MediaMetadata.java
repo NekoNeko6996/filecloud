@@ -1,5 +1,6 @@
 package com.app.filecloud.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -50,6 +51,7 @@ public class MediaMetadata {
     @JoinColumn(name = "file_id", insertable = false, updatable = false)
     @ToString.Exclude // Tránh vòng lặp vô tận khi in log
     @EqualsAndHashCode.Exclude
+    @JsonIgnore
     private FileNode fileNode;
     
     

@@ -2,6 +2,7 @@ package com.app.filecloud.service;
 
 import com.app.filecloud.dto.DuplicateFileGroup;
 import com.app.filecloud.dto.ImportResolution;
+import com.app.filecloud.dto.ScanProgressDto;
 import com.app.filecloud.dto.SubjectScanResult;
 import com.app.filecloud.entity.*;
 import com.app.filecloud.repository.*;
@@ -34,38 +35,39 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 @Slf4j
 public class MediaScanService {
-
+    
     private final ContentSubjectRepository subjectRepository;
     private final FileNodeRepository fileNodeRepository;
     private final FileSubjectsRepository fileSubjectsRepository; // Repository cho bảng trung gian
     private final UserRepository userRepository;
     
+    private final ScanProgressService progressService;
     private final MediaService mediaService;
-
+    
     private final StorageVolumeService storageVolumeService;
     private final SubjectFolderMappingRepository mappingRepository;
 
     // Regex để bắt nội dung trong ngoặc vuông: [Name] -> Name
     private final Pattern BRACKET_PATTERN = Pattern.compile("\\[(.*?)\\]");
-
+    
     private final ApplicationContext applicationContext;
 
     // 1. HÀM QUÉT PREVIEW
     public List<SubjectScanResult> scanDirectory(String rootPathStr) throws IOException {
         List<SubjectScanResult> results = new ArrayList<>();
         Path rootPath = Paths.get(rootPathStr);
-
+        
         if (!Files.exists(rootPath) || !Files.isDirectory(rootPath)) {
             throw new IllegalArgumentException("Đường dẫn không hợp lệ!");
         }
-
+        
         try (Stream<Path> stream = Files.list(rootPath)) {
             stream.filter(Files::isDirectory).forEach(folder -> {
                 String folderName = folder.getFileName().toString();
 
                 // Phân tích tên: [Name][Alias]
                 List<String> names = parseNames(folderName);
-
+                
                 if (!names.isEmpty()) {
                     String mainName = names.get(0);
                     List<String> aliases = names.subList(1, names.size());
@@ -75,7 +77,7 @@ public class MediaScanService {
 
                     // Kiểm tra DB xem Subject tồn tại chưa
                     boolean exists = subjectRepository.findByMainName(mainName).isPresent();
-
+                    
                     results.add(SubjectScanResult.builder()
                             .folderName(folderName)
                             .fullPath(folder.toAbsolutePath().toString())
@@ -89,7 +91,7 @@ public class MediaScanService {
         }
         return results;
     }
-
+    
     public void importWithMapping(List<String> selectedPaths) {
         String currentUserId = getCurrentUserId();
         if (currentUserId == null) {
@@ -99,7 +101,7 @@ public class MediaScanService {
                     .orElseThrow(() -> new RuntimeException("Lỗi: Database chưa có User nào!"));
         }
         MediaScanService proxy = applicationContext.getBean(MediaScanService.class);
-
+        
         for (String pathStr : selectedPaths) {
             try {
                 // GỌI QUA PROXY -> Transaction sẽ hoạt động
@@ -109,7 +111,7 @@ public class MediaScanService {
             }
         }
     }
-
+    
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processPathWithMapping(String pathStr, String userId) {
         Path folderPath = Paths.get(pathStr);
@@ -143,7 +145,7 @@ public class MediaScanService {
         String root = folderPath.getRoot().toString(); // VD: F:\
         // Cắt bỏ phần gốc ổ đĩa để lấy relative path chuẩn (VD: \VIDEO\Name)
         String relativePath = pathStr.substring(root.length() - 1);
-
+        
         SubjectFolderMapping mapping = mappingRepository
                 .findBySubjectIdAndVolumeIdAndRelativePath(subject.getId(), volume.getId(), relativePath)
                 .orElseGet(() -> mappingRepository.save(SubjectFolderMapping.builder()
@@ -155,7 +157,7 @@ public class MediaScanService {
         // 5. Import File (Transaction đang Active ở đây)
         importFilesToMapping(folderPath, subject, mapping, volume, userId);
     }
-
+    
     private void importFilesToMapping(Path folderPath, ContentSubject subject, SubjectFolderMapping mapping, StorageVolume volume, String userId) {
         try (Stream<Path> stream = Files.list(folderPath)) {
             stream.filter(Files::isRegularFile).forEach(file -> {
@@ -163,7 +165,7 @@ public class MediaScanService {
                     String fileName = file.getFileName().toString();
                     if (isVideoFile(fileName)) { // Gọi hàm helper cũ
                         String fileRelPath = mapping.getRelativePath() + "\\" + fileName;
-
+                        
                         if (fileNodeRepository.findByVolumeIdAndRelativePath(volume.getId(), fileRelPath).isPresent()) {
                             log.info("File trùng lặp!");
                             return;
@@ -187,7 +189,7 @@ public class MediaScanService {
                                 .createdAt(LocalDateTime.now())
                                 // Quan trọng: set isNew = true (đã mặc định trong Entity)
                                 .build();
-
+                        
                         fileNodeRepository.save(fileNode);
 
                         // Link Subject
@@ -196,9 +198,9 @@ public class MediaScanService {
                         link.setSubjectId(subject.getId());
                         link.setIsMainOwner(true);
                         fileSubjectsRepository.save(link);
-
-                        log.info("Đã map file: " + fileName);
                         
+                        log.info("Đã map file: " + fileName);
+
                         // === 2. GỌI XỬ LÝ MEDIA (METADATA & THUMBNAIL) ===
                         // QUAN TRỌNG: Sử dụng TransactionSynchronizationManager để đợi Commit xong mới chạy Async
                         // Nếu gọi trực tiếp mediaService.processMedia() ở đây, luồng Async sẽ chạy trước khi DB có dữ liệu -> Lỗi FK
@@ -237,7 +239,7 @@ public class MediaScanService {
         }
         return matches;
     }
-
+    
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()) {
@@ -250,7 +252,7 @@ public class MediaScanService {
         }
         return null;
     }
-
+    
     private int countMediaFiles(Path folder) {
         try (Stream<Path> s = Files.list(folder)) {
             return (int) s.filter(p -> isVideoFile(p.toString())).count();
@@ -258,52 +260,82 @@ public class MediaScanService {
             return 0;
         }
     }
-
+    
     private boolean isVideoFile(String name) {
         String n = name.toLowerCase();
         return n.endsWith(".mp4") || n.endsWith(".mkv") || n.endsWith(".avi") || n.endsWith(".mov");
     }
     
-    
     public List<DuplicateFileGroup> checkDuplicates(List<String> paths) {
+        log.info("--- START CHECK DUPLICATES ---");
+        log.info("Received the {} path to be checked.", paths.size());
+        
+        String userId = getCurrentUserId();
         List<DuplicateFileGroup> results = new ArrayList<>();
-
+        
         for (String pathStr : paths) {
+            log.info(">> Scanning Folder: {}", pathStr);
+            
             Path folderPath = Paths.get(pathStr);
-            if (!Files.exists(folderPath)) continue;
-
+            if (!Files.exists(folderPath)) {
+                log.warn("   [SKIP] The path does not exist.: {}", pathStr);
+                continue;
+            }
+            
             String folderName = folderPath.getFileName().toString();
             List<String> names = parseNames(folderName);
-            if (names.isEmpty()) continue;
+            if (names.isEmpty()) {
+                log.warn("   [SKIP] Unable to parse Subject name from: {}", folderName);
+                continue;
+            }
             
             String mainName = names.get(0);
+            log.info("   Subject MainName parse: '{}'", mainName);
+            
             Optional<ContentSubject> subjectOpt = subjectRepository.findByMainName(mainName);
-
-            // Nếu Subject chưa tồn tại trong DB -> Chắc chắn không trùng -> Bỏ qua
-            if (subjectOpt.isEmpty()) continue;
-
+            
+            if (subjectOpt.isEmpty()) {
+                // ĐIỂM MÙ SỐ 1: Subject chưa có trong DB (Import mới) -> Bỏ qua check trùng
+                log.warn("   [SKIP] Subject '{}' does not exist in the database -> No duplicates allowed (New Import Logic).", mainName);
+                continue;
+            }
+            
             ContentSubject subject = subjectOpt.get();
+            log.info("   Subject ID found: {}", subject.getId());
+            
             List<DuplicateFileGroup.DuplicatePair> pairs = new ArrayList<>();
-
+            
             try (Stream<Path> stream = Files.list(folderPath)) {
                 List<Path> importFiles = stream.filter(Files::isRegularFile).filter(p -> isVideoFile(p.toString())).toList();
-
-                for (Path importFile : importFiles) {
+                int totalFiles = importFiles.size();
+                log.info("   The {} video file was found in the import folder.", totalFiles);
+                
+                for (int i = 0; i < totalFiles; i++) {
+                    Path importFile = importFiles.get(i);
                     long size = Files.size(importFile);
+                    String fileName = importFile.getFileName().toString();
                     
-                    // Bước 1: Lọc sơ bộ bằng kích thước file (nhanh)
+                    reportProgress(userId, mainName, fileName, "Scanning", 0, i + 1, totalFiles);
+
+                    // Tìm các file trong DB có cùng Subject và cùng Kích thước
                     List<FileNode> candidates = fileNodeRepository.findBySubjectIdAndSize(subject.getId(), size);
                     
-                    if (!candidates.isEmpty()) {
-                        // Bước 2: Tính Hash file mới
-                        String importHash = calculateFileHash(importFile);
+                    if (candidates.isEmpty()) {
+                        // File này kích thước độc nhất -> Chắc chắn không trùng -> Bỏ qua Hash cho nhanh
+                        // log.debug("      File '{}' ({} bytes) không có candidate cùng size -> OK.", fileName, size);
+                    } else {
+                        log.info("      File '{}' ({} bytes) has {} candidate of the same size -> Start Hash...", fileName, size, candidates.size());
+                        
+                        String importHash = calculateFileHashWithProgress(importFile, userId, mainName, i + 1, totalFiles);
                         
                         for (FileNode existing : candidates) {
-                            // Đảm bảo file cũ có hash (nếu chưa có thì tính và update luôn)
                             String existingHash = ensureFileHash(existing);
                             
+                            log.debug("         Compare Hash: Import={} vs Existing={}", importHash, existingHash);
+                            
                             if (importHash.equals(existingHash)) {
-                                // Tìm thấy trùng lặp!
+                                log.warn("         !!! DUPLICATE DETECTED !!! With file: {}", existing.getName());
+                                
                                 pairs.add(DuplicateFileGroup.DuplicatePair.builder()
                                         .existingFileId(existing.getId())
                                         .existingFileName(existing.getName())
@@ -314,29 +346,35 @@ public class MediaScanService {
                                         .newSize(formatSize(size))
                                         .hash(importHash)
                                         .build());
-                                break; // Chỉ cần tìm thấy 1 bản trùng là đủ báo cáo
+                                break; // Tìm thấy 1 bản trùng là đủ
                             }
                         }
                     }
+                    reportProgress(userId, mainName, fileName, "Done", 100, i + 1, totalFiles);
                 }
             } catch (IOException e) {
-                log.error("Error checking duplicates for " + pathStr, e);
+                log.error("Folder reading error " + pathStr, e);
             }
-
+            
             if (!pairs.isEmpty()) {
                 results.add(DuplicateFileGroup.builder()
                         .subjectName(mainName)
                         .pairs(pairs)
                         .build());
+            } else {
+                log.info("   No duplicate files were found in this folder.");
             }
         }
+        
+        log.info("--- END OF CHECK --- Total number of duplicate groups: {}", results.size());
         return results;
     }
     
     public void executeResolvedImport(ImportResolution resolution) {
         String userId = getCurrentUserId();
-        if (userId == null) userId = "c410bace-3f61-43a2-b92e-81e2d6748f8e"; // Cần xử lý kỹ hơn
-
+        if (userId == null) {
+            userId = "c410bace-3f61-43a2-b92e-81e2d6748f8e"; // Cần xử lý kỹ hơn
+        }
         // 1. Xử lý các file có xung đột theo lựa chọn user
         if (resolution.getActions() != null) {
             for (ImportResolution.FileAction action : resolution.getActions()) {
@@ -344,12 +382,12 @@ public class MediaScanService {
                     Path newFile = Paths.get(action.getNewFilePath());
                     
                     switch (action.getAction()) {
-                        case "KEEP_OLD" -> { 
+                        case "KEEP_OLD" -> {
                             // Giữ file cũ -> Xóa file đang import
                             log.info("KEEP_OLD: Deleting " + newFile);
                             Files.deleteIfExists(newFile);
                         }
-
+                        
                         case "KEEP_NEW" -> {
                             // Giữ file mới -> Xóa file cũ trong DB và ổ cứng
                             FileNode existingNode = fileNodeRepository.findById(action.getExistingFileId()).orElse(null);
@@ -368,12 +406,12 @@ public class MediaScanService {
                             // Tuy nhiên, logic import quét theo Folder. 
                             // Nếu file mới vẫn nằm trong folder import, nó sẽ được import tự động ở bước 2.
                         }
-
+                        
                         case "KEEP_BOTH" -> {
                         }
                     }
                     // Không làm gì cả, file mới sẽ được import bình thường
-                                    } catch (Exception e) {
+                } catch (Exception e) {
                     log.error("Error executing action " + action.getAction(), e);
                 }
             }
@@ -404,19 +442,75 @@ public class MediaScanService {
             return "ERROR_HASH_" + System.currentTimeMillis();
         }
     }
+    
+    private String calculateFileHashWithProgress(Path path, String userId, String subjectName, int currentIdx, int totalFiles) {
+        try (FileInputStream fis = new FileInputStream(path.toFile())) {
+            long fileSize = Files.size(path);
+            long totalRead = 0;
+            long lastReportTime = 0;
+            
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            byte[] byteArray = new byte[8192]; // Tăng buffer lên 8KB cho nhanh
+            int bytesCount;
+            
+            while ((bytesCount = fis.read(byteArray)) != -1) {
+                digest.update(byteArray, 0, bytesCount);
+                totalRead += bytesCount;
 
+                // Chỉ gửi update mỗi 1 giây (1000ms) để tránh làm sập Frontend
+                long now = System.currentTimeMillis();
+                if (now - lastReportTime > 1000) {
+                    int percent = (int) ((totalRead * 100) / fileSize);
+                    reportProgress(userId, subjectName, path.getFileName().toString(), "Hashing", percent, currentIdx, totalFiles);
+                    lastReportTime = now;
+                }
+            }
+
+            // Gửi 100% khi xong
+            reportProgress(userId, subjectName, path.getFileName().toString(), "Hashing Completed", 100, currentIdx, totalFiles);
+            
+            byte[] bytes = digest.digest();
+            StringBuilder sb = new StringBuilder();
+            for (byte b : bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("Hash error", e);
+            return "ERROR_HASH_" + System.currentTimeMillis();
+        }
+    }
+    
+    private void reportProgress(String userId, String subject, String fileName, String status, int percent, int current, int total) {
+        try {
+            if (userId == null) {
+                return;
+            }
+            progressService.sendProgress(userId, ScanProgressDto.builder()
+                    .subject(subject)
+                    .fileName(fileName)
+                    .status(status)
+                    .filePercent(percent)
+                    .currentFileIndex(current)
+                    .totalFiles(total)
+                    .build());
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            log.error("Lỗi Hàm SEND PROGRESS!!");
+        }
+    }
+    
     private String ensureFileHash(FileNode fileNode) {
         if (fileNode.getFileHash() != null && !fileNode.getFileHash().isEmpty()) {
             return fileNode.getFileHash();
         }
-        // Nếu DB chưa có hash, tính toán từ file vật lý
         StorageVolume vol = storageVolumeService.getVolumeById(fileNode.getVolumeId());
         if (vol != null) {
             Path path = Paths.get(vol.getMountPoint(), fileNode.getRelativePath());
             if (Files.exists(path)) {
-                String hash = calculateFileHash(path);
+                String hash = calculateFileHash(path); // Dùng bản không progress cho nhanh gọn
                 fileNode.setFileHash(hash);
-                fileNodeRepository.save(fileNode); // Cập nhật ngược lại DB
+                fileNodeRepository.save(fileNode);
                 return hash;
             }
         }
@@ -424,7 +518,9 @@ public class MediaScanService {
     }
     
     private String formatSize(long size) {
-        if (size <= 0) return "0 MB";
+        if (size <= 0) {
+            return "0 MB";
+        }
         double sizeInMb = size / 1048576.0;
         return new DecimalFormat("#.##").format(sizeInMb) + " MB";
     }

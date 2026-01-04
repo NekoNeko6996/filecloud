@@ -13,13 +13,12 @@ public class DuplicateFileGroup {
     @Data
     @Builder
     public static class DuplicatePair {
-        // File đang có trong hệ thống
+        // CHỈ DÙNG STRING, TUYỆT ĐỐI KHÔNG DÙNG: private FileNode existingFile;
         private String existingFileId;
         private String existingFileName;
         private String existingPath;
         private String existingSize;
 
-        // File mới chuẩn bị import
         private String newFilePath;
         private String newFileName;
         private String newSize;

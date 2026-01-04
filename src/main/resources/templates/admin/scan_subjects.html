@@ -42,21 +42,75 @@
                                     <th class="px-6 py-4 text-center">Media Files</th>
                                 </tr>
                             </thead>
-                            <tbody id="scanTableBody" class="divide-y divide-white/5">
-                            </tbody>
+                            <tbody id="scanTableBody" class="divide-y divide-white/5"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
+
+            <dialog id="duplicateModal" class="p-0 rounded-xl shadow-2xl backdrop:bg-black/80 w-full max-w-5xl h-[80vh] bg-transparent">
+                <div class="flex flex-col w-full h-full bg-[#1e1e1e] text-white rounded-xl border border-gray-700 overflow-hidden">
+                    <div class="p-6 border-b border-white/10 flex justify-between items-center shrink-0">
+                        <div>
+                            <h3 class="font-bold text-xl text-yellow-500 flex items-center gap-2">
+                                <span class="material-symbols-outlined">warning</span> Duplicate Files Detected
+                            </h3>
+                            <p class="text-sm text-gray-400 mt-1">Please resolve conflicts before importing.</p>
+                        </div>
+                        <button type="button" onclick="document.getElementById('duplicateModal').close()" class="text-gray-400 hover:text-white">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-6 space-y-8" id="duplicateContent"></div>
+                    <div class="p-6 border-t border-white/10 flex justify-end gap-3 bg-[#171022] shrink-0">
+                        <button onclick="document.getElementById('duplicateModal').close()" class="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel Import</button>
+                        <button onclick="confirmResolvedImport()" class="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-bold shadow-lg">Confirm & Import</button>
+                    </div>
+                </div>
+            </dialog>
+
+            <dialog id="progressModal" class="p-0 rounded-xl shadow-2xl backdrop:bg-black/80 w-full max-w-lg bg-transparent">
+                <div class="flex flex-col w-full bg-[#1e1e1e] text-white rounded-xl border border-gray-700 overflow-hidden p-6 gap-4">
+                    <h3 class="font-bold text-xl flex items-center gap-2">
+                        <span class="material-symbols-outlined animate-spin text-primary">sync</span> 
+                        Processing Media...
+                    </h3>
+                    <div class="bg-[#2e2839] p-4 rounded-lg border border-white/5 space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Subject:</span>
+                            <span class="font-bold text-primary" id="progSubject">Waiting...</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">File:</span>
+                            <span class="text-white truncate max-w-[200px]" id="progFile">...</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Status:</span>
+                            <span class="text-yellow-400 font-mono" id="progStatus">Initializing</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-2 border-t border-white/5 pt-2">
+                            <span>Progress</span>
+                            <span id="progCount">0 / 0</span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden relative">
+                        <div id="progBar" class="bg-primary h-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                        <span id="progPercent" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow">0%</span>
+                    </div>
+                </div>
+            </dialog>
         </section>
 
         <script>
             let scanResults = [];
+            let currentPathsToImport = [];
+            let duplicateGroups = [];
+            let eventSource = null;
 
+            // --- SCAN PREVIEW ---
             async function scanPreview() {
                 const path = document.getElementById('rootPath').value;
                 const btn = document.querySelector('button[onclick="scanPreview()"]');
-
                 const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
                 const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
 
@@ -65,10 +119,7 @@
                 try {
                     const res = await fetch('/admin/scan-subjects/preview', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            [csrfHeader]: csrfToken
-                        },
+                        headers: {'Content-Type': 'application/json', [csrfHeader]: csrfToken},
                         body: JSON.stringify({path: path})
                     });
 
@@ -99,18 +150,14 @@
 
                     const row = `
                         <tr class="hover:bg-white/5 transition-colors">
-                            <td class="px-6 py-4">
-                                <input type="checkbox" value="${index}" class="item-check rounded bg-gray-700 border-gray-600 text-primary focus:ring-0" checked>
-                            </td>
+                            <td class="px-6 py-4"><input type="checkbox" value="${index}" class="item-check rounded bg-gray-700 border-gray-600 text-primary focus:ring-0" checked></td>
                             <td class="px-6 py-4">${statusBadge}</td>
                             <td class="px-6 py-4 font-mono text-white">${item.folderName}</td>
                             <td class="px-6 py-4">
                                 <div class="font-bold text-white">${item.parsedMainName}</div>
                                 <div class="text-xs text-gray-500">${item.parsedAliases.join(', ')}</div>
                             </td>
-                            <td class="px-6 py-4 text-center">
-                                <span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs font-bold">${item.mediaCount}</span>
-                            </td>
+                            <td class="px-6 py-4 text-center"><span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs font-bold">${item.mediaCount}</span></td>
                         </tr>
                     `;
                     tbody.innerHTML += row;
@@ -121,39 +168,233 @@
                 document.querySelectorAll('.item-check').forEach(cb => cb.checked = source.checked);
             }
 
+            // --- HÀM KẾT NỐI SSE (ĐÃ SỬA LỖI TREO) ---
+            function connectProgress() {
+                return new Promise((resolve, reject) => {
+                    if (eventSource)
+                        eventSource.close();
+
+                    console.log("Connecting to SSE...");
+                    eventSource = new EventSource('/admin/scan-subjects/progress');
+
+                    // 1. Timeout an toàn: Nếu 3s không kết nối được -> bỏ qua để chạy tiếp
+                    const timeout = setTimeout(() => {
+                        if (eventSource.readyState !== EventSource.OPEN) {
+                            console.warn("SSE Connection timed out. Proceeding without progress UI.");
+                            eventSource.close();
+                            resolve(); // Resolve để không chặn luồng chính
+                        }
+                    }, 3000);
+
+                    eventSource.onopen = function (e) {
+                        clearTimeout(timeout);
+                        console.log("SSE Connected successfully.");
+                        resolve();
+                    };
+
+                    eventSource.onmessage = function (event) {
+                        const data = JSON.parse(event.data);
+                        updateProgressUI(data);
+                    };
+
+                    eventSource.onerror = function (err) {
+                        clearTimeout(timeout);
+                        console.error("SSE Connection Error/Closed:", err);
+                        eventSource.close();
+                        // QUAN TRỌNG: Phải resolve ngay cả khi lỗi để code phía sau chạy tiếp
+                        resolve();
+                    };
+                });
+            }
+
+            function updateProgressUI(data) {
+                document.getElementById('progSubject').innerText = data.subject || '...';
+                document.getElementById('progFile').innerText = data.fileName || '...';
+                document.getElementById('progStatus').innerText = data.status || 'Processing';
+                document.getElementById('progCount').innerText = `${data.currentFileIndex} / ${data.totalFiles}`;
+                document.getElementById('progBar').style.width = `${data.filePercent}%`;
+                document.getElementById('progPercent').innerText = `${data.filePercent}%`;
+            }
+
+            // --- EXECUTE IMPORT (ĐÃ SỬA LỖI STREAM READ) ---
             async function executeImport() {
                 const selectedIndices = Array.from(document.querySelectorAll('.item-check:checked')).map(cb => cb.value);
                 if (selectedIndices.length === 0)
                     return alert("Select at least one folder!");
 
-                const pathsToImport = selectedIndices.map(i => scanResults[i].fullPath);
-                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
-                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+                currentPathsToImport = selectedIndices.map(i => scanResults[i].fullPath);
 
-                if (!confirm(`Importing ${pathsToImport.length} subjects. This might take a while. Continue?`))
-                    return;
+                document.getElementById('progressModal').showModal();
 
                 try {
-                    const res = await fetch('/admin/scan-subjects/execute', {
+                    await connectProgress();
+
+                    console.log("Sending check-duplicates request...");
+
+                    const res = await fetch('/admin/scan-subjects/check-duplicates', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            [csrfHeader]: csrfToken
-                        },
-                        body: JSON.stringify(pathsToImport)
+                        headers: {'Content-Type': 'application/json', [getHeader()]: getToken()},
+                        body: JSON.stringify(currentPathsToImport)
+                    });
+
+                    // 1. Đọc text response một lần duy nhất
+                    const responseText = await res.text();
+                    console.log("Raw Server Response:", responseText);
+
+                    if (!res.ok) {
+                        throw new Error(`Server Error (${res.status}): ${responseText}`);
+                    }
+
+                    if (!responseText) {
+                        throw new Error("Server returned empty response");
+                    }
+
+                    // 2. Parse JSON thủ công từ text đã đọc
+                    try {
+                        duplicateGroups = JSON.parse(responseText);
+                    } catch (e) {
+                        console.error("JSON Parse Error:", responseText);
+                        throw new Error("Invalid JSON from server.");
+                    }
+
+                    // 3. Xử lý logic (KHÔNG GỌI res.json() NỮA)
+                    document.getElementById('progressModal').close();
+
+                    if (duplicateGroups.length > 0) {
+                        // Trường hợp có trùng lặp -> Hiện bảng so sánh
+                        renderDuplicateModal(duplicateGroups);
+                        document.getElementById('duplicateModal').showModal();
+                    } else {
+                        // Trường hợp không trùng (Mảng rỗng []) -> Hỏi và Import thẳng
+                        if (confirm(`No duplicates found. Import ${currentPathsToImport.length} folders?`)) {
+                            document.getElementById('progressModal').showModal();
+                            callImportApi({safePaths: currentPathsToImport, actions: []});
+                        } else {
+                            if (eventSource)
+                                eventSource.close();
+                        }
+                    }
+
+                } catch (e) {
+                    console.error("Execute Import Error:", e);
+                    document.getElementById('progressModal').close();
+                    if (eventSource)
+                        eventSource.close();
+                    alert("Failed: " + e.message);
+                }
+            }
+
+
+            // --- RENDER & CONFIRM DUPLICATE (Giữ nguyên logic HTML string) ---
+            function renderDuplicateModal(groups) {
+                const container = document.getElementById('duplicateContent');
+                container.innerHTML = '';
+                groups.forEach((group, gIndex) => {
+                    const groupHtml = `
+                        <div class="bg-[#2e2839] rounded-xl border border-white/5 overflow-hidden">
+                            <div class="px-4 py-2 bg-primary/20 border-b border-white/5 font-bold text-primary flex items-center gap-2">
+                                <span class="material-symbols-outlined text-sm">folder</span> ${group.subjectName}
+                            </div>
+                            <table class="w-full text-sm text-left">
+                                <thead class="text-xs text-gray-500 uppercase bg-[#1e1926]">
+                                    <tr>
+                                        <th class="px-4 py-3 w-[40%]">Existing File</th>
+                                        <th class="px-4 py-3 w-[20%] text-center">Action</th>
+                                        <th class="px-4 py-3 w-[40%]">New File</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    ${group.pairs.map((pair, pIndex) => `
+                                        <tr>
+                                            <td class="px-4 py-4 align-top">
+                                                <div class="text-white font-medium break-all">${pair.existingFileName}</div>
+                                                <div class="text-xs text-gray-500 font-mono mt-1">${pair.existingPath}</div>
+                                                <div class="text-xs text-gray-400 mt-1">Size: ${pair.existingSize}</div>
+                                            </td>
+                                            <td class="px-4 py-4 align-top">
+                                                <div class="flex flex-col gap-2">
+                                                    <label class="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-white/5 transition-colors border border-transparent has-[:checked]:border-red-500/50 has-[:checked]:bg-red-500/10">
+                                                        <input type="radio" name="action_${gIndex}_${pIndex}" value="KEEP_OLD" class="text-red-500 focus:ring-0" checked>
+                                                        <div><div class="font-bold text-red-400 text-xs">Keep Old</div></div>
+                                                    </label>
+                                                    <label class="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-white/5 transition-colors border border-transparent has-[:checked]:border-green-500/50 has-[:checked]:bg-green-500/10">
+                                                        <input type="radio" name="action_${gIndex}_${pIndex}" value="KEEP_NEW" class="text-green-500 focus:ring-0">
+                                                        <div><div class="font-bold text-green-400 text-xs">Keep New</div></div>
+                                                    </label>
+                                                    <label class="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-white/5 transition-colors border border-transparent has-[:checked]:border-blue-500/50 has-[:checked]:bg-blue-500/10">
+                                                        <input type="radio" name="action_${gIndex}_${pIndex}" value="KEEP_BOTH" class="text-blue-500 focus:ring-0">
+                                                        <div><div class="font-bold text-blue-400 text-xs">Keep Both</div></div>
+                                                    </label>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4 align-top">
+                                                <div class="text-white font-medium break-all">${pair.newFileName}</div>
+                                                <div class="text-xs text-green-500 font-mono mt-1">New Location</div>
+                                                <div class="text-xs text-gray-400 mt-1">Size: ${pair.newSize}</div>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                    container.innerHTML += groupHtml;
+                });
+            }
+
+            async function confirmResolvedImport() {
+                const actions = [];
+                duplicateGroups.forEach((group, gIndex) => {
+                    group.pairs.forEach((pair, pIndex) => {
+                        const selected = document.querySelector(`input[name="action_${gIndex}_${pIndex}"]:checked`).value;
+                        actions.push({
+                            action: selected,
+                            existingFileId: pair.existingFileId,
+                            newFilePath: pair.newFilePath
+                        });
+                    });
+                });
+
+                document.getElementById('duplicateModal').close();
+                document.getElementById('progressModal').showModal(); // Hiện lại progress cho bước execute
+
+                await callImportApi({
+                    safePaths: currentPathsToImport,
+                    actions: actions
+                });
+            }
+
+            async function callImportApi(payload) {
+                try {
+                    const res = await fetch('/admin/scan-subjects/execute-resolved', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', [getHeader()]: getToken()},
+                        body: JSON.stringify(payload)
                     });
 
                     if (res.ok) {
+                        document.getElementById('progressModal').close();
+                        if (eventSource)
+                            eventSource.close();
                         alert("Import successful!");
                         window.location.href = "/subjects";
                     } else {
-                        alert("Import failed. Check logs.");
+                        document.getElementById('progressModal').close();
+                        alert("Import failed. Check server logs.");
                     }
                 } catch (e) {
-                    alert("Error sending request");
+                    console.error(e);
+                    document.getElementById('progressModal').close();
+                    alert("Error calling import API");
                 }
             }
-        </script>
 
+            function getToken() {
+                return document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            }
+            function getHeader() {
+                return document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+            }
+        </script>
     </body>
 </html>

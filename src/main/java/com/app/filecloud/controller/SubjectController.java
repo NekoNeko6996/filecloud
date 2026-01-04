@@ -4,7 +4,10 @@ import com.app.filecloud.entity.ContentSubject;
 import com.app.filecloud.entity.FileNode;
 import com.app.filecloud.repository.ContentSubjectRepository;
 import com.app.filecloud.repository.FileNodeRepository;
+import com.app.filecloud.repository.UserRepository;
+import com.app.filecloud.service.MediaScanService;
 import com.app.filecloud.service.MediaService;
+import com.app.filecloud.service.ScanProgressService;
 import java.text.DecimalFormat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -27,6 +30,9 @@ public class SubjectController {
     private final ContentSubjectRepository subjectRepository;
     private final FileNodeRepository fileNodeRepository;
     private final MediaService mediaService;
+    private final MediaScanService mediaScanService;
+    private final ScanProgressService progressService;
+    private final UserRepository userRepository;
 
     @GetMapping
     public String subjectsPage(Model model) {
