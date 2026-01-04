@@ -44,10 +44,17 @@
                                         <span th:if="${subject.aliasName2}">, <span th:text="${subject.aliasName2}">Alias 2</span></span>
                                     </p>
                                 </div>
-                                <button onclick="document.getElementById('editProfileModal').showModal()" 
-                                        class="flex items-center gap-2 bg-[#2e2839] hover:bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors w-fit border border-white/5">
-                                    <span class="material-symbols-outlined text-[18px]">edit</span> Edit Profile
-                                </button>
+
+                                <div class="flex items-center gap-2">
+                                    <button onclick="openUploadModal()" 
+                                            class="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors w-fit shadow-lg shadow-primary/20">
+                                        <span class="material-symbols-outlined text-[20px]">cloud_upload</span> Upload Media
+                                    </button>
+                                    <button onclick="document.getElementById('editProfileModal').showModal()" 
+                                            class="flex items-center gap-2 bg-[#2e2839] hover:bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors w-fit border border-white/5">
+                                        <span class="material-symbols-outlined text-[18px]">edit</span> Edit Profile
+                                    </button>
+                                </div>
                             </div>
 
                             <p class="text-gray-300 max-w-2xl leading-relaxed text-base" th:text="${subject.description ?: 'No description available.'}"></p>
@@ -206,6 +213,106 @@
                 </form>
             </dialog>
 
+
+            <dialog id="uploadModal" class="bg-[#1e1e1e] text-white p-0 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-6xl h-[85vh]">
+                <div class="flex flex-col h-full">
+                    <div class="px-6 py-4 border-b border-white/10 flex justify-between items-center bg-[#2e2839]">
+                        <h3 class="font-bold text-xl flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">cloud_upload</span> Upload Manager
+                        </h3>
+                        <button onclick="document.getElementById('uploadModal').close()" class="text-gray-400 hover:text-white">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+
+                    <div class="flex flex-1 overflow-hidden">
+
+                        <div class="w-1/3 border-r border-white/10 flex flex-col bg-[#171022]">
+                            <div class="p-4 border-b border-white/5">
+                                <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">Destination Folders</h4>
+                                <p class="text-xs text-gray-500">Select a folder to check info or assign files.</p>
+                            </div>
+
+                            <div class="flex-1 overflow-y-auto p-2 space-y-2">
+                                <div th:each="map, iter : ${mappings}" 
+                                     th:onclick="'selectTargetFolder(' + ${map.id} + ', ' + ${map.volume.id} + ', this)'"
+                                     th:data-id="${map.id}"
+                                     th:classappend="${iter.index == 0} ? 'bg-primary/20 border-primary/50' : 'border-white/5 hover:bg-white/5'"
+                                     class="folder-card cursor-pointer p-3 rounded-lg border transition-all relative group">
+
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex items-center gap-3 overflow-hidden">
+                                            <span class="material-symbols-outlined text-yellow-500 text-2xl">folder</span>
+                                            <div class="min-w-0">
+                                                <div class="text-sm font-bold text-white truncate" th:text="${map.relativePath}">Path</div>
+                                                <div class="text-xs text-gray-400 flex items-center gap-1">
+                                                    <span class="material-symbols-outlined text-[10px]">hard_drive</span>
+                                                    <span th:text="${map.volume.label}">Volume</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div th:id="'vol-info-' + ${map.id}" class="mt-3 text-xs bg-black/30 p-2 rounded hidden">
+                                        <div class="flex justify-between mb-1">
+                                            <span class="text-gray-400">Storage</span>
+                                            <span class="text-white font-bold val-free">--</span>
+                                        </div>
+                                        <div class="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                                            <div class="bg-green-500 h-full w-0 transition-all duration-500 val-bar"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-4 border-t border-white/10 bg-[#1e1926]">
+                                <button onclick="checkCurrentCapacity()" class="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white py-2 rounded-lg text-sm font-medium transition-colors mb-2">
+                                    <span class="material-symbols-outlined text-[16px]">sync</span> Check Disk Space
+                                </button>
+                                <button onclick="assignSelectedToCurrent()" class="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white py-2 rounded-lg text-sm font-bold shadow-lg">
+                                    <span class="material-symbols-outlined text-[18px]">drive_file_move</span> Assign Checkbox to This
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="w-2/3 flex flex-col bg-[#1e1e1e]">
+                            <div id="dropZone" class="m-4 border-2 border-dashed border-white/20 rounded-xl bg-white/5 flex flex-col items-center justify-center py-8 transition-colors hover:border-primary/50 hover:bg-primary/5 cursor-pointer relative">
+                                <input type="file" id="fileInput" multiple class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleFiles(this.files)">
+                                <span class="material-symbols-outlined text-4xl text-gray-400 mb-2">cloud_upload</span>
+                                <p class="text-gray-300 font-medium">Drag & Drop files here or <span class="text-primary">Browse</span></p>
+                                <p class="text-xs text-gray-500 mt-1">Supports Video & Images</p>
+                            </div>
+
+                            <div class="px-6 pb-2 flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-wide border-b border-white/5">
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" onchange="toggleAllUpload(this)" class="rounded bg-gray-700 border-gray-600 text-primary focus:ring-0">
+                                    <span>File Name</span>
+                                </div>
+                                <div class="flex gap-12 pr-12">
+                                    <span>Destination</span>
+                                    <span>Size</span>
+                                </div>
+                            </div>
+
+                            <div class="flex-1 overflow-y-auto px-4 py-2 space-y-2" id="uploadFileList">
+                                <div id="emptyState" class="text-center py-10 text-gray-500">
+                                    No files selected.
+                                </div>
+                            </div>
+
+                            <div class="p-4 border-t border-white/10 bg-[#2e2839] flex justify-between items-center">
+                                <div class="text-sm text-gray-400">
+                                    Total: <span class="text-white font-bold" id="totalFilesCount">0</span> files
+                                    (<span id="totalUploadSize">0 MB</span>)
+                                </div>
+                                <button onclick="startUpload()" id="btnStartUpload" disabled class="bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2.5 rounded-lg font-bold shadow-lg flex items-center gap-2">
+                                    <span class="material-symbols-outlined">upload</span> Start Upload
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </dialog>
         </section>
 
         <script>
@@ -263,6 +370,234 @@
                 }
             }
         </script>
+        <script th:inline="javascript">
+            // --- DATA ---
+            let uploadQueue = []; // Mảng chứa { file: FileObj, mappingId: int, mappingPath: string }
+            let activeMappingId = /*[[${mappings.isEmpty() ? null : mappings[0].id}]]*/ null;
+            let activeVolumeId = /*[[${mappings.isEmpty() ? null : mappings[0].volume.id}]]*/ null;
+            const mappingsData = /*[[${mappings}]]*/ []; // Dữ liệu mapping từ server
 
+            // --- UI FUNCTIONS ---
+            function openUploadModal() {
+                if (!activeMappingId && mappingsData.length > 0) {
+                    // Select first by default
+                    const first = document.querySelector('.folder-card');
+                    if (first)
+                        selectTargetFolder(mappingsData[0].id, mappingsData[0].volume.id, first);
+                }
+                document.getElementById('uploadModal').showModal();
+            }
+
+            function selectTargetFolder(mapId, volId, el) {
+                activeMappingId = mapId;
+                activeVolumeId = volId;
+
+                // Update UI style
+                document.querySelectorAll('.folder-card').forEach(c => {
+                    c.classList.remove('bg-primary/20', 'border-primary/50');
+                    c.classList.add('border-white/5', 'hover:bg-white/5');
+                });
+                el.classList.remove('border-white/5', 'hover:bg-white/5');
+                el.classList.add('bg-primary/20', 'border-primary/50');
+            }
+
+            function checkCurrentCapacity() {
+                if (!activeVolumeId)
+                    return;
+                const btn = event.currentTarget;
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[16px]">sync</span> Checking...';
+
+                fetch(`/subjects/check-capacity/${activeVolumeId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            const infoBox = document.getElementById(`vol-info-${activeMappingId}`);
+                            if (infoBox) {
+                                infoBox.classList.remove('hidden');
+                                infoBox.querySelector('.val-free').innerText = `${data.free} / ${data.total} Free`;
+                                infoBox.querySelector('.val-bar').style.width = `${100 - data.percent}%`; // % used
+
+                                // Color logic
+                                const bar = infoBox.querySelector('.val-bar');
+                                if (data.percent > 90)
+                                    bar.className = 'bg-red-500 h-full transition-all duration-500 val-bar';
+                                else if (data.percent > 70)
+                                    bar.className = 'bg-yellow-500 h-full transition-all duration-500 val-bar';
+                                else
+                                    bar.className = 'bg-green-500 h-full transition-all duration-500 val-bar';
+                            }
+                        })
+                        .finally(() => btn.innerHTML = originalHtml);
+            }
+
+            // --- FILE HANDLING ---
+            function handleFiles(files) {
+                if (!activeMappingId)
+                    return alert("Please create/import a folder mapping first!");
+
+                // Mặc định gán vào activeMappingId hoặc mapping đầu tiên
+                const defaultMap = mappingsData.find(m => m.id === activeMappingId) || mappingsData[0];
+
+                Array.from(files).forEach(file => {
+                    uploadQueue.push({
+                        file: file,
+                        mappingId: defaultMap.id,
+                        mappingPath: defaultMap.relativePath,
+                        status: 'pending', // pending, uploading, done, error
+                        selected: false
+                    });
+                });
+                renderFileList();
+            }
+
+            function renderFileList() {
+                const list = document.getElementById('uploadFileList');
+                const btn = document.getElementById('btnStartUpload');
+
+                // TRƯỜNG HỢP DANH SÁCH RỖNG
+                if (uploadQueue.length === 0) {
+                    // Tự tạo lại nội dung Empty State bằng HTML string
+                    list.innerHTML = `
+                        <div id="emptyState" class="text-center py-10 text-gray-500">
+                            No files selected.
+                        </div>`;
+
+                    btn.disabled = true;
+                    updateStats();
+                    return;
+                }
+
+                // TRƯỜNG HỢP CÓ FILE
+                btn.disabled = false;
+
+                // Render danh sách file
+                list.innerHTML = uploadQueue.map((item, index) => `
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5 hover:border-primary/30 group">
+                        <div class="flex items-center gap-3 overflow-hidden flex-1">
+                            <input type="checkbox" onchange="toggleFileSelection(${index}, this)" class="file-check rounded bg-gray-700 border-gray-600 text-primary focus:ring-0" ${item.selected ? 'checked' : ''}>
+                            <div class="w-8 h-8 rounded bg-black/50 flex items-center justify-center text-xs font-bold text-gray-400">
+                                ${item.file.name.split('.').pop().toUpperCase()}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-sm text-white font-medium truncate">${item.file.name}</p>
+                                <p class="text-xs ${item.status === 'error' ? 'text-red-400' : (item.status === 'done' ? 'text-green-400' : 'text-gray-500')}">
+                                    ${item.status === 'pending' ? 'Ready' : item.status}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex gap-8 items-center pl-4">
+                            <span class="text-xs bg-primary/20 text-primary px-2 py-1 rounded border border-primary/20 font-mono truncate max-w-[150px]" title="${item.mappingPath}">
+                                ${item.mappingPath}
+                            </span>
+                            <span class="text-xs text-gray-400 w-16 text-right">${(item.file.size / 1024 / 1024).toFixed(2)} MB</span>
+                            <button onclick="removeFile(${index})" class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span class="material-symbols-outlined">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                updateStats();
+            }
+
+            function toggleFileSelection(index, checkbox) {
+                uploadQueue[index].selected = checkbox.checked;
+            }
+
+            function toggleAllUpload(source) {
+                uploadQueue.forEach(item => item.selected = source.checked);
+                renderFileList();
+            }
+
+            function removeFile(index) {
+                uploadQueue.splice(index, 1);
+                renderFileList();
+            }
+
+            function updateStats() {
+                document.getElementById('totalFilesCount').innerText = uploadQueue.length;
+                const totalSize = uploadQueue.reduce((acc, item) => acc + item.file.size, 0);
+                document.getElementById('totalUploadSize').innerText = (totalSize / 1024 / 1024).toFixed(2) + " MB";
+            }
+
+            // --- LOGIC GÁN FOLDER ĐÍCH (Yêu cầu của bạn) ---
+            function assignSelectedToCurrent() {
+                if (!activeMappingId)
+                    return alert("Select a target folder on the left first.");
+
+                const targetMap = mappingsData.find(m => m.id === activeMappingId);
+                let count = 0;
+
+                uploadQueue.forEach(item => {
+                    if (item.selected && item.status === 'pending') {
+                        item.mappingId = targetMap.id;
+                        item.mappingPath = targetMap.relativePath;
+                        item.selected = false; // Bỏ check sau khi gán
+                        count++;
+                    }
+                });
+
+                if (count > 0) {
+                    renderFileList();
+                    // Reset checkbox header
+                    document.querySelector('input[onchange="toggleAllUpload(this)"]').checked = false;
+                } else {
+                    alert("No files selected (or files already uploaded). Check the boxes next to files first.");
+                }
+            }
+
+            // --- UPLOAD EXECUTION ---
+            async function startUpload() {
+                const btn = document.getElementById('btnStartUpload');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Uploading...';
+
+                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+                for (let i = 0; i < uploadQueue.length; i++) {
+                    const item = uploadQueue[i];
+                    if (item.status !== 'pending')
+                        continue;
+
+                    item.status = 'Uploading...';
+                    renderFileList(); // Update status text
+
+                    const formData = new FormData();
+                    formData.append("file", item.file);
+                    formData.append("mappingId", item.mappingId);
+
+                    try {
+                        const res = await fetch('/subjects/upload-media', {
+                            method: 'POST',
+                            headers: {[csrfHeader]: csrfToken},
+                            body: formData
+                        });
+
+                        if (res.ok) {
+                            item.status = 'done';
+                        } else {
+                            const txt = await res.text();
+                            item.status = 'error';
+                            console.error(txt);
+                        }
+                    } catch (e) {
+                        item.status = 'error';
+                        console.error(e);
+                    }
+                    renderFileList(); // Refresh UI
+                }
+
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined">check</span> Done';
+                setTimeout(() => {
+                    btn.innerHTML = '<span class="material-symbols-outlined">upload</span> Start Upload';
+                    // Reload page to show new files? Or just clear list?
+                    if (confirm("Upload completed. Reload page to see new files?")) {
+                        window.location.reload();
+                    }
+                }, 1000);
+            }
+        </script>
     </body>
 </html>

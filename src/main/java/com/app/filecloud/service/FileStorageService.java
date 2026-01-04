@@ -1,7 +1,12 @@
 package com.app.filecloud.service;
 
 import com.app.filecloud.entity.FileNode;
+import com.app.filecloud.entity.FileSubject;
+import com.app.filecloud.entity.StorageVolume;
+import com.app.filecloud.entity.SubjectFolderMapping;
 import com.app.filecloud.repository.FileNodeRepository;
+import com.app.filecloud.repository.FileSubjectsRepository;
+import com.app.filecloud.repository.SubjectFolderMappingRepository;
 import com.app.filecloud.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +30,10 @@ public class FileStorageService {
     private final FileNodeRepository fileNodeRepository;
     private final UserRepository userRepository;
     private final MediaService mediaService;
+
+    private final SubjectFolderMappingRepository mappingRepository;
+    private final FileSubjectsRepository fileSubjectsRepository;
+    private final StorageVolumeService storageVolumeService;
 
     @Value("${app.storage.root:uploads}")
     private String rootUploadDir;
@@ -141,8 +150,70 @@ public class FileStorageService {
                 .build();
 
         fileNodeRepository.save(fileNode);
-        
+
         FileNode savedNode = fileNodeRepository.save(fileNode);
         mediaService.processMedia(savedNode, targetPath);
+    }
+
+    public void uploadFileToMapping(MultipartFile file, Integer mappingId, String userId) throws IOException {
+        // 1. Lấy thông tin Mapping
+        SubjectFolderMapping mapping = mappingRepository.findById(mappingId)
+                .orElseThrow(() -> new IllegalArgumentException("Mapping not found"));
+
+        StorageVolume volume = mapping.getVolume();
+
+        // 2. Xây dựng đường dẫn vật lý: Volume MountPoint + Relative Path
+        Path folderPath = Paths.get(volume.getMountPoint(), mapping.getRelativePath());
+        if (!Files.exists(folderPath)) {
+            Files.createDirectories(folderPath);
+        }
+
+        // 3. Xử lý tên file (tránh trùng)
+        String originalName = file.getOriginalFilename();
+        String storedFileName = originalName;
+        Path targetPath = folderPath.resolve(storedFileName);
+
+        if (Files.exists(targetPath)) {
+            String nameWithoutExt = originalName.contains(".") ? originalName.substring(0, originalName.lastIndexOf('.')) : originalName;
+            String ext = originalName.contains(".") ? originalName.substring(originalName.lastIndexOf('.')) : "";
+            storedFileName = nameWithoutExt + "_" + System.currentTimeMillis() + ext;
+            targetPath = folderPath.resolve(storedFileName);
+        }
+
+        // 4. Lưu file vật lý
+        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+        // 5. Lưu FileNode vào DB
+        // Tính lại relative path chuẩn để lưu DB (Bắt đầu bằng \)
+        String dbRelativePath = mapping.getRelativePath() + File.separator + storedFileName;
+        if (!dbRelativePath.startsWith(File.separator)) {
+            dbRelativePath = File.separator + dbRelativePath;
+        }
+
+        FileNode fileNode = FileNode.builder()
+                .id(java.util.UUID.randomUUID().toString())
+                .name(storedFileName)
+                .type(FileNode.Type.FILE)
+                .size(file.getSize())
+                .mimeType(file.getContentType())
+                .volumeId(volume.getId())
+                .subjectMappingId(mapping.getId())
+                .relativePath(dbRelativePath)
+                .ownerId(userId)
+                .createdAt(java.time.LocalDateTime.now())
+                .isNew(true)
+                .build();
+
+        fileNodeRepository.save(fileNode);
+
+        // 6. Link với Subject (Bảng trung gian)
+        FileSubject link = new FileSubject();
+        link.setFileId(fileNode.getId());
+        link.setSubjectId(mapping.getSubject().getId());
+        link.setIsMainOwner(true);
+        fileSubjectsRepository.save(link);
+
+        // 7. Xử lý Media Async (Thumbnail, Metadata)
+        mediaService.processMedia(fileNode, targetPath);
     }
 }
