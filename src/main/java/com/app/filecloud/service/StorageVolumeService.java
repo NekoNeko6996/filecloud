@@ -150,4 +150,9 @@ public class StorageVolumeService {
                     return volumeRepository.findByMountPoint(mountPoint).orElse(null);
                 });
     }
+    
+    public StorageVolume getVolumeById(Integer id) {
+        if (id == null) return null;
+        return volumeRepository.findById(id).orElse(null);
+    }
 }

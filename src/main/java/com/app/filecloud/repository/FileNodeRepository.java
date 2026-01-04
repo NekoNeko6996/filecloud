@@ -24,5 +24,8 @@ public interface FileNodeRepository extends JpaRepository<FileNode, String> {
     
     @Query("SELECT f FROM FileNode f JOIN FileSubject fs ON f.id = fs.fileId WHERE fs.subjectId = :subjectId ORDER BY f.createdAt DESC")
     List<FileNode> findBySubjectId(Integer subjectId);
+    
+    @Query("SELECT f FROM FileNode f JOIN FileSubject fs ON f.id = fs.fileId WHERE fs.subjectId = :subjectId AND f.size = :size")
+    List<FileNode> findBySubjectIdAndSize(Integer subjectId, Long size);
 }
 

@@ -1,8 +1,11 @@
 package com.app.filecloud.service;
 
+import com.app.filecloud.dto.DuplicateFileGroup;
+import com.app.filecloud.dto.ImportResolution;
 import com.app.filecloud.dto.SubjectScanResult;
 import com.app.filecloud.entity.*;
 import com.app.filecloud.repository.*;
+import java.io.FileInputStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -10,9 +13,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.security.MessageDigest;
+import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -162,6 +168,8 @@ public class MediaScanService {
                             log.info("File trùng lặp!");
                             return;
                         }
+                        
+                        String hash = calculateFileHash(file);
 
                         // === TẠO FILE NODE MỚI ===
                         // Nhờ implement Persistable, lệnh save() sẽ là INSERT thẳng
@@ -175,6 +183,7 @@ public class MediaScanService {
                                 .subjectMappingId(mapping.getId())
                                 .relativePath(fileRelPath)
                                 .ownerId(userId)
+                                .fileHash(hash)
                                 .createdAt(LocalDateTime.now())
                                 // Quan trọng: set isNew = true (đã mặc định trong Entity)
                                 .build();
@@ -253,5 +262,170 @@ public class MediaScanService {
     private boolean isVideoFile(String name) {
         String n = name.toLowerCase();
         return n.endsWith(".mp4") || n.endsWith(".mkv") || n.endsWith(".avi") || n.endsWith(".mov");
+    }
+    
+    
+    public List<DuplicateFileGroup> checkDuplicates(List<String> paths) {
+        List<DuplicateFileGroup> results = new ArrayList<>();
+
+        for (String pathStr : paths) {
+            Path folderPath = Paths.get(pathStr);
+            if (!Files.exists(folderPath)) continue;
+
+            String folderName = folderPath.getFileName().toString();
+            List<String> names = parseNames(folderName);
+            if (names.isEmpty()) continue;
+            
+            String mainName = names.get(0);
+            Optional<ContentSubject> subjectOpt = subjectRepository.findByMainName(mainName);
+
+            // Nếu Subject chưa tồn tại trong DB -> Chắc chắn không trùng -> Bỏ qua
+            if (subjectOpt.isEmpty()) continue;
+
+            ContentSubject subject = subjectOpt.get();
+            List<DuplicateFileGroup.DuplicatePair> pairs = new ArrayList<>();
+
+            try (Stream<Path> stream = Files.list(folderPath)) {
+                List<Path> importFiles = stream.filter(Files::isRegularFile).filter(p -> isVideoFile(p.toString())).toList();
+
+                for (Path importFile : importFiles) {
+                    long size = Files.size(importFile);
+                    
+                    // Bước 1: Lọc sơ bộ bằng kích thước file (nhanh)
+                    List<FileNode> candidates = fileNodeRepository.findBySubjectIdAndSize(subject.getId(), size);
+                    
+                    if (!candidates.isEmpty()) {
+                        // Bước 2: Tính Hash file mới
+                        String importHash = calculateFileHash(importFile);
+                        
+                        for (FileNode existing : candidates) {
+                            // Đảm bảo file cũ có hash (nếu chưa có thì tính và update luôn)
+                            String existingHash = ensureFileHash(existing);
+                            
+                            if (importHash.equals(existingHash)) {
+                                // Tìm thấy trùng lặp!
+                                pairs.add(DuplicateFileGroup.DuplicatePair.builder()
+                                        .existingFileId(existing.getId())
+                                        .existingFileName(existing.getName())
+                                        .existingPath(existing.getRelativePath())
+                                        .existingSize(existing.getReadableSize())
+                                        .newFilePath(importFile.toAbsolutePath().toString())
+                                        .newFileName(importFile.getFileName().toString())
+                                        .newSize(formatSize(size))
+                                        .hash(importHash)
+                                        .build());
+                                break; // Chỉ cần tìm thấy 1 bản trùng là đủ báo cáo
+                            }
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                log.error("Error checking duplicates for " + pathStr, e);
+            }
+
+            if (!pairs.isEmpty()) {
+                results.add(DuplicateFileGroup.builder()
+                        .subjectName(mainName)
+                        .pairs(pairs)
+                        .build());
+            }
+        }
+        return results;
+    }
+    
+    public void executeResolvedImport(ImportResolution resolution) {
+        String userId = getCurrentUserId();
+        if (userId == null) userId = "c410bace-3f61-43a2-b92e-81e2d6748f8e"; // Cần xử lý kỹ hơn
+
+        // 1. Xử lý các file có xung đột theo lựa chọn user
+        if (resolution.getActions() != null) {
+            for (ImportResolution.FileAction action : resolution.getActions()) {
+                try {
+                    Path newFile = Paths.get(action.getNewFilePath());
+                    
+                    switch (action.getAction()) {
+                        case "KEEP_OLD" -> { 
+                            // Giữ file cũ -> Xóa file đang import
+                            log.info("KEEP_OLD: Deleting " + newFile);
+                            Files.deleteIfExists(newFile);
+                        }
+
+                        case "KEEP_NEW" -> {
+                            // Giữ file mới -> Xóa file cũ trong DB và ổ cứng
+                            FileNode existingNode = fileNodeRepository.findById(action.getExistingFileId()).orElse(null);
+                            if (existingNode != null) {
+                                // Xóa vật lý file cũ (cần tìm đường dẫn tuyệt đối từ Volume)
+                                StorageVolume vol = storageVolumeService.getVolumeById(existingNode.getVolumeId()); // Cần thêm hàm này
+                                if (vol != null) {
+                                    Path oldPhysicalPath = Paths.get(vol.getMountPoint(), existingNode.getRelativePath());
+                                    log.info("KEEP_NEW: Deleting old file " + oldPhysicalPath);
+                                    Files.deleteIfExists(oldPhysicalPath);
+                                }
+                                // Xóa DB (Cascade sẽ xóa metadata, thumbnails...)
+                                fileNodeRepository.delete(existingNode);
+                            }
+                            // File mới sẽ được import ở bước tiếp theo (nằm trong thư mục safePaths hoặc cần xử lý riêng)
+                            // Tuy nhiên, logic import quét theo Folder. 
+                            // Nếu file mới vẫn nằm trong folder import, nó sẽ được import tự động ở bước 2.
+                        }
+
+                        case "KEEP_BOTH" -> {
+                        }
+                    }
+                    // Không làm gì cả, file mới sẽ được import bình thường
+                                    } catch (Exception e) {
+                    log.error("Error executing action " + action.getAction(), e);
+                }
+            }
+        }
+
+        // 2. Tiến hành Import bình thường cho các folder (File đã xóa sẽ tự động bị bỏ qua)
+        // Chúng ta tái sử dụng hàm importWithMapping cũ
+        // Lưu ý: resolution.safePaths cần chứa tất cả các folder path đã chọn ban đầu
+        importWithMapping(resolution.getSafePaths());
+    }
+    
+    private String calculateFileHash(Path path) {
+        try (FileInputStream fis = new FileInputStream(path.toFile())) {
+            MessageDigest digest = MessageDigest.getInstance("MD5"); // Hoặc SHA-256
+            byte[] byteArray = new byte[1024];
+            int bytesCount;
+            while ((bytesCount = fis.read(byteArray)) != -1) {
+                digest.update(byteArray, 0, bytesCount);
+            }
+            byte[] bytes = digest.digest();
+            StringBuilder sb = new StringBuilder();
+            for (byte b : bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("Hash error", e);
+            return "ERROR_HASH_" + System.currentTimeMillis();
+        }
+    }
+
+    private String ensureFileHash(FileNode fileNode) {
+        if (fileNode.getFileHash() != null && !fileNode.getFileHash().isEmpty()) {
+            return fileNode.getFileHash();
+        }
+        // Nếu DB chưa có hash, tính toán từ file vật lý
+        StorageVolume vol = storageVolumeService.getVolumeById(fileNode.getVolumeId());
+        if (vol != null) {
+            Path path = Paths.get(vol.getMountPoint(), fileNode.getRelativePath());
+            if (Files.exists(path)) {
+                String hash = calculateFileHash(path);
+                fileNode.setFileHash(hash);
+                fileNodeRepository.save(fileNode); // Cập nhật ngược lại DB
+                return hash;
+            }
+        }
+        return "MISSING_FILE";
+    }
+    
+    private String formatSize(long size) {
+        if (size <= 0) return "0 MB";
+        double sizeInMb = size / 1048576.0;
+        return new DecimalFormat("#.##").format(sizeInMb) + " MB";
     }
 }
