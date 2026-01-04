@@ -105,13 +105,16 @@ public class MediaService {
 
                 String tempFrameName = fileNode.getId() + "_source.jpg";
                 Path tempFramePath = cacheDir.resolve(tempFrameName);
+                
+                double duration = probeResult.getFormat().duration;
+                long midPointMillis = (duration > 0) ? (long) ((duration / 2) * 1000) : 1000;
 
                 // Dùng FFmpeg chụp ảnh thumbnail
                 FFmpegBuilder builder = new FFmpegBuilder()
                         .setInput(file.getAbsolutePath())
                         .addOutput(tempFramePath.toString())
                         .setFrames(1)
-                        .setVideoFilter("select='gte(n\\,150)'") // Lấy frame thứ 150
+                        .setStartOffset(midPointMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
                         .setFormat("image2")
                         .done();
 
@@ -125,7 +128,7 @@ public class MediaService {
                     generateThumbnail(sourceFrame, fileNode.getId(), FileThumbnail.ThumbType.MEDIUM, 800);
 
                     // Xóa file tạm (Optional)
-                    // Files.deleteIfExists(tempFramePath);
+                    Files.deleteIfExists(tempFramePath);
                 }
             }
         } catch (Exception e) {
