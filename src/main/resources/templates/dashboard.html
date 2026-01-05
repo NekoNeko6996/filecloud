@@ -126,11 +126,12 @@
             </div>
 
             <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-80 flex flex-col border-l border-white/10 overflow-y-auto no-scrollbar z-50 bg-[#171022] shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
-                <div class="p-6 flex flex-col gap-6 pt-20">
+                <div class="p-6 flex flex-col gap-5">
                     <div class="flex items-center justify-between">
                         <h3 class="text-white font-bold text-base">File Details</h3>
                         <button onclick="closeDetails()" class="text-[#a79cba] hover:text-white transition-colors"><span class="material-symbols-outlined">close</span></button>
                     </div>
+
                     <div class="flex flex-col gap-3">
                         <div class="aspect-video w-full rounded-lg bg-gray-800 border border-white/10 relative group overflow-hidden flex items-center justify-center">
                             <img id="detailPreview" src="" class="w-full h-full object-contain hidden">
@@ -141,16 +142,45 @@
                             <p id="detailSize" class="text-[#a79cba] text-sm mt-1">Size</p>
                         </div>
                     </div>
+
                     <div class="h-px bg-white/10 w-full"></div>
-                    <div class="flex flex-col gap-4">
-                        <h4 class="text-white text-sm font-bold">Metadata</h4>
-                        <div class="flex flex-col gap-3" id="metaContainer"></div>
+
+                    <div id="detailSubjectContainer" class="hidden">
+                        <h4 class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2">Subject</h4>
+                        <a id="detailSubjectLink" href="#" class="flex items-center gap-3 p-2 rounded-lg bg-[#2e2839] border border-white/5 hover:border-primary/50 transition-colors group">
+                            <div class="w-8 h-8 rounded-full bg-black/50 overflow-hidden shrink-0">
+                                <img id="detailSubjectAvatar" src="" class="w-full h-full object-cover hidden">
+                                <span id="detailSubjectInitial" class="w-full h-full flex items-center justify-center text-white font-bold text-xs">S</span>
+                            </div>
+                            <div class="min-w-0">
+                                <p id="detailSubjectName" class="text-white text-sm font-bold truncate group-hover:text-primary transition-colors">Subject Name</p>
+                                <p class="text-[10px] text-gray-500">View Profile</p>
+                            </div>
+                            <span class="material-symbols-outlined text-gray-500 text-[16px] ml-auto">chevron_right</span>
+                        </a>
+                        <div class="h-px bg-white/10 w-full mt-4"></div>
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <h4 class="text-gray-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[14px]">label</span> Tags
+                        </h4>
+                        <div id="detailTagList" class="flex flex-wrap gap-2">
+                            <span class="text-gray-500 text-xs italic">Loading...</span>
+                        </div>
+                    </div>
+
+                    <div class="h-px bg-white/10 w-full"></div>
+
+                    <div class="flex flex-col gap-3">
+                        <h4 class="text-gray-400 text-xs font-bold uppercase tracking-wider">Metadata</h4>
+                        <div class="flex flex-col gap-2" id="metaContainer"></div>
                     </div>
                 </div>
             </aside>
 
-            <div id="contextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl overflow-hidden py-1">
-                <button onclick="viewProperties()" class="w-full text-left px-4 py-2.5 text-sm text-gray-200 hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
+            <div id="contextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl overflow-hidden p-2">
+                <button onclick="viewProperties()" class="w-full text-left px-4 py-2.5 text-sm rounded text-gray-200 hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
                     <span class="material-symbols-outlined text-[18px]">info</span> Information
                 </button>
             </div>
@@ -215,9 +245,12 @@
                 detailsPanel.classList.remove('translate-x-full');
                 detailsPanel.classList.add('translate-x-0');
 
+                // --- RESET UI ---
                 document.getElementById('detailName').innerText = "Loading...";
                 document.getElementById('detailSize').innerText = "...";
                 document.getElementById('metaContainer').innerHTML = '<p class="text-gray-500 text-xs">Loading info...</p>';
+                document.getElementById('detailTagList').innerHTML = '<span class="text-gray-500 text-xs animate-pulse">Fetching tags...</span>';
+                document.getElementById('detailSubjectContainer').classList.add('hidden'); // Ẩn subject đi chờ load
 
                 const img = document.getElementById('detailPreview');
                 const icon = document.getElementById('detailIcon');
@@ -226,6 +259,7 @@
                 img.classList.remove('hidden');
                 icon.classList.add('hidden');
 
+                // --- 1. FETCH METADATA ---
                 fetch(`/api/file/metadata/${selectedFileId}`)
                         .then(res => res.json())
                         .then(data => {
@@ -237,12 +271,66 @@
                             const addRow = (l, v) => container.innerHTML += `<div class="flex justify-between py-1 text-sm border-b border-white/5"><span class="text-gray-400">${l}</span><span class="text-white truncate max-w-[150px]" title="${v}">${v}</span></div>`;
 
                             addRow("Type", data.type);
-                            if (data.meta && data.meta.width)
-                                addRow("Res", `${data.meta.width}x${data.meta.height}`);
-                            if (data.meta && data.meta.durationSeconds) {
-                                const min = Math.floor(data.meta.durationSeconds / 60);
-                                const sec = data.meta.durationSeconds % 60;
-                                addRow("Duration", `${min}:${sec.toString().padStart(2, '0')}`);
+                            if (data.created)
+                                addRow("Uploaded", new Date(data.created).toLocaleDateString());
+
+                            if (data.meta) {
+                                if (data.meta.width)
+                                    addRow("Res", `${data.meta.width}x${data.meta.height}`);
+                                if (data.meta.durationSeconds) {
+                                    const min = Math.floor(data.meta.durationSeconds / 60);
+                                    const sec = data.meta.durationSeconds % 60;
+                                    addRow("Duration", `${min}:${sec.toString().padStart(2, '0')}`);
+                                }
+                                if (data.meta.videoCodec)
+                                    addRow("Codec", data.meta.videoCodec.toUpperCase());
+                            }
+                        });
+
+                // --- 2. FETCH TAGS (Dùng API của SubjectController) ---
+                fetch(`/subjects/media/tags?fileId=${selectedFileId}`)
+                        .then(res => res.json())
+                        .then(tags => {
+                            const tagContainer = document.getElementById('detailTagList');
+                            if (tags.length === 0) {
+                                tagContainer.innerHTML = '<span class="text-gray-500 text-xs italic">No tags assigned.</span>';
+                            } else {
+                                tagContainer.innerHTML = tags.map(tag => `
+                                <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold text-white border border-white/10 shadow-sm" 
+                                      style="background-color: ${tag.colorHex || '#833cf6'}">
+                                    ${tag.name}
+                                </span>
+                            `).join('');
+                            }
+                        })
+                        .catch(err => {
+                            document.getElementById('detailTagList').innerHTML = '<span class="text-red-400 text-xs">Error</span>';
+                        });
+
+                // --- 3. FETCH SUBJECT INFO (Dùng API mới của HomeController) ---
+                fetch(`/api/file/${selectedFileId}/subject`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.id) {
+                                const subContainer = document.getElementById('detailSubjectContainer');
+                                const subName = document.getElementById('detailSubjectName');
+                                const subLink = document.getElementById('detailSubjectLink');
+                                const subAvatar = document.getElementById('detailSubjectAvatar');
+                                const subInitial = document.getElementById('detailSubjectInitial');
+
+                                subContainer.classList.remove('hidden');
+                                subName.innerText = data.name;
+                                subLink.href = `/subjects/${data.id}`;
+
+                                if (data.avatarUrl) {
+                                    subAvatar.src = data.avatarUrl;
+                                    subAvatar.classList.remove('hidden');
+                                    subInitial.classList.add('hidden');
+                                } else {
+                                    subAvatar.classList.add('hidden');
+                                    subInitial.classList.remove('hidden');
+                                    subInitial.innerText = data.name.charAt(0).toUpperCase();
+                                }
                             }
                         });
             }

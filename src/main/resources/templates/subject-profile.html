@@ -479,6 +479,15 @@
                         </div>
                     </div>
 
+                    <div class="flex flex-col gap-3">
+                        <h4 class="text-white text-sm font-bold flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[16px] text-pink-400">label</span> Tags
+                        </h4>
+                        <div id="detailTagList" class="flex flex-wrap gap-2">
+                            <span class="text-gray-500 text-xs italic">Loading tags...</span>
+                        </div>
+                    </div>
+
                     <div class="h-px bg-white/10 w-full"></div>
 
                     <div class="flex flex-col gap-4">
@@ -1288,6 +1297,9 @@
                 detailsPanel.classList.remove('translate-x-full');
                 detailsPanel.classList.add('translate-x-0');
 
+                const tagContainer = document.getElementById('detailTagList');
+                tagContainer.innerHTML = '<span class="text-gray-500 text-xs animate-pulse">Fetching tags...</span>';
+
                 // Reset UI loading
                 document.getElementById('detailName').innerText = "Loading...";
                 document.getElementById('detailSize').innerText = "...";
@@ -1343,6 +1355,27 @@
                         .catch(err => {
                             console.error(err);
                             document.getElementById('metaContainer').innerHTML = '<p class="text-red-400 text-xs">Error loading info.</p>';
+                        });
+
+
+                fetch(`/subjects/media/tags?fileId=${rightClickedFileId}`)
+                        .then(res => res.json())
+                        .then(tags => {
+                            if (tags.length === 0) {
+                                tagContainer.innerHTML = '<span class="text-gray-500 text-xs italic">No tags assigned.</span>';
+                                return;
+                            }
+
+                            tagContainer.innerHTML = tags.map(tag => `
+                            <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold text-white border border-white/10 shadow-sm" 
+                                  style="background-color: ${tag.colorHex || '#833cf6'}">
+                                ${tag.name}
+                            </span>
+                        `).join('');
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            tagContainer.innerHTML = '<span class="text-red-400 text-xs">Error loading tags.</span>';
                         });
             }
         </script>
