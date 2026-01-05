@@ -18,8 +18,8 @@ public class FileTag {
     @Column(name = "file_id")
     private String fileId;
 
-    @Column(name = "tag_name")
-    private String tagName;
+    @Column(name = "tag_id")
+    private Integer tagId;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

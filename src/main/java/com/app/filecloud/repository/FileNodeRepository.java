@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface FileNodeRepository extends JpaRepository<FileNode, String> {
@@ -30,5 +31,11 @@ public interface FileNodeRepository extends JpaRepository<FileNode, String> {
     List<FileNode> findBySubjectIdAndSize(Integer subjectId, Long size);
     
     List<FileNode> findByType(FileNode.Type type, Pageable pageable);
+    
+    @Query(value = "SELECT f.* FROM file_nodes f " +
+                   "JOIN file_tags ft ON f.id = ft.file_id " +
+                   "WHERE ft.tag_id = :tagId " +
+                   "ORDER BY ft.created_at DESC LIMIT 50", nativeQuery = true)
+    List<FileNode> findByTagId(@Param("tagId") Integer tagId);
 }
 

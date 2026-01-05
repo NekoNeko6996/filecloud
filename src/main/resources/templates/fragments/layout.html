@@ -138,6 +138,15 @@
                                   style="font-variation-settings: 'FILL' 1;">public</span>
                             <p class="text-sm font-medium">Social Platforms</p>
                         </a>
+                        
+                        <a th:href="@{/admin/tags}" 
+                           class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group"
+                           th:classappend="${activePage == 'tags'} ? 'bg-primary/20 text-white border border-primary/20' : 'text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50'">
+                            <span class="material-symbols-outlined" 
+                                  th:classappend="${activePage == 'tags'} ? 'text-white' : 'text-[#a79cba] group-hover:text-white'"
+                                  style="font-variation-settings: 'FILL' 1;">label</span>
+                            <p class="text-sm font-medium">Tags</p>
+                        </a>
                     </div>
 
                     <div class="h-px bg-white/10 w-full"></div>
