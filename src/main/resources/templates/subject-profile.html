@@ -98,16 +98,27 @@
                     </div>
 
                     <div class="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4 pb-20" id="fileGrid">
-                        <a th:each="file : ${files}" target="_blank" 
+                        <a th:each="file : ${files}" 
+                           th:id="'file-card-' + ${file.id}"
+                           th:data-id="${file.id}"
+                           th:data-is-video="${file.isVideo()}"
+                           onclick="handleFileClick(event, this.getAttribute('data-id'), this.getAttribute('data-is-video') === 'true')"
                            th:href="${file.isVideo()} ? @{/video/{id}(id=${file.id})} : '#'"
-                           class="file-item break-inside-avoid group relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5 block hover:border-primary/50 transition-colors">
+                           oncontextmenu="showMediaContextMenu(event, this)"
+                           target="_blank"
+                           class="file-item break-inside-avoid group relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5 block hover:border-primary/50 transition-colors select-none">
+
+                            <div class="selection-checkbox absolute top-3 left-3 z-30 hidden group-hover:block has-[:checked]:block">
+                                <input type="checkbox" value="${file.id}" 
+                                       class="w-5 h-5 rounded border-gray-500 text-primary focus:ring-0 cursor-pointer hidden"
+                                       onclick="event.stopPropagation()"> </div>
 
                             <img loading="lazy"
                                  th:src="@{/api/file/thumbnail/{id}(id=${file.id})}" 
                                  class="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500 min-h-[150px] bg-black/50"
                                  onerror="this.src='https://placehold.co/400x300/1e1e1e/FFF?text=No+Thumb'">
 
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4 pointer-events-none">
                                 <p class="file-name text-white font-medium text-sm truncate" th:text="${file.name}">Name</p>
                                 <p class="text-gray-400 text-xs" th:text="${file.readableSize}">Size</p>
                             </div>
@@ -119,12 +130,12 @@
                                     </div>
                                 </div>
                                 <div th:if="${file.durationFormatted != null}" 
-                                     class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-white font-mono tracking-wide shadow-sm">
+                                     class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-white font-mono tracking-wide shadow-sm pointer-events-none">
                                     <span th:text="${file.durationFormatted}">04:20</span>
                                 </div>
                             </div>
 
-                            <div class="absolute top-2 right-2 bg-black/50 backdrop-blur rounded px-1.5 py-0.5 text-[10px] font-bold text-white uppercase"
+                            <div class="absolute top-2 right-2 bg-black/50 backdrop-blur rounded px-1.5 py-0.5 text-[10px] font-bold text-white uppercase pointer-events-none"
                                  th:text="${#strings.substringAfter(file.name, '.')}">EXT</div>
                         </a>
                     </div>
@@ -367,6 +378,55 @@
                                 <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded text-sm font-bold shadow-lg">Save</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </dialog>
+
+            <div id="mediaContextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-gray-700 rounded-lg shadow-2xl overflow-hidden p-2">
+                <button onclick="toggleSelectionMode()" class="w-full text-left px-4 py-2.5 text-sm text-gray-300 rounded hover:bg-white/10 hover:text-white flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">checklist</span> Select Multiple
+                </button>
+                <div class="h-px bg-white/10 my-1 mx-2"></div>
+                <button onclick="confirmDeleteMedia()" class="w-full text-left px-4 py-2.5 text-sm text-red-400 rounded hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">delete</span> Delete
+                </button>
+            </div>
+
+            <div id="selectionToolbar" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#1e1e1e] border border-white/10 rounded-full shadow-2xl px-6 py-3 flex items-center gap-6 animate-bounce-up">
+                <span class="text-white font-bold text-sm"><span id="selectedCount" class="text-primary">0</span> Selected</span>
+                <div class="h-4 w-px bg-white/20"></div>
+                <button onclick="confirmDeleteMedia()" class="text-red-400 hover:text-red-300 flex items-center gap-1 text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed" id="btnBatchDelete">
+                    <span class="material-symbols-outlined text-[18px]">delete</span> Delete
+                </button>
+                <button onclick="exitSelectionMode()" class="text-gray-400 hover:text-white flex items-center gap-1 text-sm font-medium">
+                    <span class="material-symbols-outlined text-[18px]">close</span> Cancel
+                </button>
+            </div>
+
+            <dialog id="deleteMediaModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-sm">
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-center gap-3 text-red-500">
+                        <span class="material-symbols-outlined text-3xl">delete_forever</span>
+                        <h3 class="text-lg font-bold text-white">Delete Media?</h3>
+                    </div>
+
+                    <p class="text-gray-300 text-sm">
+                        You are about to remove <strong id="delMediaCount" class="text-white">1 item</strong> from the library.
+                    </p>
+
+                    <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-white/10 hover:bg-white/5 transition-colors has-[:checked]:border-red-500/50 has-[:checked]:bg-red-500/10">
+                        <input type="checkbox" id="checkDelMediaPhysical" class="mt-1 rounded bg-gray-700 border-gray-600 text-red-600 focus:ring-red-600">
+                        <div>
+                            <span class="font-bold text-white block text-sm">Delete from Disk</span>
+                            <span class="text-xs text-gray-500 block mt-0.5">
+                                Also permanently delete the physical file(s).
+                            </span>
+                        </div>
+                    </label>
+
+                    <div class="flex justify-end gap-2 mt-2">
+                        <button onclick="document.getElementById('deleteMediaModal').close()" class="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
+                        <button onclick="executeDeleteMedia()" id="btnExecDel" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg">Delete</button>
                     </div>
                 </div>
             </dialog>
@@ -802,6 +862,198 @@
                     }
                 } catch (e) {
                     console.error(e);
+                }
+            }
+
+
+            // --- MEDIA CONTEXT MENU & SELECTION ---
+            const mediaMenu = document.getElementById('mediaContextMenu');
+            let rightClickedFileId = null;
+            let isSelectionMode = false;
+
+            // 1. Show Context Menu
+            function showMediaContextMenu(e, el) {
+                e.preventDefault();
+                e.stopPropagation(); // Ngăn sự kiện lan ra ngoài
+
+                // Nếu đang ở Selection Mode -> Không hiện menu, chỉ check/uncheck
+                if (isSelectionMode)
+                    return;
+
+                rightClickedFileId = el.getAttribute('data-id');
+
+                let x = e.clientX;
+                let y = e.clientY;
+
+                // Điều chỉnh vị trí để không bị tràn
+                if (window.innerWidth - x < 200)
+                    x -= 200;
+                if (window.innerHeight - y < 100)
+                    y -= 100;
+
+                mediaMenu.style.left = `${x}px`;
+                mediaMenu.style.top = `${y}px`;
+                mediaMenu.classList.remove('hidden');
+            }
+
+            // Ẩn menu khi click ra ngoài
+            document.addEventListener('click', () => mediaMenu.classList.add('hidden'));
+            document.addEventListener('scroll', () => mediaMenu.classList.add('hidden'));
+
+            // 2. Toggle Selection Mode
+            function toggleSelectionMode() {
+                isSelectionMode = true;
+                mediaMenu.classList.add('hidden');
+
+                // Hiện checkbox trên tất cả các item
+                document.querySelectorAll('.selection-checkbox').forEach(el => el.classList.remove('hidden'));
+
+                // Hiện Toolbar
+                document.getElementById('selectionToolbar').classList.remove('hidden');
+
+                // Nếu bắt đầu từ 1 file cụ thể -> check luôn file đó
+                if (rightClickedFileId) {
+                    const card = document.getElementById('file-card-' + rightClickedFileId);
+                    const checkbox = card.querySelector('input[type="checkbox"]');
+                    if (checkbox)
+                        checkbox.checked = true;
+                    updateSelectionCount();
+                }
+            }
+
+            function exitSelectionMode() {
+                isSelectionMode = false;
+                rightClickedFileId = null;
+
+                // Ẩn Toolbar
+                document.getElementById('selectionToolbar').classList.add('hidden');
+
+                // Reset checkbox
+                document.querySelectorAll('.selection-checkbox').forEach(el => {
+                    el.classList.add('hidden');
+                    const cb = el.querySelector('input');
+                    if (cb)
+                        cb.checked = false;
+                });
+
+                // Remove active styling
+                document.querySelectorAll('.file-item').forEach(el => el.classList.remove('ring-2', 'ring-primary'));
+            }
+
+            // 3. Handle File Click (Chặn chuyển trang khi đang chọn)
+            function handleFileClick(e, fileId, isVideo) {
+                if (isSelectionMode) {
+                    e.preventDefault(); // Ngăn thẻ <a> chuyển trang
+
+                    const card = document.getElementById('file-card-' + fileId);
+                    const checkbox = card.querySelector('input[type="checkbox"]');
+
+                    // Toggle check
+                    checkbox.checked = !checkbox.checked;
+                    updateSelectionCount();
+                    return;
+                }
+
+                // Nếu không phải selection mode -> Chạy mặc định (chuyển trang)
+            }
+
+            // Helper: Cập nhật số lượng đang chọn
+            function updateSelectionCount() {
+                const count = document.querySelectorAll('.selection-checkbox input:checked').length;
+                document.getElementById('selectedCount').innerText = count;
+                document.getElementById('btnBatchDelete').disabled = count === 0;
+
+                // Highlight border card được chọn
+                document.querySelectorAll('.file-item').forEach(el => {
+                    const cb = el.querySelector('input[type="checkbox"]');
+                    if (cb && cb.checked)
+                        el.classList.add('ring-2', 'ring-primary');
+                    else
+                        el.classList.remove('ring-2', 'ring-primary');
+                });
+            }
+
+            // --- DELETE MEDIA LOGIC ---
+            function confirmDeleteMedia() {
+                mediaMenu.classList.add('hidden');
+
+                let count = 0;
+                if (isSelectionMode) {
+                    count = document.querySelectorAll('.selection-checkbox input:checked').length;
+                } else if (rightClickedFileId) {
+                    count = 1;
+                }
+
+                if (count === 0)
+                    return;
+
+                document.getElementById('delMediaCount').innerText = count + (count === 1 ? ' item' : ' items');
+                document.getElementById('checkDelMediaPhysical').checked = false; // Reset checkbox mặc định là false
+                document.getElementById('deleteMediaModal').showModal();
+            }
+
+            async function executeDeleteMedia() {
+                const btn = document.getElementById('btnExecDel');
+                btn.disabled = true;
+                btn.innerHTML = 'Deleting...';
+
+                // Thu thập ID
+                let idsToDelete = [];
+                if (isSelectionMode) {
+                    document.querySelectorAll('.selection-checkbox input:checked').forEach(cb => {
+                        // Tìm data-id từ thẻ cha (thẻ a)
+                        const parentA = cb.closest('a');
+                        if (parentA)
+                            idsToDelete.push(parentA.getAttribute('data-id'));
+                    });
+                } else if (rightClickedFileId) {
+                    idsToDelete.push(rightClickedFileId);
+                }
+
+                const deletePhysical = document.getElementById('checkDelMediaPhysical').checked;
+
+                try {
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+
+                    const res = await fetch('/subjects/media/delete', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: JSON.stringify({
+                            fileIds: idsToDelete,
+                            deletePhysical: deletePhysical
+                        })
+                    });
+
+                    if (res.ok) {
+                        // Xóa thành công -> Remove khỏi UI ngay lập tức
+                        idsToDelete.forEach(id => {
+                            const el = document.getElementById('file-card-' + id);
+                            if (el)
+                                el.remove();
+                        });
+
+                        // Update stats header (Số lượng file, dung lượng...)
+                        // Cách đơn giản nhất: reload trang (hoặc trừ số liệu bằng JS)
+                        // window.location.reload(); 
+
+                        document.getElementById('deleteMediaModal').close();
+                        exitSelectionMode(); // Thoát chế độ chọn
+
+                        // Update lại số lượng hiển thị (Optional)
+                        const totalEl = document.querySelector('.total-files-display');
+                        // logic update số lượng...
+                    } else {
+                        alert("Delete failed: " + await res.text());
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Error communicating with server");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Delete';
                 }
             }
         </script>

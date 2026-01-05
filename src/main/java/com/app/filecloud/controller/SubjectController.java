@@ -40,6 +40,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -364,6 +365,59 @@ public class SubjectController {
             return ResponseEntity.ok("Deleted successfully");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error deleting");
+        }
+    }
+
+    @PostMapping("/media/delete")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> deleteSubjectMedia(@RequestBody Map<String, Object> payload) {
+        try {
+            // 1. Parse dữ liệu từ Client
+            List<String> fileIds = (List<String>) payload.get("fileIds");
+            boolean deletePhysical = (Boolean) payload.getOrDefault("deletePhysical", false);
+
+            if (fileIds == null || fileIds.isEmpty()) {
+                return ResponseEntity.badRequest().body("No files selected");
+            }
+
+            // 2. Lấy danh sách FileNode từ DB
+            List<FileNode> files = fileNodeRepository.findAllById(fileIds);
+
+            for (FileNode file : files) {
+                // A. Xóa File Vật lý (Chỉ khi user chọn)
+                if (deletePhysical) {
+                    StorageVolume vol = storageVolumeService.getVolumeById(file.getVolumeId());
+                    if (vol != null) {
+                        try {
+                            Path physicalPath = Paths.get(vol.getMountPoint(), file.getRelativePath());
+                            Files.deleteIfExists(physicalPath);
+                        } catch (Exception e) {
+                            System.err.println("Lỗi xóa file vật lý: " + file.getName());
+                        }
+                    }
+                }
+
+                // B. LUÔN LUÔN Xóa Thumbnail (Dù có xóa vật lý hay không)
+                try {
+                    Path thumbDir = Paths.get(rootUploadDir, ".cache", "thumbnails");
+                    Files.deleteIfExists(thumbDir.resolve(file.getId() + "_small.jpg"));
+                    Files.deleteIfExists(thumbDir.resolve(file.getId() + "_medium.jpg"));
+                    // Xóa luôn thư mục temp_frames nếu còn sót
+                    Files.deleteIfExists(Paths.get(rootUploadDir, ".cache", "temp_frames", file.getId() + "_source.jpg"));
+                } catch (Exception e) {
+                    // Ignore error
+                }
+            }
+
+            // 3. Xóa dữ liệu trong DB (Dùng batch để tự động cascade xóa Metadata, Tag, FileSubject)
+            fileNodeRepository.deleteAllInBatch(files);
+
+            return ResponseEntity.ok("Deleted " + files.size() + " files successfully");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error deleting media: " + e.getMessage());
         }
     }
 }
