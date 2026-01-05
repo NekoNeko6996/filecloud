@@ -136,7 +136,8 @@
                             </div>
 
                             <div class="absolute top-2 right-2 bg-black/50 backdrop-blur rounded px-1.5 py-0.5 text-[10px] font-bold text-white uppercase pointer-events-none"
-                                 th:text="${#strings.substringAfter(file.name, '.')}">EXT</div>
+                                 th:if="${file.name.contains('.')}"
+                                 th:text="${file.name.substring(file.name.lastIndexOf('.') + 1)}">EXT</div>
                         </a>
                     </div>
 
@@ -383,7 +384,10 @@
             </dialog>
 
             <div id="mediaContextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-gray-700 rounded-lg shadow-2xl overflow-hidden p-2">
-                <button onclick="toggleSelectionMode()" class="w-full text-left px-4 py-2.5 text-sm text-gray-300 rounded hover:bg-white/10 hover:text-white flex items-center gap-2 transition-colors">
+                <button onclick="viewMediaDetails(event)" class="w-full text-left px-4 py-2.5 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">info</span> Information
+                </button>
+                <button onclick="toggleSelectionMode()" class="w-full text-left px-4 py-2.5 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
                     <span class="material-symbols-outlined text-[18px]">checklist</span> Select Multiple
                 </button>
                 <div class="h-px bg-white/10 my-1 mx-2"></div>
@@ -430,6 +434,38 @@
                     </div>
                 </div>
             </dialog>
+
+
+            <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-80 flex flex-col border-l border-white/10 overflow-y-auto no-scrollbar z-50 bg-[#171022] shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
+                <div class="p-6 flex flex-col gap-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-white font-bold text-base">File Details</h3>
+                        <button onclick="closeDetails()" class="text-[#a79cba] hover:text-white transition-colors">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+
+                    <div class="flex flex-col gap-3">
+                        <div class="aspect-video w-full rounded-lg bg-gray-800 border border-white/10 relative group overflow-hidden flex items-center justify-center">
+                            <img id="detailPreview" src="" class="w-full h-full object-contain hidden">
+                            <span id="detailIcon" class="material-symbols-outlined text-5xl text-gray-500">description</span>
+                        </div>
+                        <div>
+                            <h2 id="detailName" class="text-white font-bold text-lg leading-tight break-words">Filename</h2>
+                            <p id="detailSize" class="text-[#a79cba] text-sm mt-1">Size</p>
+                        </div>
+                    </div>
+
+                    <div class="h-px bg-white/10 w-full"></div>
+
+                    <div class="flex flex-col gap-4">
+                        <h4 class="text-white text-sm font-bold">Metadata</h4>
+                        <div class="flex flex-col gap-3" id="metaContainer">
+                            <p class="text-gray-500 text-xs italic">Loading info...</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
         </section>
 
         <script th:inline="javascript">
@@ -897,7 +933,25 @@
             }
 
             // Ẩn menu khi click ra ngoài
-            document.addEventListener('click', () => mediaMenu.classList.add('hidden'));
+            document.addEventListener('click', function (e) {
+                // 1. Xử lý đóng Context Menu (Subject & Media)
+                const subjectMenu = document.getElementById('subjectContextMenu');
+                const mediaMenu = document.getElementById('mediaContextMenu');
+
+                if (subjectMenu && !subjectMenu.contains(e.target)) {
+                    subjectMenu.classList.add('hidden');
+                }
+                if (mediaMenu && !mediaMenu.contains(e.target)) {
+                    mediaMenu.classList.add('hidden');
+                }
+
+                // 2. Xử lý đóng Details Panel (Logic Mới)
+                const panel = document.getElementById('detailsPanel');
+                // Nếu click KHÔNG nằm trong panel VÀ panel đang mở
+                if (panel && !panel.contains(e.target) && !panel.classList.contains('translate-x-full')) {
+                    closeDetails();
+                }
+            });
             document.addEventListener('scroll', () => mediaMenu.classList.add('hidden'));
 
             // 2. Toggle Selection Mode
@@ -1055,6 +1109,96 @@
                     btn.disabled = false;
                     btn.innerHTML = 'Delete';
                 }
+            }
+        </script>
+        <script th:inline="javascript">
+            // --- DETAILS PANEL LOGIC ---
+            const detailsPanel = document.getElementById('detailsPanel');
+
+            function closeDetails() {
+                detailsPanel.classList.remove('translate-x-0');
+                detailsPanel.classList.add('translate-x-full');
+            }
+
+            // Helper format giây -> MM:SS
+            function formatDuration(seconds) {
+                if (!seconds)
+                    return "";
+                const min = Math.floor(seconds / 60);
+                const sec = seconds % 60;
+                return `${min}:${sec.toString().padStart(2, '0')}`;
+            }
+
+            function viewMediaDetails(e) {
+                if (e)
+                    e.stopPropagation();
+
+                // Ẩn menu chuột phải
+                mediaMenu.classList.add('hidden');
+
+                if (!rightClickedFileId)
+                    return;
+
+                // Slide panel ra
+                detailsPanel.classList.remove('translate-x-full');
+                detailsPanel.classList.add('translate-x-0');
+
+                // Reset UI loading
+                document.getElementById('detailName').innerText = "Loading...";
+                document.getElementById('detailSize').innerText = "...";
+                document.getElementById('metaContainer').innerHTML = '<p class="text-gray-500 text-xs animate-pulse">Fetching metadata...</p>';
+
+                const img = document.getElementById('detailPreview');
+                const icon = document.getElementById('detailIcon');
+
+                // Hiển thị thumbnail (vì đây là media nên chắc chắn có thumb)
+                img.src = `/api/file/thumbnail/${rightClickedFileId}`;
+                img.classList.remove('hidden');
+                icon.classList.add('hidden');
+
+                // Gọi API lấy thông tin chi tiết
+                fetch(`/api/file/metadata/${rightClickedFileId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            document.getElementById('detailName').innerText = data.name;
+                            document.getElementById('detailSize').innerText = data.size;
+
+                            const container = document.getElementById('metaContainer');
+                            container.innerHTML = '';
+
+                            // Hàm helper thêm dòng dữ liệu
+                            const addRow = (label, value) => {
+                                if (value == null || value === '')
+                                    return;
+                                container.innerHTML += `
+                                <div class="flex justify-between items-center text-sm py-2 border-b border-white/5 last:border-0">
+                                    <span class="text-[#a79cba] font-medium">${label}</span>
+                                    <span class="text-white truncate max-w-[160px]" title="${value}">${value}</span>
+                                </div>`;
+                            };
+
+                            addRow("Type", data.type);
+                            addRow("Date", data.created ? new Date(data.created).toLocaleDateString() : "");
+
+                            // Hiển thị Metadata Media (Nếu có)
+                            if (data.meta && data.meta !== "N/A") {
+                                const m = data.meta;
+                                if (m.width && m.height)
+                                    addRow("Resolution", `${m.width} x ${m.height}`);
+                                if (m.durationSeconds)
+                                    addRow("Duration", formatDuration(m.durationSeconds));
+                                if (m.videoCodec)
+                                    addRow("Codec", m.videoCodec.toUpperCase());
+                                if (m.frameRate)
+                                    addRow("Frame Rate", Math.round(m.frameRate) + " fps");
+                                if (m.takenAt)
+                                    addRow("Taken At", new Date(m.takenAt).toLocaleDateString());
+                            }
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            document.getElementById('metaContainer').innerHTML = '<p class="text-red-400 text-xs">Error loading info.</p>';
+                        });
             }
         </script>
     </body>
