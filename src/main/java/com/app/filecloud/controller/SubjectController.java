@@ -2,18 +2,19 @@ package com.app.filecloud.controller;
 
 import com.app.filecloud.entity.ContentSubject;
 import com.app.filecloud.entity.FileNode;
+import com.app.filecloud.entity.SocialPlatform;
 import com.app.filecloud.entity.StorageVolume;
 import com.app.filecloud.entity.SubjectFolderMapping;
+import com.app.filecloud.entity.SubjectSocialLink;
 import com.app.filecloud.repository.ContentSubjectRepository;
 import com.app.filecloud.repository.FileNodeRepository;
 import com.app.filecloud.repository.FileTagRepository;
-import com.app.filecloud.repository.MediaMetadataRepository;
+import com.app.filecloud.repository.SocialPlatformRepository;
 import com.app.filecloud.repository.SubjectFolderMappingRepository;
+import com.app.filecloud.repository.SubjectSocialLinkRepository;
 import com.app.filecloud.repository.UserRepository;
 import com.app.filecloud.service.FileStorageService;
-import com.app.filecloud.service.MediaScanService;
 import com.app.filecloud.service.MediaService;
-import com.app.filecloud.service.ScanProgressService;
 import com.app.filecloud.service.StorageVolumeService;
 import java.io.File;
 import java.nio.file.Files;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -49,15 +51,15 @@ public class SubjectController {
     private final ContentSubjectRepository subjectRepository;
     private final FileNodeRepository fileNodeRepository;
     private final MediaService mediaService;
-    private final MediaScanService mediaScanService;
-    private final ScanProgressService progressService;
     private final UserRepository userRepository;
 
     private final SubjectFolderMappingRepository mappingRepository;
     private final FileStorageService fileStorageService;
     private final StorageVolumeService storageVolumeService;
     private final FileTagRepository fileTagRepository;
-    private final MediaMetadataRepository mediaMetadataRepository;
+
+    private final SocialPlatformRepository platformRepository;
+    private final SubjectSocialLinkRepository socialLinkRepository;
 
     // root path
     @Value("${app.storage.root:uploads}")
@@ -83,8 +85,23 @@ public class SubjectController {
         long totalSize = files.stream().mapToLong(FileNode::getSize).sum();
         String formattedSize = formatSize(totalSize);
 
-        List<SubjectFolderMapping> mappings = mappingRepository.findBySubjectId(id);
-        model.addAttribute("mappings", mappings);
+        List<SubjectFolderMapping> rawMappings = mappingRepository.findBySubjectId(id);
+
+        List<Map<String, Object>> mappingsDto = rawMappings.stream().map(m -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", m.getId());
+            map.put("relativePath", m.getRelativePath());
+
+            // Chỉ lấy info Volume cần thiết, tránh lấy cả object Volume to đùng
+            Map<String, Object> volMap = new HashMap<>();
+            volMap.put("id", m.getVolume().getId());
+            volMap.put("label", m.getVolume().getLabel());
+            map.put("volume", volMap);
+
+            return map;
+        }).collect(Collectors.toList());
+
+        model.addAttribute("mappings", mappingsDto);
 
         // 4. Đẩy dữ liệu ra View
         model.addAttribute("subject", subject);
@@ -221,7 +238,7 @@ public class SubjectController {
     @ResponseBody
     @Transactional
     public ResponseEntity<String> deleteSubject(@RequestParam("id") Integer id,
-                                                @RequestParam(value = "deletePhysical", defaultValue = "false") boolean deletePhysical) {
+            @RequestParam(value = "deletePhysical", defaultValue = "false") boolean deletePhysical) {
         try {
             ContentSubject subject = subjectRepository.findById(id)
                     .orElseThrow(() -> new IllegalArgumentException("Subject not found"));
@@ -238,7 +255,8 @@ public class SubjectController {
                         try {
                             Path physicalPath = Paths.get(vol.getMountPoint(), file.getRelativePath());
                             Files.deleteIfExists(physicalPath);
-                        } catch (Exception e) { /* Ignore lỗi file hệ thống */ }
+                        } catch (Exception e) {
+                            /* Ignore lỗi file hệ thống */ }
                     }
                 }
 
@@ -278,6 +296,74 @@ public class SubjectController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("Error deleting: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/socials")
+    @ResponseBody
+    public ResponseEntity<List<Map<String, Object>>> getSocialLinks(@PathVariable Integer id) {
+        List<SubjectSocialLink> links = socialLinkRepository.findBySubjectId(id);
+
+        List<Map<String, Object>> response = links.stream().map(link -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", link.getId());
+            map.put("platformId", link.getPlatform().getId());
+            map.put("platformName", link.getPlatform().getName());
+            map.put("iconUrl", link.getPlatform().getIconUrl());
+            map.put("profilePath", link.getProfilePath());
+            map.put("fullUrlOverride", link.getFullUrlOverride());
+            return map;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(response);
+    }
+
+    // 2. Lấy danh sách tất cả Platform (để nạp vào dropdown)
+    @GetMapping("/platforms")
+    @ResponseBody
+    public ResponseEntity<List<SocialPlatform>> getAllPlatforms() {
+        return ResponseEntity.ok(platformRepository.findAll());
+    }
+
+    // 3. Lưu (Thêm mới hoặc Cập nhật) Link
+    @PostMapping("/socials/save")
+    @ResponseBody
+    public ResponseEntity<String> saveSocialLink(@RequestParam("subjectId") Integer subjectId,
+            @RequestParam(value = "linkId", required = false) Long linkId,
+            @RequestParam("platformId") Integer platformId,
+            @RequestParam("profilePath") String profilePath,
+            @RequestParam(value = "fullUrl", required = false) String fullUrl) {
+        try {
+            SubjectSocialLink link;
+            if (linkId != null) {
+                link = socialLinkRepository.findById(linkId).orElseThrow();
+            } else {
+                link = new SubjectSocialLink();
+                ContentSubject subject = subjectRepository.findById(subjectId).orElseThrow();
+                link.setSubject(subject);
+            }
+
+            SocialPlatform platform = platformRepository.findById(platformId).orElseThrow();
+            link.setPlatform(platform);
+            link.setProfilePath(profilePath);
+            link.setFullUrlOverride(fullUrl != null && !fullUrl.trim().isEmpty() ? fullUrl : null);
+
+            socialLinkRepository.save(link);
+            return ResponseEntity.ok("Saved successfully");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error saving: " + e.getMessage());
+        }
+    }
+
+    // 4. Xóa Link
+    @PostMapping("/socials/delete")
+    @ResponseBody
+    public ResponseEntity<String> deleteSocialLink(@RequestParam("linkId") Long linkId) {
+        try {
+            socialLinkRepository.deleteById(linkId);
+            return ResponseEntity.ok("Deleted successfully");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error deleting");
         }
     }
 }

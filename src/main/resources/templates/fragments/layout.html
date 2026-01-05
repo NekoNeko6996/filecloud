@@ -101,10 +101,10 @@
                         <span class="material-symbols-outlined text-[18px]">create_new_folder</span>
                         <span>Create Folder</span>
                     </button>
-                    
+
                     <a class="flex items-center justify-center gap-2 rounded-xl h-12 bg-primary hover:bg-primary-dark transition-colors font-bold shadow-lg shadow-primary/20 cursor-pointer"
-                            th:if="${activePage == 'subjects'}"
-                            th:href="@{/admin/scan-subjects}">
+                       th:if="${activePage == 'subjects'}"
+                       th:href="@{/admin/scan-subjects}">
                         <span class="material-symbols-outlined text-[18px]">person_add</span>
                         <span>Scan New Subject</span>
                     </a>
@@ -128,6 +128,15 @@
                                   th:classappend="${activePage == 'subjects'} ? 'text-white' : 'text-[#a79cba] group-hover:text-white'"
                                   style="font-variation-settings: 'FILL' 1;">group</span>
                             <p class="text-sm font-medium">People / Subjects</p>
+                        </a>
+
+                        <a th:href="@{/admin/platforms}" 
+                           class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group"
+                           th:classappend="${activePage == 'platforms'} ? 'bg-primary/20 text-white border border-primary/20' : 'text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50'">
+                            <span class="material-symbols-outlined" 
+                                  th:classappend="${activePage == 'platforms'} ? 'text-white' : 'text-[#a79cba] group-hover:text-white'"
+                                  style="font-variation-settings: 'FILL' 1;">public</span>
+                            <p class="text-sm font-medium">Social Platforms</p>
                         </a>
                     </div>
 

@@ -59,14 +59,19 @@
 
                             <p class="text-gray-300 max-w-2xl leading-relaxed text-base" th:text="${subject.description ?: 'No description available.'}"></p>
 
-                            <div class="flex flex-wrap gap-3 mt-1">
-                                <a th:each="link : ${subject.socialLinks}" th:href="${link.fullUrlOverride != null ? link.fullUrlOverride : link.platform.baseUrl + link.profilePath}" 
+                            <div class="flex items-center gap-3 mt-3">
+                                <a th:each="link : ${subject.socialLinks}" 
+                                   th:href="${(link.fullUrlOverride != null && link.fullUrlOverride != '') ? link.fullUrlOverride : link.platform.baseUrl + link.profilePath}" 
                                    target="_blank"
                                    class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#2e2839] border border-white/5 hover:border-primary/50 hover:bg-primary/10 transition-all group">
-                                    <img th:if="${link.platform.iconUrl}" th:src="${link.platform.iconUrl}" class="w-4 h-4 rounded-full">
-                                    <span th:unless="${link.platform.iconUrl}" class="material-symbols-outlined text-[18px] text-gray-400">link</span>
+                                    <img th:if="${link.platform.iconUrl}" th:src="${link.platform.iconUrl}" class="w-4 h-4 rounded-full object-contain">
+                                    <span th:unless="${link.platform.iconUrl}" class="material-symbols-outlined text-[18px] text-gray-400">public</span>
                                     <span class="text-xs font-medium text-gray-300 group-hover:text-primary" th:text="${link.platform.name}">Platform</span>
                                 </a>
+
+                                <button onclick="openSocialModal()" class="h-8 rounded p-2 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/10 transition-colors" title="Manage Social Links">
+                                    <span class="material-symbols-outlined text-[18px]">edit</span> Socal Link
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -313,9 +318,61 @@
                     </div>
                 </div>
             </dialog>
+
+            <dialog id="socialModal" class="bg-[#1e1e1e] text-white p-0 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-2xl">
+                <div class="flex h-[500px]">
+
+                    <div class="w-1/2 border-r border-white/10 flex flex-col bg-[#171022]">
+                        <div class="p-4 border-b border-white/10 flex justify-between items-center">
+                            <h3 class="font-bold text-sm text-gray-300">Current Links</h3>
+                            <button onclick="resetSocialForm()" class="text-xs bg-primary/20 text-primary px-2 py-1 rounded hover:bg-primary hover:text-white transition-colors">
+                                + Add New
+                            </button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-2 space-y-2" id="socialListContainer">
+                            <p class="text-center text-gray-500 text-xs mt-10">Loading...</p>
+                        </div>
+                    </div>
+
+                    <div class="w-1/2 flex flex-col p-6 bg-[#1e1e1e]">
+                        <h3 class="font-bold text-lg mb-4" id="socialFormTitle">Add New Link</h3>
+
+                        <form id="socialForm" onsubmit="saveSocialLink(event)" class="flex flex-col gap-4 flex-1">
+                            <input type="hidden" name="linkId" id="inputLinkId">
+                            <input type="hidden" name="subjectId" th:value="${subject.id}">
+
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">Platform</label>
+                                <select name="platformId" id="selectPlatform" required 
+                                        class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary">
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">Profile Path / Username</label>
+                                <input type="text" name="profilePath" id="inputProfilePath" required placeholder="e.g. username123"
+                                       class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary">
+                                <p class="text-[10px] text-gray-500 mt-1">Appended to Base URL</p>
+                            </div>
+
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">Full URL Override (Optional)</label>
+                                <input type="text" name="fullUrl" id="inputFullUrl" placeholder="https://..."
+                                       class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono">
+                                <p class="text-[10px] text-gray-500 mt-1">Use specific URL instead of auto-generated one</p>
+                            </div>
+
+                            <div class="mt-auto flex justify-end gap-2 pt-4 border-t border-white/5">
+                                <button type="button" onclick="document.getElementById('socialModal').close()" class="px-3 py-2 text-sm text-gray-400 hover:text-white">Close</button>
+                                <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded text-sm font-bold shadow-lg">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </dialog>
         </section>
 
-        <script>
+        <script th:inline="javascript">
             // --- JS TÌM KIẾM FILE (CLIENT SIDE) ---
             document.getElementById('fileSearchInput').addEventListener('keyup', function (e) {
                 const term = e.target.value.toLowerCase();
@@ -597,6 +654,155 @@
                         window.location.reload();
                     }
                 }, 1000);
+            }
+        </script>
+        <script th:inline="javascript">
+            // --- SOCIAL LINKS LOGIC ---
+            const subjectId = /*[[${subject.id}]]*/ 0;
+            let allPlatforms = [];
+
+            function openSocialModal() {
+                document.getElementById('socialModal').showModal();
+                loadPlatforms();
+                loadSocialLinks();
+                resetSocialForm();
+            }
+
+            // 1. Load Platforms cho Dropdown
+            async function loadPlatforms() {
+                if (allPlatforms.length > 0)
+                    return; // Cache
+                try {
+                    const res = await fetch('/subjects/platforms');
+                    allPlatforms = await res.json();
+                    const select = document.getElementById('selectPlatform');
+                    select.innerHTML = allPlatforms.map(p =>
+                            `<option value="${p.id}">${p.name} (${p.baseUrl})</option>`
+                    ).join('');
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            // 2. Load danh sách Link hiện tại
+            async function loadSocialLinks() {
+                const list = document.getElementById('socialListContainer');
+                list.innerHTML = '<p class="text-center text-gray-500 text-xs mt-4">Loading...</p>';
+
+                try {
+                    const res = await fetch(`/subjects/${subjectId}/socials`);
+                    const links = await res.json();
+
+                    if (links.length === 0) {
+                        list.innerHTML = '<p class="text-center text-gray-500 text-xs mt-4">No links added yet.</p>';
+                        return;
+                    }
+
+                    list.innerHTML = links.map(link => `
+                        <div class="flex items-center justify-between p-3 bg-white/5 rounded border border-white/5 hover:bg-white/10 group">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <img src="${link.iconUrl || 'https://ui-avatars.com/api/?name=' + link.platformName}" class="w-6 h-6 rounded-full object-contain bg-black/20">
+                                <div class="min-w-0">
+                                    <p class="text-xs font-bold text-white truncate">${link.platformName}</p>
+                                    <a href="${link.finalUrl}" target="_blank" class="text-[10px] text-gray-400 truncate font-mono hover:text-primary hover:underline">
+                                        ${link.profilePath}
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick='editSocialLink(${JSON.stringify(link)})' class="p-1 text-gray-400 hover:text-blue-400" title="Edit">
+                                    <span class="material-symbols-outlined text-[16px]">edit</span>
+                                </button>
+                                <button onclick="deleteSocialLink(${link.id})" class="p-1 text-gray-400 hover:text-red-400" title="Delete">
+                                    <span class="material-symbols-outlined text-[16px]">delete</span>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                } catch (e) {
+                    console.error(e);
+                    list.innerHTML = '<p class="text-red-400 text-xs text-center">Error loading data</p>';
+                }
+            }
+
+            // 3. Reset Form (Mode Add)
+            function resetSocialForm() {
+                document.getElementById('socialForm').reset();
+                document.getElementById('inputLinkId').value = '';
+                document.getElementById('socialFormTitle').innerText = 'Add New Link';
+            }
+
+            // 4. Edit Mode
+            function editSocialLink(link) {
+                document.getElementById('inputLinkId').value = link.id;
+                document.getElementById('selectPlatform').value = link.platformId;
+                document.getElementById('inputProfilePath').value = link.profilePath;
+                document.getElementById('inputFullUrl').value = link.fullUrlOverride || '';
+                document.getElementById('socialFormTitle').innerText = 'Edit Link: ' + link.platformName;
+            }
+
+            // 5. Save Action
+            async function saveSocialLink(e) {
+                e.preventDefault();
+                const form = document.getElementById('socialForm');
+                const formData = new FormData(form);
+                const btn = form.querySelector('button[type="submit"]');
+                const oldText = btn.innerText;
+
+                btn.disabled = true;
+                btn.innerText = 'Saving...';
+
+                try {
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                    const res = await fetch('/subjects/socials/save', {
+                        method: 'POST',
+                        headers: {'X-CSRF-TOKEN': csrfToken}, // Giả định dùng Spring Security
+                        body: formData
+                    });
+
+                    if (res.ok) {
+                        loadSocialLinks(); // Reload list
+                        resetSocialForm(); // Reset form
+                        // Optional: Reload page to update main view header
+                        if (confirm("Saved! Reload page to update header links?")) {
+                            window.location.reload();
+                        }
+                    } else {
+                        alert("Save failed: " + await res.text());
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Connection error");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = oldText;
+                }
+            }
+
+            // 6. Delete Action
+            async function deleteSocialLink(id) {
+                if (!confirm("Remove this link?"))
+                    return;
+
+                try {
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                    const formData = new FormData();
+                    formData.append('linkId', id);
+
+                    const res = await fetch('/subjects/socials/delete', {
+                        method: 'POST',
+                        headers: {'X-CSRF-TOKEN': csrfToken},
+                        body: formData
+                    });
+
+                    if (res.ok) {
+                        loadSocialLinks();
+                    } else {
+                        alert("Delete failed");
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
             }
         </script>
     </body>

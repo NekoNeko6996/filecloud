@@ -21,4 +21,7 @@ public class SocialPlatform {
     
     @Column(name = "icon_url")
     private String iconUrl;
+    
+    @Column(name = "is_active")
+    private boolean isAcvite;
 }
