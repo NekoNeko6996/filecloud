@@ -7,9 +7,19 @@ import java.util.List;
 
 @Repository
 public interface FileTagRepository extends JpaRepository<FileTag, Integer> {
+
     // Xóa toàn bộ tag của một file (dùng khi vòng lặp xóa từng file)
     void deleteByFileId(String fileId);
-    
+
     // Đếm số lượng tag của danh sách file (Dùng cho API Preview để báo user biết sắp xóa bao nhiêu tag)
     long countByFileIdIn(List<String> fileIds);
+
+    boolean existsByFileIdAndTagId(String fileId, Integer tagId);
+
+    // Xóa tag khỏi file
+    void deleteByFileIdAndTagId(String fileId, Integer tagId);
+
+    List<FileTag> findByFileId(String fileId);
+    
+    List<FileTag> findByFileIdIn(List<String> fileIds);
 }

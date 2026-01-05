@@ -97,12 +97,32 @@
                         </div>
                     </div>
 
+                    <div class="flex flex-col gap-3" th:if="${not #lists.isEmpty(subjectTags)}">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[18px]">filter_list</span> Filter by Tags
+                            </h4>
+                            <button onclick="resetTagFilter()" id="btnResetTags" class="text-xs text-primary hover:text-white hidden transition-colors">Reset All</button>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2" id="tagFilterContainer">
+                            <button th:each="tag : ${subjectTags}"
+                                    th:onclick="'toggleTagFilter(' + ${tag.id} + ', this)'"
+                                    th:data-id="${tag.id}"
+                                    class="tag-filter-btn px-3 py-1.5 rounded-lg border border-white/10 bg-[#2e2839] text-xs text-gray-300 font-medium hover:border-primary/50 hover:text-white transition-all select-none flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full" th:style="'background-color:' + (${tag.colorHex} ?: '#833cf6')"></span>
+                                <span th:text="${tag.name}">Tag Name</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4 pb-20" id="fileGrid">
                         <a th:each="file : ${files}" 
                            th:id="'file-card-' + ${file.id}"
                            th:data-id="${file.id}"
                            th:data-is-video="${file.isVideo()}"
                            onclick="handleFileClick(event, this.getAttribute('data-id'), this.getAttribute('data-is-video') === 'true')"
+                           th:data-tag-ids="${fileTagMap.get(file.id)}"
                            th:href="${file.isVideo()} ? @{/video/{id}(id=${file.id})} : '#'"
                            oncontextmenu="showMediaContextMenu(event, this)"
                            target="_blank"
@@ -387,6 +407,9 @@
                 <button onclick="viewMediaDetails(event)" class="w-full text-left px-4 py-2.5 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
                     <span class="material-symbols-outlined text-[18px]">info</span> Information
                 </button>
+                <button onclick="openManageTagsModal()" class="w-full text-left px-4 py-2.5 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">label</span> Manage Tags
+                </button>
                 <button onclick="toggleSelectionMode()" class="w-full text-left px-4 py-2.5 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
                     <span class="material-symbols-outlined text-[18px]">checklist</span> Select Multiple
                 </button>
@@ -466,6 +489,46 @@
                     </div>
                 </div>
             </aside>
+
+            <dialog id="manageTagsModal" class="bg-[#1e1e1e] text-white p-0 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-md">
+                <div class="flex flex-col h-[500px]">
+                    <div class="p-4 border-b border-white/10 flex justify-between items-center bg-[#2e2839]">
+                        <h3 class="font-bold text-lg flex items-center gap-2">
+                            <span class="material-symbols-outlined text-pink-400">label</span> Manage Tags
+                        </h3>
+                        <button onclick="document.getElementById('manageTagsModal').close()" class="text-gray-400 hover:text-white">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+
+                    <div class="p-4 border-b border-white/10 bg-[#171022]">
+                        <p class="text-xs text-gray-400 uppercase font-bold mb-2">Active Tags</p>
+                        <div id="activeTagsList" class="flex flex-wrap gap-2 min-h-[40px]">
+                            <span class="text-gray-500 text-sm italic">No tags assigned.</span>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 flex flex-col p-4">
+                        <div class="relative group mb-4">
+                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">search</span>
+                            <input type="text" id="tagSearchInput" onkeyup="handleTagSearch(this.value)" 
+                                   placeholder="Search or create new tag..." 
+                                   class="w-full bg-black/30 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                        </div>
+
+                        <div class="flex-1 overflow-y-auto space-y-1" id="tagSearchResults">
+                            <p class="text-center text-gray-500 text-xs mt-4">Type to search tags.</p>
+                        </div>
+
+                        <div id="createTagOption" class="hidden mt-2 pt-2 border-t border-white/10">
+                            <button onclick="createNewTag()" class="w-full flex items-center justify-between p-3 bg-primary/10 border border-primary/30 rounded-lg text-primary hover:bg-primary/20 transition-colors">
+                                <span class="font-bold text-sm">Create new tag: "<span id="newTagName"></span>"</span>
+                                <span class="material-symbols-outlined">add_circle</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </dialog>
         </section>
 
         <script th:inline="javascript">
@@ -483,6 +546,88 @@
                     }
                 });
             });
+
+            let activeTagIds = new Set(); // Lưu các ID tag đang chọn
+
+            // 1. Sự kiện Tìm kiếm (Replace code cũ của search input)
+            document.getElementById('fileSearchInput').addEventListener('keyup', function (e) {
+                applyFilters();
+            });
+
+            // 2. Toggle chọn Tag
+            function toggleTagFilter(tagId, btn) {
+                if (activeTagIds.has(tagId)) {
+                    activeTagIds.delete(tagId);
+                    // Style Inactive
+                    btn.classList.remove('bg-primary', 'text-white', 'border-primary');
+                    btn.classList.add('bg-[#2e2839]', 'text-gray-300', 'border-white/10');
+                } else {
+                    activeTagIds.add(tagId);
+                    // Style Active
+                    btn.classList.remove('bg-[#2e2839]', 'text-gray-300', 'border-white/10');
+                    btn.classList.add('bg-primary', 'text-white', 'border-primary');
+                }
+
+                // Hiện/Ẩn nút Reset
+                document.getElementById('btnResetTags').classList.toggle('hidden', activeTagIds.size === 0);
+
+                applyFilters();
+            }
+
+            // 3. Reset Filter
+            function resetTagFilter() {
+                activeTagIds.clear();
+                document.querySelectorAll('.tag-filter-btn').forEach(btn => {
+                    btn.classList.remove('bg-primary', 'text-white', 'border-primary');
+                    btn.classList.add('bg-[#2e2839]', 'text-gray-300', 'border-white/10');
+                });
+                document.getElementById('btnResetTags').classList.add('hidden');
+                applyFilters();
+            }
+
+            // 4. Logic Lọc Chính (Core)
+            function applyFilters() {
+                const searchVal = document.getElementById('fileSearchInput').value.toLowerCase();
+                const items = document.querySelectorAll('.file-item');
+                let visibleCount = 0;
+
+                items.forEach(item => {
+                    // Lọc theo Tên
+                    const name = item.querySelector('.file-name').innerText.toLowerCase();
+                    const matchesName = name.includes(searchVal);
+
+                    // Lọc theo Tag (Logic AND: File phải chứa TẤT CẢ tag đang chọn)
+                    // Nếu muốn Logic OR (Chứa 1 trong các tag) -> dùng activeTagIds.some(...)
+                    let matchesTags = true;
+                    if (activeTagIds.size > 0) {
+                        const fileTagsAttr = item.getAttribute('data-tag-ids'); // Chuỗi "1 5 9"
+                        if (!fileTagsAttr) {
+                            matchesTags = false; // Không có tag nào thì auto fail nếu đang lọc
+                        } else {
+                            const fileTagArray = fileTagsAttr.split(' ').map(Number);
+                            // Kiểm tra xem file có chứa mọi tag đang active không
+                            for (let tagId of activeTagIds) {
+                                if (!fileTagArray.includes(tagId)) {
+                                    matchesTags = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Kết quả cuối cùng
+                    if (matchesName && matchesTags) {
+                        item.style.display = ''; // Hiện
+                        visibleCount++;
+                    } else {
+                        item.style.display = 'none'; // Ẩn
+                    }
+                });
+
+                // (Optional) Hiển thị thông báo nếu không tìm thấy
+                // console.log("Visible Items:", visibleCount);
+            }
+
 
             // --- LOGIC AVATAR PREVIEW ---
             function toggleAvatarInput(type) {
@@ -1199,6 +1344,166 @@
                             console.error(err);
                             document.getElementById('metaContainer').innerHTML = '<p class="text-red-400 text-xs">Error loading info.</p>';
                         });
+            }
+        </script>
+        <script th:inline="javascript">
+            // --- MANAGE TAGS LOGIC ---
+            let currentTagSearchTerm = '';
+
+            function openManageTagsModal() {
+                mediaMenu.classList.add('hidden'); // Đóng menu chuột phải
+                if (!rightClickedFileId)
+                    return;
+
+                document.getElementById('manageTagsModal').showModal();
+                loadFileTags();
+
+                // Reset search
+                document.getElementById('tagSearchInput').value = '';
+                document.getElementById('tagSearchResults').innerHTML = '<p class="text-center text-gray-500 text-xs mt-4">Type to search tags.</p>';
+                document.getElementById('createTagOption').classList.add('hidden');
+            }
+
+            // 1. Load tags hiện có của file
+            async function loadFileTags() {
+                const container = document.getElementById('activeTagsList');
+                container.innerHTML = '<span class="text-gray-500 text-xs animate-pulse">Loading...</span>';
+
+                try {
+                    const res = await fetch(`/subjects/media/tags?fileId=${rightClickedFileId}`);
+                    const tags = await res.json();
+
+                    if (tags.length === 0) {
+                        container.innerHTML = '<span class="text-gray-500 text-sm italic">No tags assigned.</span>';
+                        return;
+                    }
+
+                    container.innerHTML = tags.map(tag => `
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-white border border-white/10" 
+                              style="background-color: ${tag.colorHex || '#555'}">
+                            ${tag.name}
+                            <button onclick="removeTag(${tag.id})" class="hover:text-black/50 ml-1 rounded-full bg-black/20 w-4 h-4 flex items-center justify-center">
+                                &times;
+                            </button>
+                        </span>
+                    `).join('');
+                } catch (e) {
+                    console.error(e);
+                    container.innerHTML = '<span class="text-red-400 text-xs">Error loading tags</span>';
+                }
+            }
+
+            // 2. Tìm kiếm Tag
+            async function handleTagSearch(query) {
+                currentTagSearchTerm = query.trim();
+                const resultBox = document.getElementById('tagSearchResults');
+                const createBox = document.getElementById('createTagOption');
+                const newNameSpan = document.getElementById('newTagName');
+
+                if (query.length < 1) {
+                    resultBox.innerHTML = '<p class="text-center text-gray-500 text-xs mt-4">Type to search tags.</p>';
+                    createBox.classList.add('hidden');
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`/subjects/tags/search?q=${encodeURIComponent(query)}`);
+                    const tags = await res.json();
+
+                    // Hiển thị kết quả tìm kiếm
+                    if (tags.length > 0) {
+                        resultBox.innerHTML = tags.map(tag => `
+                            <button onclick="addTag(${tag.id})" class="w-full flex items-center gap-3 p-2 rounded hover:bg-white/5 text-left group transition-colors">
+                                <div class="w-3 h-3 rounded-full" style="background-color: ${tag.colorHex || '#833cf6'}"></div>
+                                <span class="text-sm text-gray-300 group-hover:text-white flex-1">${tag.name}</span>
+                                <span class="text-[10px] text-gray-500 font-mono">#${tag.slug}</span>
+                            </button>
+                        `).join('');
+                    } else {
+                        resultBox.innerHTML = '<p class="text-center text-gray-500 text-xs mt-4">No matches found.</p>';
+                    }
+
+                    // Logic hiển thị nút Create
+                    // Luôn hiện nút create nếu query không rỗng (để user có thể tạo tag mới trùng tên nhưng khác ý nghĩa, hoặc đơn giản là tạo mới)
+                    // Hoặc chỉ hiện khi không tìm thấy match chính xác. Ở đây ta luôn hiện để tiện.
+                    newNameSpan.innerText = query;
+                    createBox.classList.remove('hidden');
+
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            // 3. Add Tag
+            async function addTag(tagId) {
+                try {
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                    const formData = new FormData();
+                    formData.append('fileId', rightClickedFileId);
+                    formData.append('tagId', tagId);
+
+                    await fetch('/subjects/media/tags/add', {
+                        method: 'POST',
+                        headers: {'X-CSRF-TOKEN': csrfToken},
+                        body: formData
+                    });
+
+                    loadFileTags(); // Reload list
+                    // Clear search
+                    document.getElementById('tagSearchInput').value = '';
+                    handleTagSearch('');
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            // 4. Remove Tag
+            async function removeTag(tagId) {
+                if (!confirm("Unlink this tag?"))
+                    return;
+                try {
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                    const formData = new FormData();
+                    formData.append('fileId', rightClickedFileId);
+                    formData.append('tagId', tagId);
+
+                    await fetch('/subjects/media/tags/remove', {
+                        method: 'POST',
+                        headers: {'X-CSRF-TOKEN': csrfToken},
+                        body: formData
+                    });
+
+                    loadFileTags();
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            // 5. Create New Tag
+            async function createNewTag() {
+                if (!currentTagSearchTerm)
+                    return;
+
+                try {
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                    const formData = new FormData();
+                    formData.append('name', currentTagSearchTerm);
+
+                    const res = await fetch('/subjects/tags/create-quick', {
+                        method: 'POST',
+                        headers: {'X-CSRF-TOKEN': csrfToken},
+                        body: formData
+                    });
+
+                    if (res.ok) {
+                        const newTag = await res.json();
+                        // Sau khi tạo xong, add luôn vào file hiện tại
+                        addTag(newTag.id);
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Failed to create tag");
+                }
             }
         </script>
     </body>

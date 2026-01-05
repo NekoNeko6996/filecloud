@@ -2,16 +2,19 @@ package com.app.filecloud.controller;
 
 import com.app.filecloud.entity.ContentSubject;
 import com.app.filecloud.entity.FileNode;
+import com.app.filecloud.entity.FileTag;
 import com.app.filecloud.entity.SocialPlatform;
 import com.app.filecloud.entity.StorageVolume;
 import com.app.filecloud.entity.SubjectFolderMapping;
 import com.app.filecloud.entity.SubjectSocialLink;
+import com.app.filecloud.entity.Tag;
 import com.app.filecloud.repository.ContentSubjectRepository;
 import com.app.filecloud.repository.FileNodeRepository;
 import com.app.filecloud.repository.FileTagRepository;
 import com.app.filecloud.repository.SocialPlatformRepository;
 import com.app.filecloud.repository.SubjectFolderMappingRepository;
 import com.app.filecloud.repository.SubjectSocialLinkRepository;
+import com.app.filecloud.repository.TagRepository;
 import com.app.filecloud.repository.UserRepository;
 import com.app.filecloud.service.FileStorageService;
 import com.app.filecloud.service.MediaService;
@@ -33,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -61,6 +65,8 @@ public class SubjectController {
 
     private final SocialPlatformRepository platformRepository;
     private final SubjectSocialLinkRepository socialLinkRepository;
+
+    private final TagRepository tagRepository;
 
     // root path
     @Value("${app.storage.root:uploads}")
@@ -103,6 +109,29 @@ public class SubjectController {
         }).collect(Collectors.toList());
 
         model.addAttribute("mappings", mappingsDto);
+
+        // === THÊM LOGIC LẤY TAG ===
+        List<String> fileIds = files.stream().map(FileNode::getId).toList();
+
+        // Lấy tất cả liên kết File-Tag
+        List<FileTag> allFileTags = fileIds.isEmpty() ? List.of() : fileTagRepository.findByFileIdIn(fileIds);
+
+        // 1. Danh sách tất cả Tag Unique có trong Subject này (để hiển thị bộ lọc)
+        Set<Integer> uniqueTagIds = allFileTags.stream().map(FileTag::getTagId).collect(Collectors.toSet());
+        List<Tag> subjectTags = tagRepository.findAllById(uniqueTagIds);
+
+        // 2. Map dữ liệu: FileId -> Chuỗi các TagId (VD: "1 5 8") để gắn vào HTML attribute
+        Map<String, String> fileTagMap = new HashMap<>();
+        for (FileNode f : files) {
+            String tagsStr = allFileTags.stream()
+                    .filter(ft -> ft.getFileId().equals(f.getId()))
+                    .map(ft -> String.valueOf(ft.getTagId()))
+                    .collect(Collectors.joining(" ")); // Cách nhau bằng dấu cách
+            fileTagMap.put(f.getId(), tagsStr);
+        }
+
+        model.addAttribute("subjectTags", subjectTags);
+        model.addAttribute("fileTagMap", fileTagMap);
 
         // 4. Đẩy dữ liệu ra View
         model.addAttribute("subject", subject);
@@ -419,5 +448,79 @@ public class SubjectController {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("Error deleting media: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/media/tags")
+    @ResponseBody
+    public ResponseEntity<List<Tag>> getFileTags(@RequestParam("fileId") String fileId) {
+        // Query tìm các Tag dựa trên fileId thông qua bảng trung gian file_tags
+        // Lưu ý: Cần thêm hàm findTagsByFileId vào TagRepository hoặc dùng logic dưới đây
+        List<FileTag> fileTags = fileTagRepository.findByFileId(fileId);
+        List<Integer> tagIds = fileTags.stream().map(FileTag::getTagId).toList();
+
+        if (tagIds.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(tagRepository.findAllById(tagIds));
+    }
+
+    // 2. Tìm kiếm Tag (để user chọn add)
+    @GetMapping("/tags/search")
+    @ResponseBody
+    public ResponseEntity<List<Tag>> searchTags(@RequestParam("q") String query) {
+        // Cần thêm hàm findByNameContainingIgnoreCase vào TagRepository
+        // return ResponseEntity.ok(tagRepository.findByNameContainingIgnoreCase(query));
+
+        // Demo đơn giản nếu chưa có hàm custom: lấy tất cả rồi lọc (chỉ ổn với data ít)
+        List<Tag> all = tagRepository.findAll();
+        List<Tag> filtered = all.stream()
+                .filter(t -> t.getName().toLowerCase().contains(query.toLowerCase()))
+                .limit(10)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(filtered);
+    }
+
+    // 3. Thêm Tag vào File
+    @PostMapping("/media/tags/add")
+    @ResponseBody
+    public ResponseEntity<String> addTagToFile(@RequestParam("fileId") String fileId,
+            @RequestParam("tagId") Integer tagId) {
+        // Kiểm tra xem đã tồn tại chưa
+        if (fileTagRepository.existsByFileIdAndTagId(fileId, tagId)) {
+            return ResponseEntity.ok("Already tagged");
+        }
+
+        FileTag ft = new FileTag();
+        ft.setFileId(fileId);
+        ft.setTagId(tagId);
+        fileTagRepository.save(ft);
+        return ResponseEntity.ok("Added");
+    }
+
+    // 4. Xóa Tag khỏi File
+    @PostMapping("/media/tags/remove")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> removeTagFromFile(@RequestParam("fileId") String fileId,
+            @RequestParam("tagId") Integer tagId) {
+        fileTagRepository.deleteByFileIdAndTagId(fileId, tagId);
+        return ResponseEntity.ok("Removed");
+    }
+
+    // 5. Tạo Tag mới nhanh (Quick Create)
+    @PostMapping("/tags/create-quick")
+    @ResponseBody
+    public ResponseEntity<Tag> createQuickTag(@RequestParam("name") String name) {
+        Tag tag = new Tag();
+        tag.setName(name);
+        tag.setSlug(toSlug(name)); // Dùng lại hàm toSlug helper (xem phần dưới)
+        tag.setColorHex("#833cf6"); // Màu mặc định
+        Tag saved = tagRepository.save(tag);
+        return ResponseEntity.ok(saved);
+    }
+
+    // Helper tạo slug (copy từ TagController qua nếu chưa có)
+    private String toSlug(String input) {
+        return input.toLowerCase().replaceAll("[^a-z0-9]", "-").replaceAll("-+", "-");
     }
 }
