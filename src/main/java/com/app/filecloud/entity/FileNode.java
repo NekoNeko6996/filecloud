@@ -48,6 +48,9 @@ public class FileNode implements Persistable<String> {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+    
+    @Column(name = "modified_at")
+    private LocalDateTime modifiedAt;
 
     @Column(name = "volume_id")
     private Integer volumeId;

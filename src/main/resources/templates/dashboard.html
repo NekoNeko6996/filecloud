@@ -5,113 +5,132 @@
 
         <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
             <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="text-[#a79cba]">Home</span>
-                    <span class="material-symbols-outlined text-[#a79cba] text-[16px]">chevron_right</span>
-                    <span class="font-bold text-white bg-[#2e2839] px-2 py-1 rounded" th:text="${currentFolder != null ? currentFolder.name : 'Root'}">Root</span>
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-2xl">grid_view</span>
+                    <h2 class="text-xl font-bold text-white">Dashboard</h2>
                 </div>
-                <div class="flex items-center gap-4 flex-1 justify-center max-w-lg mx-4">
-                    <div class="relative w-full group">
-                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#a79cba]">search</span>
-                        <input class="w-full bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-10 py-2 text-sm text-white placeholder-[#a79cba] focus:outline-none focus:ring-2 focus:ring-primary/50" 
-                               th:placeholder="#{dashboard.search.placeholder}" type="text"/>
-                    </div>
+                <div class="relative group w-64">
+                    <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-500">search</span>
+                    <input type="text" placeholder="Search library..." class="w-full bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-primary outline-none">
                 </div>
             </header>
 
-            <div class="flex-1 overflow-y-auto p-6 scroll-smooth" onclick="closeContextMenu()">
+            <div class="flex-1 overflow-y-auto p-8 scroll-smooth space-y-10">
 
-                <div class="mb-8">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-white text-lg font-bold">Folders</h2>
-                        <button onclick="openCreateFolder()" class="text-xs flex items-center gap-1 text-gray-400 hover:text-white transition-colors">
-                            <span class="material-symbols-outlined text-sm">create_new_folder</span> New Folder
+                <div class="relative">
+                    <div class="flex items-center justify-between mb-4 px-1">
+                        <h3 class="text-white text-xl font-bold flex items-center gap-2">Recently Updated</h3>
+                    </div>
+
+                    <div class="relative group">
+                        <button onclick="scrollCarousel('subjectCarousel', -1)" 
+                                class="absolute left-0 top-1/2 -translate-y-1/2 z-30 w-12 h-full flex items-center justify-center text-white translate-x-0">
+                            <span class="material-symbols-outlined text-3xl">chevron_left</span>
                         </button>
-                    </div>
 
-                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        <a th:if="${currentFolder != null}" th:href="@{/(folderId=${currentFolder.parentId})}"
-                           class="flex items-center justify-center bg-white/5 rounded-xl p-4 border border-dashed border-gray-600 hover:bg-white/10 cursor-pointer transition-colors">
-                            <span class="material-symbols-outlined text-gray-400">arrow_back</span>
-                        </a>
+                        <div id="subjectCarousel" class="flex overflow-x-auto gap-5 px-1 no-scrollbar snap-x snap-mandatory scroll-smooth">
+                            <div th:each="sub : ${recentSubjects}" 
+                                 onclick="window.location.href = this.getAttribute('data-url')"
+                                 th:data-url="@{/subjects/{id}(id=${sub.id})}"
+                                 class="snap-start shrink-0 w-[280px] h-[350px] relative rounded-2xl overflow-hidden cursor-pointer group/card border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20">
 
-                        <a th:each="item : ${items}" th:if="${item.isFolder()}" 
-                           th:href="@{/(folderId=${item.id})}"
-                           class="folder-card-gradient rounded-xl p-4 border border-white/5 hover:border-primary/50 cursor-pointer group transition-all duration-200">
-                            <div class="flex justify-between items-start mb-3">
-                                <span class="material-symbols-outlined text-[#a79cba] text-[32px] group-hover:text-primary transition-colors" style="font-variation-settings: 'FILL' 1;">folder</span>
-                            </div>
-                            <p class="text-white text-sm font-medium truncate" th:text="${item.name}">Name</p>
-                        </a>
-                    </div>
-                </div>
+                                <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110">
+                                <div th:unless="${sub.avatarUrl != null}" class="w-full h-full bg-gradient-to-br from-gray-800 to-black flex items-center justify-center">
+                                    <span class="text-6xl font-bold text-white/10" th:text="${#strings.substring(sub.mainName,0,1)}">A</span>
+                                </div>
 
-                <div class="mb-8">
-                    <h2 class="text-white text-lg font-bold mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-purple-400">photo_library</span> Photos
-                    </h2>
-                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                        <div th:each="item : ${items}" th:if="${item.isImage()}" 
-                             class="group relative aspect-square rounded-xl bg-[#2e2839] border border-white/5 hover:border-primary/50 overflow-hidden cursor-pointer shadow-lg transition-all"
-                             th:attr="data-id=${item.id}, data-has-thumb='true'" 
-                             oncontextmenu="openContextMenu(event, this)">
+                                <div class="absolute inset-0 bg-gradient-to-t from-[#171022] via-[#171022]/40 to-transparent opacity-90 group-hover/card:opacity-80 transition-opacity"></div>
 
-                            <img th:src="@{/api/file/thumbnail/{id}(id=${item.id})}" 
-                                 class="w-full h-full object-cover transition-transform duration-500" loading="lazy"
-                                 onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
-
-                            <div class="w-full h-full flex items-center justify-center bg-gray-800 hidden">
-                                <span class="material-symbols-outlined text-4xl text-gray-500">image</span>
-                            </div>
-
-                            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 pt-8 pointer-events-none">
-                                <p class="text-white text-xs font-medium truncate" th:text="${item.name}">Name</p>
-                                <p class="text-gray-400 text-[10px]" th:text="${item.readableSize}">Size</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-8">
-                    <h2 class="text-white text-lg font-bold mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-blue-400">movie</span> Videos
-                    </h2>
-                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                        <div th:each="item : ${items}" th:if="${item.isVideo()}" 
-                             class="group relative aspect-video rounded-xl bg-[#2e2839] border border-white/5 hover:border-blue-500/50 overflow-hidden cursor-pointer shadow-lg transition-all"
-                             th:attr="data-id=${item.id}, data-has-thumb='true'" 
-                             oncontextmenu="openContextMenu(event, this)">
-
-                            <img th:src="@{/api/file/thumbnail/{id}(id=${item.id})}" 
-                                 class="w-full h-full object-cover transition-transform duration-500 opacity-80 group-hover:opacity-100" loading="lazy"
-                                 onerror="this.style.display='none';">
-
-                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                                <div class="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20 group-hover:bg-primary/80 transition-colors">
-                                    <span class="material-symbols-outlined text-white text-3xl drop-shadow-md">play_arrow</span>
+                                <div class="absolute bottom-0 left-0 w-full p-5">
+                                    <div class="flex flex-wrap gap-2 mb-2">
+                                        <span th:each="link : ${sub.socialLinks}" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide text-white bg-white/10 backdrop-blur border border-white/10">
+                                            <span th:text="${link.platform.name}">Plat</span>
+                                        </span>
+                                    </div>
+                                    <h4 class="text-2xl font-bold text-white leading-tight mb-1 truncate drop-shadow-md" th:text="${sub.mainName}">Name</h4>
+                                    <p class="text-gray-300 text-xs font-medium flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-[14px]">schedule</span>
+                                        <span th:text="${#temporals.format(sub.updatedAt, 'dd MMM yyyy')}">Date</span>
+                                    </p>
                                 </div>
                             </div>
 
-                            <div class="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-white/10 z-20">
-                                <span class="video-duration-tag" th:data-id="${item.id}">...</span>
-                            </div>
-
-                            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-6 pointer-events-none z-20">
-                                <p class="text-white text-xs font-medium truncate" th:text="${item.name}">Name</p>
-                                <p class="text-gray-400 text-[10px]" th:text="${item.readableSize}">Size</p>
+                            <div th:if="${recentSubjects.isEmpty()}" class="w-full h-40 flex items-center justify-center text-gray-500 border border-dashed border-white/10 rounded-xl">
+                                No subjects found.
                             </div>
                         </div>
+
+                        <button onclick="scrollCarousel('subjectCarousel', 1)" 
+                                class="absolute right-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 flex items-center justify-center text-white translate-x-0">
+                            <span class="material-symbols-outlined text-3xl">chevron_right</span>
+                        </button>
                     </div>
                 </div>
-            </div>
 
-            <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-80 flex flex-col border-l border-white/10 overflow-y-auto no-scrollbar z-40 bg-[#171022] shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
-                <div class="p-6 flex flex-col gap-6 pt-20">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-white font-bold text-base" th:text="#{dashboard.details.title}">Details</h3>
-                        <button onclick="closeDetails()" class="text-[#a79cba] hover:text-white transition-colors"><span class="material-symbols-outlined">close</span></button>
+                <div class="relative">
+                    <div class="flex items-center justify-between mb-4 px-1">
+                        <h3 class="text-white text-xl font-bold flex items-center gap-2">New Arrivals</h3>
                     </div>
 
+                    <div class="relative group">
+                        <button onclick="scrollCarousel('mediaCarousel', -1)" 
+                                class="absolute left-0 top-1/2 -translate-y-1/2 z-30 bg-black/70 w-12 h-full flex items-center justify-center text-white -translate-x-full translate-x-0 rounded-l-xl">
+                            <span class="material-symbols-outlined text-3xl">chevron_left</span>
+                        </button>
+
+                        <div id="mediaCarousel" class="flex overflow-x-auto gap-5 px-1 no-scrollbar snap-x snap-mandatory scroll-smooth">
+
+                            <a th:each="file : ${recentFiles}" 
+                               th:href="${file.isVideo()} ? @{/video/{id}(id=${file.id})} : '#'"
+                               th:data-id="${file.id}"
+                               th:data-has-thumb="true"
+                               oncontextmenu="openContextMenu(event, this)"
+                               class="snap-start shrink-0 w-[220px] aspect-[4/3] relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5 group/card hover:border-primary/50 transition-all shadow-lg">
+
+                                <img loading="lazy"
+                                     th:src="@{/api/file/thumbnail/{id}(id=${file.id})}" 
+                                     class="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
+                                     onerror="this.src='https://placehold.co/400x300/1e1e1e/FFF?text=No+Thumb'">
+
+                                <div th:if="${file.isVideo()}">
+                                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/20 group-hover/card:bg-black/10 transition-colors">
+                                        <div class="w-10 h-10 rounded-full bg-white/20 backdrop-blur flex items-center justify-center scale-90 group-hover/card:scale-110 transition-transform">
+                                            <span class="material-symbols-outlined text-white">play_arrow</span>
+                                        </div>
+                                    </div>
+
+                                    <div th:if="${file.durationFormatted != null}" 
+                                         class="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[10px] font-bold text-white font-mono shadow-sm z-20 pointer-events-none border border-white/10">
+                                        <span th:text="${file.durationFormatted}">00:00</span>
+                                    </div>
+                                </div>
+
+                                <div class="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/90 to-transparent pointer-events-none">
+                                    <p class="text-white text-xs font-medium truncate" th:text="${file.name}">Name</p>
+                                    <p class="text-gray-400 text-[10px]" th:text="${#temporals.format(file.createdAt, 'dd/MM HH:mm')}">Date</p>
+                                </div>
+                            </a>
+
+                            <div th:if="${recentFiles.isEmpty()}" class="w-full h-40 flex items-center justify-center text-gray-500 border border-dashed border-white/10 rounded-xl">
+                                No media uploaded yet.
+                            </div>
+                        </div>
+
+                        <button onclick="scrollCarousel('mediaCarousel', 1)" 
+                                class="absolute right-0 top-1/2 bg-black/70 -translate-y-1/2 z-30 w-12 h-full flex items-center justify-center text-white translate-x-0">
+                            <span class="material-symbols-outlined text-3xl">chevron_right</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-80 flex flex-col border-l border-white/10 overflow-y-auto no-scrollbar z-50 bg-[#171022] shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
+                <div class="p-6 flex flex-col gap-6 pt-20">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-white font-bold text-base">File Details</h3>
+                        <button onclick="closeDetails()" class="text-[#a79cba] hover:text-white transition-colors"><span class="material-symbols-outlined">close</span></button>
+                    </div>
                     <div class="flex flex-col gap-3">
                         <div class="aspect-video w-full rounded-lg bg-gray-800 border border-white/10 relative group overflow-hidden flex items-center justify-center">
                             <img id="detailPreview" src="" class="w-full h-full object-contain hidden">
@@ -124,69 +143,43 @@
                     </div>
                     <div class="h-px bg-white/10 w-full"></div>
                     <div class="flex flex-col gap-4">
-                        <h4 class="text-white text-sm font-bold" th:text="#{dashboard.details.info}">Information</h4>
-                        <div class="flex flex-col gap-3" id="metaContainer">
-                            <p class="text-gray-500 text-xs italic">Select 'Properties' to view details.</p>
-                        </div>
+                        <h4 class="text-white text-sm font-bold">Metadata</h4>
+                        <div class="flex flex-col gap-3" id="metaContainer"></div>
                     </div>
                 </div>
             </aside>
 
-            <div id="contextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl overflow-hidden">
-                <button onclick="alert('Preview')" class="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-[#833cf6] hover:text-white flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px]">visibility</span> Preview
-                </button>
-                <button onclick="viewProperties()" class="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-[#833cf6] hover:text-white flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px]">info</span> Properties
-                </button>
-                <div class="h-px bg-white/10 mx-2 my-1"></div>
-                <button class="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px]">delete</span> Delete
+            <div id="contextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl overflow-hidden py-1">
+                <button onclick="viewProperties()" class="w-full text-left px-4 py-2.5 text-sm text-gray-200 hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">info</span> Information
                 </button>
             </div>
-
-            <dialog id="createFolderModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/50">
-                <h3 class="text-lg font-bold mb-4">Create Folder</h3>
-                <form th:action="@{/folder/create}" method="post" class="flex flex-col gap-4">
-                    <input type="hidden" name="parentId" th:value="${currentFolderId}">
-                    <input type="text" name="name" placeholder="Name" class="bg-black/50 border border-gray-600 rounded px-3 py-2 text-white">
-                    <div class="flex gap-2 justify-end">
-                        <button type="button" onclick="this.closest('dialog').close()" class="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
-                        <button type="submit" class="bg-primary px-4 py-2 rounded text-sm font-bold">Create</button>
-                    </div>
-                </form>
-            </dialog>
-            <form id="uploadForm" th:action="@{/file/upload}" method="post" enctype="multipart/form-data" class="hidden">
-                <input type="hidden" name="parentId" th:value="${currentFolderId}">
-                <input type="file" name="file" id="fileInput" onchange="document.getElementById('uploadForm').submit()">
-            </form>
 
         </section>
 
         <script>
-            // --- GLOBAL FUNCTIONS FOR LAYOUT ---
-            window.triggerUpload = function () {
-                document.getElementById('fileInput').click();
+            // --- CAROUSEL SCROLL LOGIC ---
+            function scrollCarousel(id, direction) {
+                const container = document.getElementById(id);
+                // Scroll bằng chiều rộng của 1 card + gap
+                const scrollAmount = id === 'subjectCarousel' ? 300 : 240;
+
+                container.scrollBy({
+                    left: direction * scrollAmount,
+                    behavior: 'smooth'
+                });
             }
 
-            // --- LOCAL FUNCTIONS ---
-            function openCreateFolder() {
-                document.getElementById('createFolderModal').showModal();
-            }
-
-            // Context Menu Logic
-            let selectedFileId = null;
-            let hasThumb = false;
+            // --- CONTEXT MENU & DETAILS ---
             const contextMenu = document.getElementById('contextMenu');
             const detailsPanel = document.getElementById('detailsPanel');
+            let selectedFileId = null;
 
             window.openContextMenu = function (e, element) {
                 e.preventDefault();
                 e.stopPropagation();
                 selectedFileId = element.getAttribute('data-id');
-                hasThumb = element.getAttribute('data-has-thumb') === 'true';
 
-                // Điều chỉnh vị trí menu nếu sát lề
                 let x = e.pageX;
                 let y = e.pageY;
                 if (window.innerWidth - x < 200)
@@ -197,50 +190,41 @@
                 contextMenu.classList.remove('hidden');
             }
 
-            function closeContextMenu() {
-                contextMenu.classList.add('hidden');
-            }
-
-            document.addEventListener('click', function (e) {
-                if (!contextMenu.contains(e.target))
-                    closeContextMenu();
-            });
-
-            // Sidebar Details Logic
             function closeDetails() {
                 detailsPanel.classList.remove('translate-x-0');
                 detailsPanel.classList.add('translate-x-full');
             }
 
-            // Format giây -> MM:SS
-            function formatDuration(seconds) {
-                if (!seconds)
-                    return "";
-                const min = Math.floor(seconds / 60);
-                const sec = seconds % 60;
-                return `${min}:${sec.toString().padStart(2, '0')}`;
-            }
+            // Auto close events
+            document.addEventListener('click', function (e) {
+                if (!contextMenu.contains(e.target))
+                    contextMenu.classList.add('hidden');
 
+                // Close panel if click outside
+                if (!detailsPanel.contains(e.target) && !detailsPanel.classList.contains('translate-x-full') && !e.target.closest('#contextMenu')) {
+                    closeDetails();
+                }
+            });
+
+            // View Info Logic
             function viewProperties() {
-                closeContextMenu();
+                contextMenu.classList.add('hidden');
+                if (!selectedFileId)
+                    return;
+
                 detailsPanel.classList.remove('translate-x-full');
                 detailsPanel.classList.add('translate-x-0');
 
                 document.getElementById('detailName').innerText = "Loading...";
-                document.getElementById('metaContainer').innerHTML = '<p class="text-gray-500 text-xs">Loading metadata...</p>';
+                document.getElementById('detailSize').innerText = "...";
+                document.getElementById('metaContainer').innerHTML = '<p class="text-gray-500 text-xs">Loading info...</p>';
 
                 const img = document.getElementById('detailPreview');
                 const icon = document.getElementById('detailIcon');
 
-                if (hasThumb) {
-                    img.src = `/api/file/thumbnail/${selectedFileId}`;
-                    img.classList.remove('hidden');
-                    icon.classList.add('hidden');
-                } else {
-                    img.classList.add('hidden');
-                    icon.classList.remove('hidden');
-                    icon.innerText = 'description';
-                }
+                img.src = `/api/file/thumbnail/${selectedFileId}`;
+                img.classList.remove('hidden');
+                icon.classList.add('hidden');
 
                 fetch(`/api/file/metadata/${selectedFileId}`)
                         .then(res => res.json())
@@ -248,54 +232,20 @@
                             document.getElementById('detailName').innerText = data.name;
                             document.getElementById('detailSize').innerText = data.size;
 
-                            if (!hasThumb)
-                                icon.innerText = data.type.startsWith('video') ? 'movie' : 'description';
-
                             const container = document.getElementById('metaContainer');
                             container.innerHTML = '';
-                            const addRow = (label, value) => {
-                                if (value == null || value === '')
-                                    return;
-                                container.innerHTML += `<div class="flex justify-between items-center text-sm py-1 border-b border-white/5 last:border-0"><span class="text-[#a79cba]">${label}</span><span class="text-white font-medium truncate max-w-[160px]" title="${value}">${value}</span></div>`;
-                            };
+                            const addRow = (l, v) => container.innerHTML += `<div class="flex justify-between py-1 text-sm border-b border-white/5"><span class="text-gray-400">${l}</span><span class="text-white truncate max-w-[150px]" title="${v}">${v}</span></div>`;
 
                             addRow("Type", data.type);
-                            addRow("Uploaded", data.created ? new Date(data.created).toLocaleDateString() : "");
-
-                            if (data.meta && data.meta !== "N/A") {
-                                const m = data.meta;
-                                if (m.width && m.height)
-                                    addRow("Dimensions", `${m.width} x ${m.height}`);
-                                if (m.durationSeconds)
-                                    addRow("Duration", formatDuration(m.durationSeconds));
-                                if (m.videoCodec)
-                                    addRow("Codec", m.videoCodec.toUpperCase());
-                                if (m.takenAt)
-                                    addRow("Taken", new Date(m.takenAt).toLocaleDateString());
-                                if (m.locationName)
-                                    addRow("Location", m.locationName);
+                            if (data.meta && data.meta.width)
+                                addRow("Res", `${data.meta.width}x${data.meta.height}`);
+                            if (data.meta && data.meta.durationSeconds) {
+                                const min = Math.floor(data.meta.durationSeconds / 60);
+                                const sec = data.meta.durationSeconds % 60;
+                                addRow("Duration", `${min}:${sec.toString().padStart(2, '0')}`);
                             }
-                        })
-                        .catch(err => console.error(err));
-            }
-
-            // Load Video Durations on Load
-            document.addEventListener('DOMContentLoaded', () => {
-                document.querySelectorAll('.video-duration-tag').forEach(tag => {
-                    const fileId = tag.getAttribute('data-id');
-                    if (fileId) {
-                        fetch(`/api/file/metadata/${fileId}`)
-                                .then(res => res.json())
-                                .then(data => {
-                                    if (data.meta && data.meta.durationSeconds)
-                                        tag.innerText = formatDuration(data.meta.durationSeconds);
-                                    else
-                                        tag.parentElement.style.display = 'none';
-                                }).catch(() => {
                         });
-                    }
-                });
-            });
+            }
         </script>
 
     </body>

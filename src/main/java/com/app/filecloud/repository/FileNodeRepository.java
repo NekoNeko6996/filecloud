@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 
 @Repository
@@ -27,5 +28,7 @@ public interface FileNodeRepository extends JpaRepository<FileNode, String> {
     
     @Query("SELECT f FROM FileNode f JOIN FileSubject fs ON f.id = fs.fileId WHERE fs.subjectId = :subjectId AND f.size = :size")
     List<FileNode> findBySubjectIdAndSize(Integer subjectId, Long size);
+    
+    List<FileNode> findByType(FileNode.Type type, Pageable pageable);
 }
 
