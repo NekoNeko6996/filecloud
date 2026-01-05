@@ -6,6 +6,8 @@ import com.app.filecloud.entity.StorageVolume;
 import com.app.filecloud.entity.SubjectFolderMapping;
 import com.app.filecloud.repository.ContentSubjectRepository;
 import com.app.filecloud.repository.FileNodeRepository;
+import com.app.filecloud.repository.FileTagRepository;
+import com.app.filecloud.repository.MediaMetadataRepository;
 import com.app.filecloud.repository.SubjectFolderMappingRepository;
 import com.app.filecloud.repository.UserRepository;
 import com.app.filecloud.service.FileStorageService;
@@ -14,6 +16,9 @@ import com.app.filecloud.service.MediaService;
 import com.app.filecloud.service.ScanProgressService;
 import com.app.filecloud.service.StorageVolumeService;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
@@ -27,9 +32,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
@@ -45,11 +52,16 @@ public class SubjectController {
     private final MediaScanService mediaScanService;
     private final ScanProgressService progressService;
     private final UserRepository userRepository;
-    
+
     private final SubjectFolderMappingRepository mappingRepository;
     private final FileStorageService fileStorageService;
     private final StorageVolumeService storageVolumeService;
-    
+    private final FileTagRepository fileTagRepository;
+    private final MediaMetadataRepository mediaMetadataRepository;
+
+    // root path
+    @Value("${app.storage.root:uploads}")
+    private String rootUploadDir;
 
     @GetMapping
     public String subjectsPage(Model model) {
@@ -70,7 +82,7 @@ public class SubjectController {
         // 3. Tính toán thống kê
         long totalSize = files.stream().mapToLong(FileNode::getSize).sum();
         String formattedSize = formatSize(totalSize);
-        
+
         List<SubjectFolderMapping> mappings = mappingRepository.findBySubjectId(id);
         model.addAttribute("mappings", mappings);
 
@@ -118,39 +130,43 @@ public class SubjectController {
 
         return "redirect:/subjects/" + subject.getId();
     }
-    
+
     @PostMapping("/upload-media")
     @ResponseBody
-    public ResponseEntity<String> uploadMedia(@RequestParam("file") MultipartFile file, 
-                                              @RequestParam("mappingId") Integer mappingId) {
+    public ResponseEntity<String> uploadMedia(@RequestParam("file") MultipartFile file,
+            @RequestParam("mappingId") Integer mappingId) {
         try {
             String userId = getCurrentUserId(); // Hàm helper có sẵn
-            if (userId == null) return ResponseEntity.status(401).body("Unauthorized");
-            
+            if (userId == null) {
+                return ResponseEntity.status(401).body("Unauthorized");
+            }
+
             fileStorageService.uploadFileToMapping(file, mappingId, userId);
             return ResponseEntity.ok("Uploaded: " + file.getOriginalFilename());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
         }
     }
-    
+
     @GetMapping("/check-capacity/{volumeId}")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> checkVolumeCapacity(@PathVariable Integer volumeId) {
         StorageVolume volume = storageVolumeService.getVolumeById(volumeId);
-        if (volume == null) return ResponseEntity.notFound().build();
+        if (volume == null) {
+            return ResponseEntity.notFound().build();
+        }
 
         // Quét lại dung lượng thực tế (có thể tốn thời gian nên làm ở đây)
         File root = new File(volume.getMountPoint());
         long total = root.getTotalSpace();
         long free = root.getUsableSpace();
-        
+
         // Format cho đẹp
         Map<String, Object> data = new HashMap<>();
         data.put("total", formatSize(total));
         data.put("free", formatSize(free));
-        data.put("percent", (int)((double)(total - free) / total * 100));
-        
+        data.put("percent", (int) ((double) (total - free) / total * 100));
+
         return ResponseEntity.ok(data);
     }
 
@@ -163,7 +179,7 @@ public class SubjectController {
         int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
         return new DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " " + units[digitGroups];
     }
-    
+
     private String getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated()) {
@@ -172,5 +188,96 @@ public class SubjectController {
                     .orElse(null);
         }
         return null;
+    }
+
+    @GetMapping("/{id}/delete-preview")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getDeletePreview(@PathVariable Integer id) {
+        ContentSubject subject = subjectRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Subject not found"));
+
+        List<FileNode> files = fileNodeRepository.findBySubjectId(id);
+        long totalSize = files.stream().mapToLong(FileNode::getSize).sum();
+
+        // --- LOGIC MỚI: ĐẾM TAG ---
+        long tagCount = 0;
+        if (!files.isEmpty()) {
+            List<String> fileIds = files.stream().map(FileNode::getId).toList();
+            tagCount = fileTagRepository.countByFileIdIn(fileIds);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("name", subject.getMainName());
+        response.put("fileCount", files.size());
+        response.put("totalSize", formatSize(totalSize));
+        response.put("tagCount", tagCount); // <--- Trả về số lượng tag
+        response.put("hasAvatar", subject.getAvatarUrl() != null && !subject.getAvatarUrl().isEmpty());
+
+        return ResponseEntity.ok(response);
+    }
+
+    // === CẬP NHẬT API DELETE ===
+    @PostMapping("/delete")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> deleteSubject(@RequestParam("id") Integer id,
+                                                @RequestParam(value = "deletePhysical", defaultValue = "false") boolean deletePhysical) {
+        try {
+            ContentSubject subject = subjectRepository.findById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Subject not found"));
+
+            // Lấy danh sách file
+            List<FileNode> files = fileNodeRepository.findBySubjectId(id);
+
+            // 1. VÒNG LẶP CHỈ ĐỂ XÓA FILE VẬT LÝ (KHÔNG THAO TÁC DB Ở ĐÂY)
+            for (FileNode file : files) {
+                // Xóa file vật lý trên ổ cứng
+                if (deletePhysical) {
+                    StorageVolume vol = storageVolumeService.getVolumeById(file.getVolumeId());
+                    if (vol != null) {
+                        try {
+                            Path physicalPath = Paths.get(vol.getMountPoint(), file.getRelativePath());
+                            Files.deleteIfExists(physicalPath);
+                        } catch (Exception e) { /* Ignore lỗi file hệ thống */ }
+                    }
+                }
+
+                // Xóa Thumbnail rác
+                try {
+                    Path thumbDir = Paths.get(rootUploadDir, ".cache", "thumbnails");
+                    Files.deleteIfExists(thumbDir.resolve(file.getId() + "_small.jpg"));
+                    Files.deleteIfExists(thumbDir.resolve(file.getId() + "_medium.jpg"));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+
+            // 2. XÓA DỮ LIỆU DB BẰNG BATCH (QUAN TRỌNG)
+            // Thay vì delete từng cái gây lỗi Hibernate, ta xóa 1 lần.
+            // DB sẽ tự động xóa MediaMetadata, FileTag, FileSubject nhờ ON DELETE CASCADE
+            if (!files.isEmpty()) {
+                fileNodeRepository.deleteAllInBatch(files);
+            }
+
+            // 3. Xóa Avatar Subject
+            if (subject.getAvatarUrl() != null && subject.getAvatarUrl().startsWith("/avatars/")) {
+                try {
+                    String relativeAvatarPath = subject.getAvatarUrl().startsWith("/")
+                            ? subject.getAvatarUrl().substring(1)
+                            : subject.getAvatarUrl();
+                    Files.deleteIfExists(Paths.get(rootUploadDir, relativeAvatarPath));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+
+            // 4. Xóa Subject
+            subjectRepository.delete(subject);
+
+            return ResponseEntity.ok("Deleted successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error deleting: " + e.getMessage());
+        }
     }
 }

@@ -14,8 +14,13 @@
 
             <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div th:each="sub : ${subjects}" class="group relative h-40 rounded-xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20"
-                         th:onclick="'window.location.href = \'' + @{/subjects/{id}(id=${sub.id})} + '\''">
+                    <div th:each="sub : ${subjects}" 
+                         class="group relative h-40 rounded-xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20"
+                         th:data-url="@{/subjects/{id}(id=${sub.id})}"
+                         th:data-id="${sub.id}"
+                         th:data-name="${sub.mainName}"
+                         onclick="window.location.href = this.getAttribute('data-url')"
+                         oncontextmenu="showContextMenu(event, this.getAttribute('data-id'), this.getAttribute('data-name'))">
                         <div class="absolute inset-0 z-0">
                             <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover opacity-60 blur-sm scale-110 transition-transform duration-700">
                             <div class="absolute inset-0 bg-gradient-to-r from-[#171022] via-[#171022]/80 to-transparent"></div>
@@ -49,7 +54,7 @@
 
                                 <div class="flex items-center gap-3 mt-1 text-xs text-gray-300 font-medium">
                                     <span class="flex items-center gap-1">
-                                        <span class="text-white font-bold">2.4k</span> items
+                                        <span class="text-white font-bold">2.4k</span> items    
                                     </span>
                                     <span class="w-1 h-1 rounded-full bg-gray-500"></span>
                                     <span class="truncate max-w-[120px]" 
@@ -84,11 +89,235 @@
                     </div>
                 </form>
             </dialog>
+
+            <dialog id="deleteModal" class="bg-[#1e1e1e] text-white p-0 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-md">
+                <div class="p-6">
+                    <div class="flex items-center gap-4 mb-4 text-red-500">
+                        <span class="material-symbols-outlined text-4xl">warning</span>
+                        <h3 class="text-xl font-bold text-white">Delete Subject?</h3>
+                    </div>
+
+                    <p class="text-gray-300 mb-4">
+                        You are about to delete <strong id="delSubjectName" class="text-white">...</strong>.
+                        This action cannot be undone.
+                    </p>
+
+                    <div class="bg-[#2e2839] p-4 rounded-lg border border-white/5 mb-6 text-sm space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Related Files:</span>
+                            <span class="font-bold text-white" id="delFileCount">0</span>
+                        </div>
+
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Attached Tags:</span>
+                            <span class="font-bold text-yellow-400" id="delTagCount">0</span>
+                        </div>
+
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Total Size:</span>
+                            <span class="font-bold text-primary" id="delTotalSize">0 MB</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Database Records:</span>
+                            <span class="text-red-400 font-bold">Will be removed</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-white/10 hover:bg-white/5 transition-colors has-[:checked]:border-red-500/50 has-[:checked]:bg-red-500/10">
+                            <input type="checkbox" id="checkDeletePhysical" onchange="toggleDeleteWarning()" class="mt-1 rounded bg-gray-700 border-gray-600 text-red-600 focus:ring-red-600">
+                            <div>
+                                <span class="font-bold text-white block">Delete physical files from Disk</span>
+                                <span class="text-xs text-gray-500 block mt-1">
+                                    If checked, actual video/image files on your hard drive will be PERMANENTLY deleted.
+                                </span>
+                            </div>
+                        </label>
+
+                        <div id="physicalWarning" class="hidden mt-3 text-xs text-red-400 bg-red-900/20 p-2 rounded border border-red-900/50 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-sm">error</span>
+                            Warning: Files on HDD will be lost forever!
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3">
+                        <button onclick="document.getElementById('deleteModal').close()" class="px-4 py-2 text-gray-400 hover:text-white font-medium">Cancel</button>
+                        <button onclick="confirmDeleteAction()" id="btnConfirmDelete" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-colors flex items-center gap-2">
+                            <span class="material-symbols-outlined">delete</span> Confirm Delete
+                        </button>
+                    </div>
+                </div>
+            </dialog>
+
+            <div id="subjectContextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-gray-700 rounded-lg shadow-2xl overflow-hidden p-2">
+                <button id="ctxInfoBtn" class="w-full text-left px-4 py-2.5 text-sm rounded text-gray-300 hover:bg-white/10 hover:text-white flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">info</span>
+                    Information
+                </button>
+
+                <div class="h-px bg-white/10 my-1 mx-2"></div>
+
+                <button id="ctxDeleteBtn" class="w-full text-left px-4 py-2.5 text-sm rounded text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                    Delete
+                </button>
+            </div>
         </section>
-
         <script>
-            // Script riêng cho trang Subjects (hiện tại chưa có logic phức tạp)
-        </script>
+            // --- CONTEXT MENU LOGIC ---
+            const contextMenu = document.getElementById('subjectContextMenu');
+            const ctxInfoBtn = document.getElementById('ctxInfoBtn');
+            const ctxDeleteBtn = document.getElementById('ctxDeleteBtn');
 
+            let activeSubjectId = null;
+            let activeSubjectName = null;
+
+            // Hàm được gọi khi chuột phải vào thẻ Subject
+            function showContextMenu(event, id, name) {
+                event.preventDefault(); // Ngăn menu mặc định của trình duyệt
+                event.stopPropagation(); // Ngăn sự kiện click chuyển trang của thẻ cha
+
+                activeSubjectId = id;
+                activeSubjectName = name;
+
+                // Tính toán vị trí menu để không bị tràn màn hình
+                let x = event.clientX;
+                let y = event.clientY;
+
+                // Nếu menu gần mép phải -> hiện sang trái
+                if (x + 200 > window.innerWidth)
+                    x -= 200;
+                // Nếu menu gần mép dưới -> hiện lên trên
+                if (y + 100 > window.innerHeight)
+                    y -= 100;
+
+                contextMenu.style.left = `${x}px`;
+                contextMenu.style.top = `${y}px`;
+                contextMenu.classList.remove('hidden');
+            }
+
+            // Xử lý khi click "Information"
+            ctxInfoBtn.onclick = function () {
+                if (activeSubjectId) {
+                    window.location.href = `/subjects/${activeSubjectId}`;
+                }
+                hideContextMenu();
+            };
+
+            // Xử lý khi click "Delete" -> Gọi lại logic xóa cũ
+            ctxDeleteBtn.onclick = function () {
+                if (activeSubjectId) {
+                    // Gọi hàm prepareDelete (được tách ra từ hàm deleteSubject cũ)
+                    prepareDeleteModal(activeSubjectId, activeSubjectName);
+                }
+                hideContextMenu();
+            };
+
+            // Ẩn menu khi click bất kỳ đâu
+            document.addEventListener('click', hideContextMenu);
+            document.addEventListener('scroll', hideContextMenu); // Ẩn khi cuộn chuột
+
+            function hideContextMenu() {
+                contextMenu.classList.add('hidden');
+            }
+
+            // --- DELETE LOGIC (Sửa lại một chút để tái sử dụng) ---
+            let currentDeleteId = null;
+
+            // Hàm này thay thế cho deleteSubject(event, id) cũ
+            async function prepareDeleteModal(id, name) {
+                currentDeleteId = id;
+
+                const modal = document.getElementById('deleteModal');
+                const btn = document.getElementById('btnConfirmDelete');
+
+                // Reset UI
+                document.getElementById('checkDeletePhysical').checked = false;
+                toggleDeleteWarning();
+                // Dùng tên được truyền vào hoặc placeholder nếu đang load
+                document.getElementById('delSubjectName').innerText = name || "Loading...";
+                document.getElementById('delFileCount').innerText = "...";
+                document.getElementById('delTagCount').innerText = "...";
+                document.getElementById('delTotalSize').innerText = "...";
+                btn.disabled = true;
+
+                modal.showModal();
+
+                // Fetch Preview Data
+                try {
+                    const res = await fetch(`/subjects/${id}/delete-preview`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        document.getElementById('delSubjectName').innerText = data.name;
+                        document.getElementById('delFileCount').innerText = data.fileCount;
+                        document.getElementById('delTagCount').innerText = data.tagCount || 0;
+                        document.getElementById('delTotalSize').innerText = data.totalSize;
+                        btn.disabled = false;
+                    } else {
+                        alert("Error fetching subject info");
+                        modal.close();
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Connection error");
+                    modal.close();
+                }
+            }
+
+            function toggleDeleteWarning() {
+                const isChecked = document.getElementById('checkDeletePhysical').checked;
+                const warning = document.getElementById('physicalWarning');
+                if (isChecked) {
+                    warning.classList.remove('hidden');
+                } else {
+                    warning.classList.add('hidden');
+                }
+            }
+
+            async function confirmDeleteAction() {
+                if (!currentDeleteId)
+                    return;
+
+                const deletePhysical = document.getElementById('checkDeletePhysical').checked;
+
+                if (deletePhysical) {
+                    if (!confirm("ARE YOU SURE? This will permanently delete files from your storage volume.")) {
+                        return;
+                    }
+                }
+
+                const btn = document.getElementById('btnConfirmDelete');
+                btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Deleting...';
+                btn.disabled = true;
+
+                try {
+                    const formData = new FormData();
+                    formData.append('id', currentDeleteId);
+                    formData.append('deletePhysical', deletePhysical);
+
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+
+                    const res = await fetch('/subjects/delete', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: formData
+                    });
+
+                    if (res.ok) {
+                        window.location.reload();
+                    } else {
+                        const txt = await res.text();
+                        alert("Delete failed: " + txt);
+                        btn.disabled = false;
+                        btn.innerHTML = 'Confirm Delete';
+                    }
+                } catch (e) {
+                    alert("Error sending delete request");
+                    btn.disabled = false;
+                }
+            }
+        </script>
     </body>
 </html>
