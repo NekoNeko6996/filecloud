@@ -2,8 +2,13 @@
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{fragments/video_layout :: layout(${file.name}, ~{::div.grid-container}, ~{::#page-scripts})}">
     <body>
+        <div id="mainGrid" class="grid-container grid grid-cols-1 lg:grid-cols-4 gap-8 p-5 pl-10">
+            <div id="sidebarOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] hidden transition-opacity duration-300" onclick="closeSidebar()"></div>
+            <button id="playlistFab" onclick="openSidebar()" 
+                    class="fixed bottom-6 right-6 z-[50] size-14 rounded-full bg-primary hover:bg-primary-hover text-white shadow-2xl flex items-center justify-center transition-transform hover:scale-110 hidden">
+                <span class="material-symbols-outlined text-3xl">queue_music</span>
+            </button>
 
-        <div id="mainGrid" class="grid-container grid grid-cols-1 lg:grid-cols-4 gap-8 p-5 pl-10 transition-all duration-500">
             <div id="leftCol" class="lg:col-span-3 flex flex-col gap-6 transition-all duration-500">
                 <div id="videoWrapper" class="relative w-full group select-none isolate transition-all">
                     <canvas id="ambientCanvas" 
@@ -177,16 +182,26 @@
                 </div>
             </div>
 
-            <div id="rightCol" class="lg:col-span-1 flex flex-col gap-3 relative h-fit sticky top-7 transition-all duration-500">
+            <div id="rightCol" class="lg:col-span-1 flex flex-col gap-3 relative h-fit transition-all duration-300">
+                <div id="sidebarHeader" class="hidden flex items-center justify-between border-b border-white/10 mb-2">
+                    <h3 class="text-white font-bold text-lg">Playlist</h3>
+                    <button onclick="closeSidebar()" class="text-gray-400 hover:text-white">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+
                 <div class="flex items-center justify-between text-white">
-                    <h3 class="font-bold text-lg" th:text="${subject != null ? 'Playlist of ' + subject.mainName : 'Playlist'}">Playlist</h3>
+                    <h3 class="font-bold text-lg" 
+                        th:text="${subject != null} ? |${subject.mainName}'s Playlist| : 'Playlist'">
+                        Playlist
+                    </h3>
                     <span class="text-xs text-gray-400" th:text="${#lists.size(playlist) + ' videos'}">0 videos</span>
                 </div>
 
                 <div class="-mx-4 px-4 md:mx-0 md:px-0 backdrop-blur py-2 border-b border-white/5 lg:border-none">
                     <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-2" th:if="${not #lists.isEmpty(subjectTags)}">
                         <button onclick="resetTagFilter()" id="btnResetTags" class="whitespace-nowrap px-3 py-1.5 bg-white text-black text-sm font-bold rounded-lg transition-colors shadow-lg hover:shadow-white/20">All</button>
-
+                        
                         <button th:each="tag : ${subjectTags}" 
                                 th:onclick="'toggleTagFilter(' + ${tag.id} + ', this)'"
                                 class="tag-filter-btn whitespace-nowrap px-3 py-1.5 bg-surface-dark hover:bg-surface-dark-hover border border-white/10 text-gray-300 hover:text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 select-none">
@@ -194,6 +209,7 @@
                             <span th:text="${tag.name}">Tag</span>
                         </button>
                     </div>
+                    <p class="text-gray-300 text-sm leading-relaxed whitespace-pre-line" th:if="${#lists.isEmpty(subjectTags)}">No tag found...</p>
                 </div>
 
                 <div class="flex flex-col gap-2 max-h-[calc(100vh-150px)] overflow-y-auto pr-1 custom-scrollbar" id="playlistContainer">
@@ -288,6 +304,9 @@
                 const mainGrid = document.getElementById('mainGrid');
                 const leftCol = document.getElementById('leftCol');
                 const rightCol = document.getElementById('rightCol');
+                const playlistFab = document.getElementById('playlistFab');
+                const sidebarHeader = document.getElementById('sidebarHeader');
+                const videoContainer = document.getElementById('videoContainer');
 
                 const theaterBtn = document.getElementById('theaterBtn');
                 const toggleLoopBtn = document.getElementById('toggleLoopBtn');
@@ -317,6 +336,73 @@
                 if (activeItem) {
                     activeItem.scrollIntoView({block: 'center', behavior: 'smooth'});
                 }
+
+                // --- NEW: SIDEBAR LOGIC ---
+                window.openSidebar = function () {
+                    rightCol.classList.remove('translate-x-full', 'invisible');
+                    rightCol.classList.add('translate-x-0', 'visible');
+                    sidebarOverlay.classList.remove('hidden');
+                    // Tắt scroll body
+                    document.body.style.overflow = 'hidden';
+                }
+
+                window.closeSidebar = function () {
+                    rightCol.classList.add('translate-x-full', 'invisible');
+                    rightCol.classList.remove('translate-x-0', 'visible');
+                    sidebarOverlay.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }
+
+                function checkResponsiveLayout() {
+                    const isMobile = window.innerWidth < 1024;
+                    const shouldBeSidebar = isTheater || isMobile;
+
+                    if (shouldBeSidebar) {
+                        // CHUYỂN SANG CHẾ ĐỘ SIDEBAR
+                        // 1. Setup Class cho Sidebar Fixed
+                        rightCol.classList.add('fixed', 'top-0', 'right-0', 'h-screen', 'w-80', 'bg-[#1e1e1e]', 'z-[70]', 'shadow-2xl', 'transition-transform', 'duration-300', 'p-3');
+
+                        // 2. Ẩn nó đi (trạng thái đóng ban đầu)
+                        // Lưu ý: Chỉ thêm 'translate-x-full' nếu nó chưa được mở (để tránh đóng lại nếu đang mở)
+                        if (!rightCol.classList.contains('translate-x-0')) {
+                            rightCol.classList.add('translate-x-full', 'invisible');
+                        }
+
+                        // 3. Xóa các class của Grid Mode
+                        rightCol.classList.remove('lg:col-span-1', 'relative', 'h-fit');
+
+                        // 4. UI phụ
+                        sidebarHeader.classList.remove('hidden');
+                        playlistFab.classList.remove('hidden');
+
+                        // 5. Mở rộng cột trái (Theater Mode)
+                        if (isTheater) {
+                            leftCol.classList.remove('lg:col-span-3');
+                            leftCol.classList.add('lg:col-span-4');
+                        }
+                    } else {
+                        // CHUYỂN VỀ CHẾ ĐỘ GRID (DESKTOP NORMAL)
+                        // 1. Đóng sidebar nếu đang mở
+                        window.closeSidebar();
+
+                        // 2. Xóa các class Fixed
+                        rightCol.classList.remove('fixed', 'top-0', 'right-0', 'h-screen', 'w-80', 'bg-[#1e1e1e]', 'z-[70]', 'shadow-2xl', 'translate-x-full', 'invisible');
+
+                        // 3. Thêm lại class Grid
+                        rightCol.classList.add('lg:col-span-1', 'relative', 'h-fit', 'visible');
+                        rightCol.style.transform = ''; // Reset transform style inline
+
+                        // 4. Ẩn UI phụ
+                        sidebarHeader.classList.add('hidden');
+                        playlistFab.classList.add('hidden');
+
+                        // 5. Trả cột trái về bình thường
+                        leftCol.classList.remove('lg:col-span-4');
+                        leftCol.classList.add('lg:col-span-3');
+                    }
+                }
+
+                window.addEventListener('resize', checkResponsiveLayout);
 
                 window.toggleTagFilter = function (tagId, btn) {
                     if (activeTags.has(tagId)) {
@@ -678,6 +764,8 @@
                         theaterBtn.classList.remove('text-primary');
                         videoContainer.classList.remove('ring-primary/50');
                     }
+
+                    checkResponsiveLayout();
 
                     // Cập nhật lại kích thước Ambient Light sau khi layout đổi (chờ hiệu ứng CSS 500ms)
                     setTimeout(() => {
