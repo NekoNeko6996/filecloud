@@ -22,7 +22,7 @@
                             <source th:src="@{/api/media/stream/{id}(id=${file.id})}" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
-                        <div class="controls-layer absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
+                        <div id="gradientOverlay" class="controls-layer absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
                         <div id="seekOverlay" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none opacity-0 transition-opacity duration-200 z-30">
                             <div class="bg-black/60 backdrop-blur-md px-6 py-3 rounded-full flex items-center gap-3 border border-white/10 shadow-2xl scale-110">
                                 <span class="material-symbols-outlined text-white text-3xl" id="seekIcon">fast_forward</span>
@@ -83,7 +83,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="controls-layer absolute bottom-0 left-0 w-full px-4 pb-4 pt-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col gap-2">
+                        <div id="bottomControls" class="controls-layer absolute bottom-0 left-0 w-full px-4 pb-4 pt-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col gap-2">
                             <div class="relative h-1.5 w-full bg-white/20 rounded-full cursor-pointer group/progress transition-all hover:h-2.5" id="progressContainer">
                                 <div id="bufferBar" class="absolute top-0 left-0 h-full bg-white/30 rounded-full w-0 transition-all duration-300"></div>
                                 <div id="progressBar" class="absolute top-0 left-0 h-full bg-primary rounded-full w-0 relative">
@@ -201,7 +201,7 @@
                 <div class="-mx-4 px-4 md:mx-0 md:px-0 backdrop-blur py-2 border-b border-white/5 lg:border-none">
                     <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-2" th:if="${not #lists.isEmpty(subjectTags)}">
                         <button onclick="resetTagFilter()" id="btnResetTags" class="whitespace-nowrap px-3 py-1.5 bg-white text-black text-sm font-bold rounded-lg transition-colors shadow-lg hover:shadow-white/20">All</button>
-                        
+
                         <button th:each="tag : ${subjectTags}" 
                                 th:onclick="'toggleTagFilter(' + ${tag.id} + ', this)'"
                                 class="tag-filter-btn whitespace-nowrap px-3 py-1.5 bg-surface-dark hover:bg-surface-dark-hover border border-white/10 text-gray-300 hover:text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 select-none">
@@ -238,35 +238,57 @@
                     </a>
                 </div>
             </div>
+
+            <style>
+                .idle-mode {
+                    cursor: none !important;
+                }
+                .idle-mode .controls-layer {
+                    opacity: 0 !important;
+                }
+                .idle-mode #settingsMenu {
+                    visibility: hidden !important;
+                    opacity: 0 !important;
+                }
+
+                /* Custom Scrollbar for Playlist */
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #333;
+                    border-radius: 2px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: #555;
+                }
+
+                /* --- XỬ LÝ RIÊNG CHO CHẾ ĐỘ TOÀN MÀN HÌNH --- */
+
+                /* 1. Ẩn luôn lớp phủ tối (gradient) khi Fullscreen để màn hình trong suốt */
+                .fullscreen-mode #gradientOverlay {
+                    display: none !important;
+                }
+
+                /* 2. Mặc định ẩn thanh controls dưới đáy (ghi đè logic group-hover cũ) */
+                .fullscreen-mode #bottomControls {
+                    opacity: 0 !important;
+                    /* Tăng vùng đệm vô hình phía trên lên 80px để dễ bắt chuột hơn khi di xuống */
+                    padding-top: 80px !important;
+                    transition: opacity 0.3s ease;
+                }
+
+                /* 3. CHỈ hiện khi chuột thực sự nằm trong vùng bottomControls */
+                .fullscreen-mode #bottomControls:hover {
+                    opacity: 1 !important;
+                    /* Tạo background tối cục bộ để icon trắng dễ nhìn trên nền video sáng */
+                    background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
+                }
+            </style>
         </div>
-
-        <style>
-            .idle-mode {
-                cursor: none !important;
-            }
-            .idle-mode .controls-layer {
-                opacity: 0 !important;
-            }
-            .idle-mode #settingsMenu {
-                visibility: hidden !important;
-                opacity: 0 !important;
-            }
-
-            /* Custom Scrollbar for Playlist */
-            .custom-scrollbar::-webkit-scrollbar {
-                width: 4px;
-            }
-            .custom-scrollbar::-webkit-scrollbar-track {
-                background: transparent;
-            }
-            .custom-scrollbar::-webkit-scrollbar-thumb {
-                background: #333;
-                border-radius: 2px;
-            }
-            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                background: #555;
-            }
-        </style>
 
     <th:block id="page-scripts">
         <script>
@@ -672,10 +694,16 @@
                         fullscreenBtn.querySelector('span').textContent = 'close_fullscreen';
                         videoWrapper.classList.add('bg-black');
                         videoContainer.classList.remove('rounded-xl');
+
+                        // --- THÊM DÒNG NÀY: Bật chế độ Fullscreen Mode ---
+                        videoWrapper.classList.add('fullscreen-mode');
                     } else {
                         fullscreenBtn.querySelector('span').textContent = 'fullscreen';
                         videoWrapper.classList.remove('bg-black');
                         videoContainer.classList.add('rounded-xl');
+
+                        // --- THÊM DÒNG NÀY: Tắt chế độ Fullscreen Mode ---
+                        videoWrapper.classList.remove('fullscreen-mode');
                     }
                 });
 
