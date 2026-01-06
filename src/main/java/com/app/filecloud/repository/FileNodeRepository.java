@@ -35,7 +35,10 @@ public interface FileNodeRepository extends JpaRepository<FileNode, String> {
     @Query(value = "SELECT f.* FROM file_nodes f " +
                    "JOIN file_tags ft ON f.id = ft.file_id " +
                    "WHERE ft.tag_id = :tagId " +
-                   "ORDER BY ft.created_at DESC LIMIT 50", nativeQuery = true)
+                   "ORDER BY ft.created_at DESC LIMIT 50", nativeQuery = true)  
     List<FileNode> findByTagId(@Param("tagId") Integer tagId);
+    
+    @Query(value = "SELECT * FROM file_nodes WHERE type = 'FILE' AND mime_type LIKE 'video/%' AND id != :excludeId ORDER BY RAND() LIMIT :limit", nativeQuery = true)
+    List<FileNode> findRandomVideos(@Param("excludeId") String excludeId, @Param("limit") int limit);
 }
 

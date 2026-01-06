@@ -3,34 +3,33 @@
       th:replace="~{fragments/video_layout :: layout(${file.name}, ~{::div.grid-container}, ~{::#page-scripts})}">
     <body>
 
-        <div class="grid-container grid grid-cols-1 lg:grid-cols-4 gap-8 p-5 pl-10">
-            <div class="lg:col-span-3 flex flex-col gap-6">
-
-                <div id="videoWrapper" class="relative w-full group select-none isolate">
-
+        <div id="mainGrid" class="grid-container grid grid-cols-1 lg:grid-cols-4 gap-8 p-5 pl-10 transition-all duration-500">
+            <div id="leftCol" class="lg:col-span-3 flex flex-col gap-6 transition-all duration-500">
+                <div id="videoWrapper" class="relative w-full group select-none isolate transition-all">
                     <canvas id="ambientCanvas" 
-                            class="absolute top-1/2 left-1/2 w-full h-full -z-10 transition-opacity duration-1000 opacity-0 pointer-events-none"
-                            style="filter: blur(60px) saturate(200%); transform: translate(-50%, -50%) scale(1.05); mix-blend-mode: screen;"
+                            class="absolute top-1/2 left-1/2 w-full h-full -z-10 transition-opacity duration-1000 opacity-0 pointer-events-none rounded-xl"
+                            style="filter: blur(60px) saturate(200%); transform: translate(-50%, -50%) scale(1.15); mix-blend-mode: screen;"
                             width="100" height="60"></canvas>
-                    <div class="relative w-full bg-transparent rounded-xl overflow-hidden z-10">
 
+                    <div id="videoContainer" class="relative w-full h-full bg-transparent rounded-xl overflow-hidden">
                         <video id="mainPlayer" class="w-full aspect-video object-contain cursor-pointer"
-                               style="-webkit-mask-image: radial-gradient(ellipse at center, black 75%, transparent 100%);
-                               mask-image: radial-gradient(ellipse at center, black 75%, transparent 100%);">
+                               style="-webkit-mask-image: radial-gradient(ellipse at center, black 75%, transparent 100%);">
                             <source th:src="@{/api/media/stream/{id}(id=${file.id})}" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
-
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
-
-                        <div id="centerPlayBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-16 bg-black/50 rounded-full flex items-center justify-center opacity-0 pointer-events-none transition-transform scale-150 z-20 backdrop-blur-sm ring-1 ring-white/20">
-                            <span class="material-symbols-outlined text-white text-[40px]">play_arrow</span>
+                        <div class="controls-layer absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
+                        <div id="seekOverlay" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none opacity-0 transition-opacity duration-200 z-30">
+                            <div class="bg-black/60 backdrop-blur-md px-6 py-3 rounded-full flex items-center gap-3 border border-white/10 shadow-2xl scale-110">
+                                <span class="material-symbols-outlined text-white text-3xl" id="seekIcon">fast_forward</span>
+                                <span class="text-white font-bold text-xl font-mono" id="seekText">5s >></span>
+                            </div>
                         </div>
-
-                        <div id="settingsMenu" class="absolute bottom-16 right-4 w-64 bg-surface-dark/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl transform translate-y-4 opacity-0 invisible transition-all duration-200 z-30 overflow-hidden">
-                            <div class="p-2">
+                        <div id="centerPlayBtn" class="controls-layer absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-20 bg-black/60 rounded-full flex items-center justify-center backdrop-blur-sm ring-1 ring-white/20 cursor-pointer hover:bg-black/80 hover:scale-110 transition-all z-20 hidden">
+                            <span class="material-symbols-outlined text-white text-[48px]">play_arrow</span>
+                        </div>
+                        <div id="settingsMenu" class="absolute bottom-20 right-4 w-72 bg-[#1e1e1e]/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl transform translate-y-4 opacity-0 invisible transition-all duration-200 z-40 overflow-hidden">
+                            <div class="p-2 space-y-1">
                                 <div class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/5 mb-1">Settings</div>
-
                                 <button id="toggleAmbientBtn" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
                                     <div class="flex items-center gap-3">
                                         <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">light_mode</span>
@@ -40,20 +39,47 @@
                                         <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform" id="ambientSwitchKnob"></span>
                                     </div>
                                 </button>
-
-                                <button class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
+                                <button id="toggleLoopBtn" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
                                     <div class="flex items-center gap-3">
-                                        <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">speed</span>
-                                        <span class="text-white text-sm font-medium">Playback Speed</span>
+                                        <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">repeat</span>
+                                        <span class="text-white text-sm font-medium">Loop Video</span>
                                     </div>
-                                    <span class="text-xs text-gray-400">Normal</span>
+                                    <div class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-600 transition-colors" id="loopSwitchBg">
+                                        <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform" id="loopSwitchKnob"></span>
+                                    </div>
                                 </button>
+
+                                <button id="toggleAutoplayBtn" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
+                                    <div class="flex items-center gap-3">
+                                        <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">autoplay</span>
+                                        <span class="text-white text-sm font-medium">Autoplay</span>
+                                    </div>
+                                    <div class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-600 transition-colors" id="autoplaySwitchBg">
+                                        <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform" id="autoplaySwitchKnob"></span>
+                                    </div>
+                                </button>
+                                <div class="px-3 py-2 rounded-lg hover:bg-white/5 transition-colors">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-3">
+                                            <span class="material-symbols-outlined text-gray-300 text-[20px]">update</span>
+                                            <span class="text-white text-sm font-medium">Seek Time</span>
+                                        </div>
+                                        <span class="text-primary text-xs font-bold bg-primary/20 px-2 py-0.5 rounded" id="seekSettingValue">5s</span>
+                                    </div>
+                                    <div class="px-1">
+                                        <input type="range" min="1" max="20" step="1" id="seekSettingSlider" 
+                                               class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-primary hover:bg-white/40 transition-colors">
+                                        <div class="flex justify-between text-[10px] text-gray-500 mt-1 font-mono">
+                                            <span>1s</span>
+                                            <span>10s</span>
+                                            <span>20s</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        <div class="absolute bottom-0 left-0 w-full px-4 pb-4 pt-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col gap-2">
-
-                            <div class="relative h-1.5 w-full bg-white/20 rounded-full cursor-pointer group/progress" id="progressContainer">
+                        <div class="controls-layer absolute bottom-0 left-0 w-full px-4 pb-4 pt-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col gap-2">
+                            <div class="relative h-1.5 w-full bg-white/20 rounded-full cursor-pointer group/progress transition-all hover:h-2.5" id="progressContainer">
                                 <div id="bufferBar" class="absolute top-0 left-0 h-full bg-white/30 rounded-full w-0 transition-all duration-300"></div>
                                 <div id="progressBar" class="absolute top-0 left-0 h-full bg-primary rounded-full w-0 relative">
                                     <div class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 size-3 bg-white rounded-full scale-0 group-hover/progress:scale-100 transition-transform shadow-md"></div>
@@ -61,13 +87,11 @@
                                 <input type="range" min="0" max="100" value="0" step="0.1" id="seekSlider" 
                                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
                             </div>
-
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-4">
                                     <button id="playBtn" class="text-white hover:text-primary transition-colors">
                                         <span class="material-symbols-outlined text-[32px]" id="playIcon">play_arrow</span>
                                     </button>
-
                                     <div class="flex items-center gap-2 group/vol">
                                         <button id="muteBtn" class="text-white hover:text-primary transition-colors">
                                             <span class="material-symbols-outlined text-[24px]" id="volumeIcon">volume_up</span>
@@ -77,15 +101,16 @@
                                                    class="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer accent-primary hover:bg-white/50">
                                         </div>
                                     </div>
-
                                     <div class="text-xs font-medium font-mono text-gray-300">
                                         <span id="currentTime">00:00</span> / <span id="duration">00:00</span>
                                     </div>
                                 </div>
-
                                 <div class="flex items-center gap-3">
                                     <button id="settingsBtn" class="text-white hover:text-primary transition-colors rotate-0 transition-transform duration-300">
                                         <span class="material-symbols-outlined text-[24px]">settings</span>
+                                    </button>
+                                    <button id="theaterBtn" class="text-white hover:text-primary transition-colors" title="Theater Mode">
+                                        <span class="material-symbols-outlined text-[24px]">rectangle</span>
                                     </button>
                                     <button id="fullscreenBtn" class="text-white hover:text-primary transition-colors">
                                         <span class="material-symbols-outlined text-[28px]">fullscreen</span>
@@ -95,11 +120,11 @@
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-col gap-4 mt-7">
-                    <h1 class="text-white text-2xl md:text-3xl lg:text-[2rem] font-bold leading-tight tracking-tight" 
-                        th:text="${file.name}">Video Title</h1>
 
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                <div class="flex flex-col gap-4 mt-2">
+                    <h1 class="text-white text-2xl md:text-3xl lg:text-[2rem] font-bold leading-tight tracking-tight" 
+                        th:text="${file.name.lastIndexOf('.') > 0 ? file.name.substring(0, file.name.lastIndexOf('.')) : file.name}">Title</h1>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
                         <div class="flex items-center gap-4">
                             <a th:href="@{/subjects/{id}(id=${subject?.id})}" class="relative cursor-pointer hover:opacity-80 transition-opacity">
                                 <div class="size-12 rounded-full bg-cover bg-center ring-2 ring-primary/20 bg-gray-700 overflow-hidden">
@@ -109,31 +134,14 @@
                                     </div>
                                 </div>
                             </a>
-
                             <div class="flex flex-col">
                                 <div class="flex items-center gap-2">
-                                    <a th:href="@{/subjects/{id}(id=${subject?.id})}" 
-                                       class="text-white text-lg font-bold hover:text-primary transition-colors" 
-                                       th:text="${subject != null ? subject.mainName : 'Unknown Subject'}">Subject Name</a>
-                                    <span class="material-symbols-outlined text-[16px] text-blue-400" title="Verified">verified</span>
+                                    <a th:href="@{/subjects/{id}(id=${subject?.id})}" class="text-white text-lg font-bold hover:text-primary transition-colors" th:text="${subject != null ? subject.mainName : 'Unknown Subject'}">Name</a>
+                                    <span class="material-symbols-outlined text-[16px] text-blue-400">verified</span>
                                 </div>
-                                <span class="text-gray-400 text-sm" 
-                                      th:text="${subject != null && subject.aliasName1 != null ? subject.aliasName1 : 'No alias'}">Alias</span>
+                                <span class="text-gray-400 text-sm" th:text="${subject != null && subject.aliasName1 != null ? subject.aliasName1 : 'No alias'}">Alias</span>
                             </div>
-
-                            <button class="ml-2 px-6 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-bold rounded-full transition-colors shadow-lg shadow-primary/20">
-                                Follow
-                            </button>
-                        </div>
-
-                        <div class="flex items-center gap-2 self-start sm:self-auto">
-                            <button class="flex items-center gap-2 h-10 px-4 bg-surface-dark hover:bg-surface-dark-hover rounded-full text-white text-sm font-medium transition-colors border border-white/5">
-                                <span class="material-symbols-outlined text-[20px]">thumb_up</span>
-                                <span>Like</span>
-                            </button>
-                            <button class="flex items-center justify-center size-10 bg-surface-dark hover:bg-surface-dark-hover rounded-full text-white transition-colors border border-white/5" title="Share">
-                                <span class="material-symbols-outlined text-[20px]">share</span>
-                            </button>
+                            <button class="ml-2 px-6 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-bold rounded-full transition-colors shadow-lg shadow-primary/20">Follow</button>
                         </div>
                     </div>
 
@@ -145,86 +153,115 @@
                             <span th:if="${file.durationFormatted}">•</span>
                             <span th:if="${file.durationFormatted}" th:text="${file.durationFormatted}">Duration</span>
                         </div>
-                        <p class="text-gray-300 text-sm leading-relaxed whitespace-pre-line" 
-                           th:text="${subject != null ? subject.description : 'No description available for this content.'}"></p>
+                        <p class="text-gray-300 text-sm leading-relaxed whitespace-pre-line"  th:text="${subject?.description ?: 'No description available for this content.'}"></p>
                     </div>
 
-                    <div class="mt-4">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-white text-lg font-bold">Comments</h3>
-                        </div>
-                        <div class="flex gap-4 mb-6">
-                            <div class="size-10 rounded-full bg-gray-700 shrink-0 flex items-center justify-center text-white text-xs">You</div>
-                            <div class="flex-1">
-                                <input class="w-full bg-transparent border-0 border-b border-white/10 focus:border-primary focus:ring-0 px-0 py-2 text-white placeholder:text-gray-500 transition-colors" placeholder="Add a comment..." type="text"/>
-                            </div>
+                    <div class="mt-8 pt-8">
+                        <h3 class="text-white text-xl font-bold mb-6 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-yellow-500">auto_awesome</span> You might also like
+                        </h3>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <a th:each="rnd : ${randomVideos}" th:href="@{/video/{id}(id=${rnd.id})}" class="group relative aspect-[4/5] rounded-xl overflow-hidden bg-[#2e2839] border border-white/5 hover:border-primary/50 transition-all">
+                                <img th:src="@{/api/media/thumbnail/{id}(id=${rnd.id})}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https://placehold.co/300x400/1e1e1e/FFF?text=No+Thumb'">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent"></div>
+                                <div class="absolute bottom-0 left-0 p-3 w-full">
+                                    <p class="text-white font-bold text-sm truncate" th:text="${rnd.name}">Name</p>
+                                    <div class="flex items-center justify-between mt-1">
+                                        <span class="text-[10px] text-gray-400 bg-white/10 px-1.5 py-0.5 rounded" th:text="${rnd.readableSize}">Size</span>
+                                        <span class="text-[10px] text-primary font-mono" th:if="${rnd.durationFormatted}" th:text="${rnd.durationFormatted}">00:00</span>
+                                    </div>
+                                </div>
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="lg:col-span-1 flex flex-col gap-6 relative">
+            <div id="rightCol" class="lg:col-span-1 flex flex-col gap-3 relative h-fit sticky top-5 transition-all duration-500">
+                <div class="flex items-center justify-between text-white">
+                    <h3 class="font-bold text-lg" th:text="${subject != null ? 'Playlist of ' + subject.mainName : 'Playlist'}">Playlist</h3>
+                    <span class="text-xs text-gray-400" th:text="${#lists.size(playlist) + ' videos'}">0 videos</span>
+                </div>
 
                 <div class="-mx-4 px-4 md:mx-0 md:px-0 backdrop-blur py-2 border-b border-white/5 lg:border-none">
-                    <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-2">
-                        <button class="whitespace-nowrap px-3 py-1.5 bg-white text-black text-sm font-bold rounded-lg transition-colors">All</button>
-                        <button class="whitespace-nowrap px-3 py-1.5 bg-surface-dark hover:bg-surface-dark-hover border border-white/5 text-gray-300 hover:text-white text-sm font-medium rounded-lg transition-colors">Related</button>
+                    <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-2" th:if="${not #lists.isEmpty(subjectTags)}">
+                        <button onclick="resetTagFilter()" id="btnResetTags" class="whitespace-nowrap px-3 py-1.5 bg-white text-black text-sm font-bold rounded-lg transition-colors shadow-lg hover:shadow-white/20">All</button>
+
+                        <button th:each="tag : ${subjectTags}" 
+                                th:onclick="'toggleTagFilter(' + ${tag.id} + ', this)'"
+                                class="tag-filter-btn whitespace-nowrap px-3 py-1.5 bg-surface-dark hover:bg-surface-dark-hover border border-white/10 text-gray-300 hover:text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 select-none">
+                            <span class="w-1.5 h-1.5 rounded-full" th:style="'background-color:' + (${tag.colorHex} ?: '#833cf6')"></span>
+                            <span th:text="${tag.name}">Tag</span>
+                        </button>
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between text-white">
-                    <h3 class="font-bold text-lg" th:text="${subject != null ? 'More from ' + subject.mainName : 'Recommendations'}">Recommendations</h3>
-                </div>
+                <div class="flex flex-col gap-2 max-h-[calc(100vh-150px)] overflow-y-auto pr-1 custom-scrollbar" id="playlistContainer">
+                    <a th:each="rec : ${playlist}" 
+                       th:href="@{/video/{id}(id=${rec.id})}"
+                       th:id="'video-' + ${rec.id}"
+                       th:data-tags="${fileTagMap.get(rec.id)}"
+                       th:data-id="${rec.id}"
+                       th:data-active="${rec.id == file.id}"
+                       class="playlist-item flex gap-3 group cursor-pointer p-2 rounded-xl transition-all duration-200 border border-transparent"
+                       th:classappend="${rec.id == file.id} ? 'bg-primary/20 border-l-4 border-l-primary' : 'hover:bg-surface-dark border-white/5'">
 
-                <div class="flex flex-col gap-4">
-                    <a th:each="rec : ${recommendations}" 
-                       th:href="@{/video/{id}(id=${rec.id})}" 
-                       class="flex gap-3 group cursor-pointer hover:bg-surface-dark p-2 -ml-2 rounded-xl transition-colors">
-
-                        <div class="relative w-40 aspect-video rounded-lg overflow-hidden shrink-0 bg-black ring-1 ring-white/10">
-                            <img th:src="@{/api/media/thumbnail/{id}(id=${rec.id})}" 
-                                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                 onerror="this.src='https://placehold.co/160x90/1e1e1e/FFF?text=No+Thumb'">
-
-                            <div th:if="${rec.durationFormatted}" 
-                                 class="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-bold text-white shadow-sm">
-                                <span th:text="${rec.durationFormatted}">00:00</span>
+                        <div class="relative w-32 aspect-video rounded-lg overflow-hidden shrink-0 bg-black ring-1 ring-white/10">
+                            <img th:src="@{/api/media/thumbnail/{id}(id=${rec.id})}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https://placehold.co/160x90/1e1e1e/FFF?text=No+Thumb'">
+                            <div th:if="${rec.durationFormatted}" class="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-bold text-white shadow-sm"><span th:text="${rec.durationFormatted}">00:00</span></div>
+                            <div th:if="${rec.id == file.id}" class="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-white text-xl animate-pulse">equalizer</span>
                             </div>
                         </div>
-
-                        <div class="flex flex-col py-1 min-w-0 justify-between">
-                            <div>
-                                <h4 class="text-white text-sm font-bold leading-tight mb-1 group-hover:text-primary transition-colors line-clamp-2" 
-                                    th:text="${rec.name}">Video Name</h4>
-                                <div class="text-xs text-gray-400 truncate" th:text="${subject != null ? subject.mainName : 'Unknown'}">Artist</div>
-                            </div>
+                        <div class="flex flex-col py-1 min-w-0 justify-between flex-1">
+                            <h4 class="text-white text-sm font-bold leading-tight mb-1 group-hover:text-primary transition-colors line-clamp-2" 
+                                th:classappend="${rec.id == file.id} ? 'text-primary' : ''"
+                                th:text="${rec.name}">Name</h4>
                             <div class="text-xs text-gray-500" th:text="${rec.readableSize}">Size</div>
                         </div>
                     </a>
-
-                    <div th:if="${recommendations.isEmpty()}" class="text-gray-500 text-center py-8 text-sm">
-                        No related videos found.
-                    </div>
-                </div>
-
-                <div class="bg-gradient-to-br from-primary/20 to-surface-dark rounded-xl p-4 mt-4">
-                    <div class="flex items-start gap-3">
-                        <span class="material-symbols-outlined text-primary text-[32px]">cloud_upload</span>
-                        <div>
-                            <h4 class="text-white font-bold text-sm">Backup your memories</h4>
-                            <p class="text-gray-400 text-xs mt-1">Your MediaVault is secure.</p>
-                            <button class="mt-3 text-xs font-bold text-white bg-primary hover:bg-primary/80 px-3 py-1.5 rounded-lg transition-colors">Manage Storage</button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
 
+        <style>
+            .idle-mode {
+                cursor: none !important;
+            }
+            .idle-mode .controls-layer {
+                opacity: 0 !important;
+            }
+            .idle-mode #settingsMenu {
+                visibility: hidden !important;
+                opacity: 0 !important;
+            }
+
+            /* Custom Scrollbar for Playlist */
+            .custom-scrollbar::-webkit-scrollbar {
+                width: 4px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+                background: #333;
+                border-radius: 2px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                background: #555;
+            }
+        </style>
+
     <th:block id="page-scripts">
         <script>
             document.addEventListener("DOMContentLoaded", () => {
+                // --- JS VARIABLES ---
+                let animationFrameId, idleTimer, feedbackTimeout;
                 const video = document.getElementById('mainPlayer');
+                const videoWrapper = document.getElementById('videoWrapper');
                 const canvas = document.getElementById('ambientCanvas');
+
+                // Controls & Settings
                 const playBtn = document.getElementById('playBtn');
                 const playIcon = document.getElementById('playIcon');
                 const centerPlayBtn = document.getElementById('centerPlayBtn');
@@ -237,156 +274,293 @@
                 const volumeIcon = document.getElementById('volumeIcon');
                 const volumeSlider = document.getElementById('volumeSlider');
                 const fullscreenBtn = document.getElementById('fullscreenBtn');
-
-                // QUAN TRỌNG: Fullscreen cần gọi trên Wrapper để bao gồm cả ánh sáng
-                const videoContainer = document.getElementById('videoWrapper');
-
-                // Settings Elements
                 const settingsBtn = document.getElementById('settingsBtn');
                 const settingsMenu = document.getElementById('settingsMenu');
                 const toggleAmbientBtn = document.getElementById('toggleAmbientBtn');
                 const ambientSwitchBg = document.getElementById('ambientSwitchBg');
                 const ambientSwitchKnob = document.getElementById('ambientSwitchKnob');
+                const seekSettingSlider = document.getElementById('seekSettingSlider');
+                const seekSettingValue = document.getElementById('seekSettingValue');
+                const seekOverlay = document.getElementById('seekOverlay');
+                const seekText = document.getElementById('seekText');
+                const seekIcon = document.getElementById('seekIcon');
 
-                let isAmbientOn = true;
+                const mainGrid = document.getElementById('mainGrid');
+                const leftCol = document.getElementById('leftCol');
+                const rightCol = document.getElementById('rightCol');
 
-                /* =========================================
-                 1. LOGIC AMBIENT LIGHT (CINEMATIC)
-                 ========================================= */
+                const theaterBtn = document.getElementById('theaterBtn');
+                const toggleLoopBtn = document.getElementById('toggleLoopBtn');
+                const loopSwitchBg = document.getElementById('loopSwitchBg');
+                const loopSwitchKnob = document.getElementById('loopSwitchKnob');
+
+                const toggleAutoplayBtn = document.getElementById('toggleAutoplayBtn');
+                const autoplaySwitchBg = document.getElementById('autoplaySwitchBg');
+                const autoplaySwitchKnob = document.getElementById('autoplaySwitchKnob');
+
+                // States mới
+                let isLoop = localStorage.getItem('isLoop') === 'true';
+                let isAutoplay = localStorage.getItem('isAutoplay') === 'true';
+                let isTheater = localStorage.getItem('isTheater') === 'true';
+
+                let isAmbientOn = localStorage.getItem('ambientMode') !== 'false';
+                let seekStep = parseInt(localStorage.getItem('seekStep')) || 5;
                 const ctx = canvas.getContext('2d', {alpha: false, desynchronized: true});
-                const FPS_LIMIT = 15;
-                const INTERVAL = 1000 / FPS_LIMIT;
-                let lastDrawTime = 0;
-                let animationFrameId;
 
-                function loop(timestamp) {
-                    if (!video.paused && !video.ended && isAmbientOn) {
-                        const elapsed = timestamp - lastDrawTime;
-                        if (elapsed > INTERVAL) {
-                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                            lastDrawTime = timestamp - (elapsed % INTERVAL);
+                // --- 1. PLAYLIST & TAG FILTER LOGIC (NEW) ---
+                const activeTags = new Set();
+                const playlistItems = document.querySelectorAll('.playlist-item');
+                const btnResetTags = document.getElementById('btnResetTags');
+
+                // Scroll to active item on load
+                const activeItem = document.querySelector('.playlist-item[data-active="true"]');
+                if (activeItem) {
+                    activeItem.scrollIntoView({block: 'center', behavior: 'smooth'});
+                }
+
+                window.toggleTagFilter = function (tagId, btn) {
+                    if (activeTags.has(tagId)) {
+                        activeTags.delete(tagId);
+                        btn.classList.remove('bg-primary', 'text-white', 'border-primary');
+                        btn.classList.add('bg-surface-dark', 'text-gray-300', 'border-white/10');
+                    } else {
+                        activeTags.add(tagId);
+                        btn.classList.remove('bg-surface-dark', 'text-gray-300', 'border-white/10');
+                        btn.classList.add('bg-primary', 'text-white', 'border-primary');
+                    }
+
+                    // Toggle Active Visuals for Reset Btn
+                    if (activeTags.size > 0) {
+                        btnResetTags.classList.remove('bg-white', 'text-black');
+                        btnResetTags.classList.add('bg-surface-dark', 'text-gray-300');
+                    } else {
+                        resetTagFilter(false); // Reset visuals only
+                    }
+
+                    applyPlaylistFilter();
+                };
+
+                window.resetTagFilter = function (apply = true) {
+                    activeTags.clear();
+                    document.querySelectorAll('.tag-filter-btn').forEach(btn => {
+                        btn.classList.remove('bg-primary', 'text-white', 'border-primary');
+                        btn.classList.add('bg-surface-dark', 'text-gray-300', 'border-white/10');
+                    });
+                    btnResetTags.classList.add('bg-white', 'text-black');
+                    btnResetTags.classList.remove('bg-surface-dark', 'text-gray-300');
+
+                    if (apply)
+                        applyPlaylistFilter();
+                };
+
+                function applyPlaylistFilter() {
+                    playlistItems.forEach(item => {
+                        const itemTags = (item.getAttribute('data-tags') || '').split(' ').map(Number);
+
+                        // AND Logic: Item must have ALL selected tags
+                        let isVisible = true;
+                        if (activeTags.size > 0) {
+                            for (let tag of activeTags) {
+                                if (!itemTags.includes(tag)) {
+                                    isVisible = false;
+                                    break;
+                                }
+                            }
                         }
+
+                        item.style.display = isVisible ? 'flex' : 'none';
+                        if (!isVisible)
+                            item.classList.remove('visible-item');
+                        else
+                            item.classList.add('visible-item');
+                    });
+                }
+
+                // Mark initial visible items
+                playlistItems.forEach(item => item.classList.add('visible-item'));
+
+
+                // --- 2. AMBIENT FUNCTIONS ---
+                function loop() {
+                    if (!video.paused && !video.ended && isAmbientOn) {
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                         animationFrameId = requestAnimationFrame(loop);
                     }
                 }
-
-                function startAmbient() {
+                function startAmbientLoop() {
                     if (!isAmbientOn)
                         return;
                     canvas.classList.remove('opacity-0');
                     canvas.classList.add('opacity-100');
-                    if (animationFrameId)
-                        cancelAnimationFrame(animationFrameId);
-                    loop(0);
+                    cancelAnimationFrame(animationFrameId);
+                    loop();
                 }
-
-                function stopAmbient() {
-                    if (animationFrameId)
-                        cancelAnimationFrame(animationFrameId);
+                function stopAmbientLoop() {
+                    cancelAnimationFrame(animationFrameId);
                 }
-
-                toggleAmbientBtn.addEventListener('click', () => {
-                    isAmbientOn = !isAmbientOn;
-
+                function applyAmbientState() {
                     if (isAmbientOn) {
                         ambientSwitchBg.classList.replace('bg-gray-600', 'bg-primary');
                         ambientSwitchKnob.classList.add('translate-x-5');
                         ambientSwitchKnob.classList.remove('translate-x-1');
                         canvas.style.display = 'block';
                         if (!video.paused)
-                            startAmbient();
+                            startAmbientLoop();
                     } else {
                         ambientSwitchBg.classList.replace('bg-primary', 'bg-gray-600');
                         ambientSwitchKnob.classList.remove('translate-x-5');
                         ambientSwitchKnob.classList.add('translate-x-1');
                         canvas.style.display = 'none';
-                        stopAmbient();
+                        stopAmbientLoop();
                     }
+                }
+
+                // --- 3. INIT ---
+                applyAmbientState();
+                seekSettingSlider.value = seekStep;
+                seekSettingValue.innerText = `${seekStep}s`;
+
+                toggleAmbientBtn.addEventListener('click', () => {
+                    isAmbientOn = !isAmbientOn;
+                    localStorage.setItem('ambientMode', isAmbientOn);
+                    applyAmbientState();
                 });
 
-                /* =========================================
-                 2. LOGIC VIDEO CONTROLS
-                 ========================================= */
+                seekSettingSlider.addEventListener('input', (e) => {
+                    seekStep = parseInt(e.target.value);
+                    seekSettingValue.innerText = `${seekStep}s`;
+                    localStorage.setItem('seekStep', seekStep);
+                });
+
+                // --- 4. IDLE MODE ---
+                function resetIdleTimer() {
+                    videoWrapper.classList.remove('idle-mode');
+                    clearTimeout(idleTimer);
+                    if (!video.paused) {
+                        idleTimer = setTimeout(() => {
+                            if (!settingsMenu.contains(document.activeElement)) {
+                                videoWrapper.classList.add('idle-mode');
+                            }
+                        }, 2500);
+                    }
+                }
+                videoWrapper.addEventListener('mousemove', resetIdleTimer);
+                videoWrapper.addEventListener('mousedown', resetIdleTimer);
+                videoWrapper.addEventListener('keydown', resetIdleTimer);
+                videoWrapper.addEventListener('mouseleave', () => {
+                    if (!video.paused)
+                        videoWrapper.classList.add('idle-mode');
+                });
+
+                // --- 5. PLAYER LOGIC ---
+                function togglePlay(e) {
+                    if (e)
+                        e.stopPropagation();
+                    if (video.paused || video.ended)
+                        video.play();
+                    else
+                        video.pause();
+                }
+                video.addEventListener('play', () => {
+                    playIcon.innerText = 'pause';
+                    centerPlayBtn.classList.add('hidden');
+                    startAmbientLoop();
+                    resetIdleTimer();
+                });
+                video.addEventListener('pause', () => {
+                    playIcon.innerText = 'play_arrow';
+                    centerPlayBtn.classList.remove('hidden');
+                    stopAmbientLoop();
+                    videoWrapper.classList.remove('idle-mode');
+                });
+                video.addEventListener('ended', () => {
+                    playIcon.innerText = 'replay';
+                    centerPlayBtn.classList.remove('hidden');
+                    stopAmbientLoop();
+                    videoWrapper.classList.remove('idle-mode');
+                });
+                centerPlayBtn.addEventListener('click', togglePlay);
+                playBtn.addEventListener('click', togglePlay);
+                video.addEventListener('click', togglePlay);
+
+                if (video.paused) {
+                    centerPlayBtn.classList.remove('hidden');
+                    playIcon.innerText = 'play_arrow';
+                } else {
+                    centerPlayBtn.classList.add('hidden');
+                    playIcon.innerText = 'pause';
+                    startAmbientLoop();
+                }
+
+                // --- 6. SEEK FEEDBACK ---
+                function showSeekFeedback(direction) {
+                    const symbol = direction === 'forward' ? '' : '';
+                    const iconName = direction === 'forward' ? 'fast_forward' : 'fast_rewind';
+                    seekText.innerText = direction === 'forward' ? `${seekStep}s ${symbol}` : `${symbol} ${seekStep}s`;
+                    seekIcon.innerText = iconName;
+                    seekOverlay.classList.remove('opacity-0', 'scale-90');
+                    seekOverlay.classList.add('opacity-100', 'scale-110');
+                    clearTimeout(feedbackTimeout);
+                    feedbackTimeout = setTimeout(() => {
+                        seekOverlay.classList.remove('opacity-100', 'scale-110');
+                        seekOverlay.classList.add('opacity-0', 'scale-90');
+                    }, 600);
+                }
+                function performSeek(seconds) {
+                    if (seconds > 0) {
+                        video.currentTime = Math.min(video.duration, video.currentTime + seconds);
+                        showSeekFeedback('forward');
+                    } else {
+                        video.currentTime = Math.max(0, video.currentTime + seconds);
+                        showSeekFeedback('backward');
+                    }
+                    if (isAmbientOn)
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    resetIdleTimer();
+                }
+
+                // Time & Progress
                 function formatTime(time) {
                     const minutes = Math.floor(time / 60);
                     const seconds = Math.floor(time % 60);
                     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
                 }
-
-                function togglePlay() {
-                    if (video.paused || video.ended) {
-                        video.play();
-                    } else {
-                        video.pause();
-                    }
-                }
-
-                function updatePlayButton() {
-                    if (video.paused) {
-                        playIcon.textContent = 'play_arrow';
-                        centerPlayBtn.classList.remove('scale-150', 'opacity-0');
-                        centerPlayBtn.classList.add('scale-100', 'opacity-100');
-                        setTimeout(() => {
-                            centerPlayBtn.classList.add('opacity-0', 'scale-150');
-                        }, 500);
-                        stopAmbient();
-                    } else {
-                        playIcon.textContent = 'pause';
-                        centerPlayBtn.classList.add('opacity-0', 'scale-150');
-                        startAmbient();
-                    }
-                }
-
-                playBtn.addEventListener('click', togglePlay);
-                video.addEventListener('click', togglePlay);
-                video.addEventListener('play', updatePlayButton);
-                video.addEventListener('pause', updatePlayButton);
-
                 video.addEventListener('timeupdate', () => {
-                    const currentTime = video.currentTime;
-                    const duration = video.duration;
-
-                    if (!isNaN(duration)) {
-                        const percentage = (currentTime / duration) * 100;
-                        seekSlider.value = percentage;
-                        progressBar.style.width = `${percentage}%`;
-                        currentTimeElem.textContent = formatTime(currentTime);
-                        durationElem.textContent = formatTime(duration);
+                    const ct = video.currentTime;
+                    const d = video.duration;
+                    if (!isNaN(d)) {
+                        const pct = (ct / d) * 100;
+                        seekSlider.value = pct;
+                        progressBar.style.width = `${pct}%`;
+                        currentTimeElem.textContent = formatTime(ct);
+                        durationElem.textContent = formatTime(d);
                     }
                 });
-
                 video.addEventListener('progress', () => {
                     if (video.buffered.length > 0) {
                         const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-                        const duration = video.duration;
-                        if (duration > 0) {
-                            bufferBar.style.width = `${(bufferedEnd / duration) * 100}%`;
-                        }
+                        const d = video.duration;
+                        if (d > 0)
+                            bufferBar.style.width = `${(bufferedEnd / d) * 100}%`;
                     }
                 });
-
                 seekSlider.addEventListener('input', (e) => {
                     const time = (video.duration / 100) * e.target.value;
                     video.currentTime = time;
                     if (isAmbientOn)
                         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    resetIdleTimer();
                 });
-
                 video.addEventListener('loadedmetadata', () => {
                     durationElem.textContent = formatTime(video.duration);
                 });
 
+                // Volume
                 volumeSlider.addEventListener('input', (e) => {
                     video.volume = e.target.value;
-                    if (video.volume === 0) {
-                        video.muted = true;
-                        volumeIcon.textContent = 'volume_off';
-                    } else {
-                        video.muted = false;
-                        volumeIcon.textContent = video.volume < 0.5 ? 'volume_down' : 'volume_up';
-                    }
+                    video.muted = video.volume === 0;
+                    volumeIcon.textContent = video.muted ? 'volume_off' : (video.volume < 0.5 ? 'volume_down' : 'volume_up');
                 });
-
                 muteBtn.addEventListener('click', () => {
                     video.muted = !video.muted;
                     if (video.muted) {
@@ -399,56 +573,225 @@
                     }
                 });
 
-                // Fullscreen Logic
+                // Fullscreen
                 fullscreenBtn.addEventListener('click', () => {
                     if (!document.fullscreenElement) {
-                        videoContainer.requestFullscreen().catch(err => {
-                            alert(`Error attempting to enable fullscreen mode: ${err.message}`);
-                        });
+                        videoWrapper.requestFullscreen().catch(err => alert(`Error: ${err.message}`));
                     } else {
                         document.exitFullscreen();
                     }
                 });
-
                 document.addEventListener('fullscreenchange', () => {
                     if (document.fullscreenElement) {
                         fullscreenBtn.querySelector('span').textContent = 'close_fullscreen';
-                        // Khi Fullscreen thì thêm background đen để tránh viền trắng (nếu có)
-                        videoContainer.classList.add('bg-black');
+                        videoWrapper.classList.add('bg-black');
+                        videoContainer.classList.remove('rounded-xl');
                     } else {
                         fullscreenBtn.querySelector('span').textContent = 'fullscreen';
-                        videoContainer.classList.remove('bg-black');
+                        videoWrapper.classList.remove('bg-black');
+                        videoContainer.classList.add('rounded-xl');
                     }
                 });
 
+                // Settings Menu
                 settingsBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const isHidden = settingsMenu.classList.contains('invisible');
-
                     if (isHidden) {
                         settingsMenu.classList.remove('invisible', 'opacity-0', 'translate-y-4');
                         settingsMenu.classList.add('opacity-100', 'translate-y-0');
                         settingsBtn.classList.add('rotate-90', 'text-primary');
+                        videoWrapper.classList.remove('idle-mode');
                     } else {
                         closeSettings();
                     }
                 });
-
                 function closeSettings() {
                     settingsMenu.classList.add('invisible', 'opacity-0', 'translate-y-4');
                     settingsMenu.classList.remove('opacity-100', 'translate-y-0');
                     settingsBtn.classList.remove('rotate-90', 'text-primary');
                 }
-
                 document.addEventListener('click', (e) => {
-                    if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+                    if (!settingsMenu.contains(e.target) && e.target !== settingsBtn)
                         closeSettings();
+                });
+
+                // --- 1. SETTINGS STATE MANAGEMENT (LOOP & AUTOPLAY) ---
+                function updateSwitchUI(isOn, bg, knob) {
+                    if (isOn) {
+                        bg.classList.replace('bg-gray-600', 'bg-primary');
+                        knob.classList.add('translate-x-5');
+                        knob.classList.remove('translate-x-1');
+                    } else {
+                        bg.classList.replace('bg-primary', 'bg-gray-600');
+                        knob.classList.remove('translate-x-5');
+                        knob.classList.add('translate-x-1');
+                    }
+                }
+
+                // Init UI
+                updateSwitchUI(isLoop, loopSwitchBg, loopSwitchKnob);
+                updateSwitchUI(isAutoplay, autoplaySwitchBg, autoplaySwitchKnob);
+
+                // Events
+                toggleLoopBtn.addEventListener('click', () => {
+                    isLoop = !isLoop;
+                    localStorage.setItem('isLoop', isLoop);
+                    updateSwitchUI(isLoop, loopSwitchBg, loopSwitchKnob);
+                });
+
+                toggleAutoplayBtn.addEventListener('click', () => {
+                    isAutoplay = !isAutoplay;
+                    localStorage.setItem('isAutoplay', isAutoplay);
+                    updateSwitchUI(isAutoplay, autoplaySwitchBg, autoplaySwitchKnob);
+                });
+
+                // --- 2. THEATER MODE LOGIC ---
+                function applyTheaterState() {
+                    if (isTheater) {
+                        // 1. Layout: Mở rộng chiều ngang (Full Width)
+                        leftCol.classList.remove('lg:col-span-3');
+                        leftCol.classList.add('lg:col-span-4');
+
+                        // 2. Height Control: Cố định chiều cao, KHÔNG cho giãn tự do
+                        // Xóa 'aspect-video' để video không tự cao lên theo chiều ngang
+                        video.classList.remove('aspect-video');
+                        // Thêm chiều cao cố định (75% chiều cao màn hình là chuẩn cho rạp chiếu)
+                        video.classList.add('h-[80vh]');
+
+                        // 3. UI Styles
+                        theaterBtn.classList.add('text-primary');
+                        videoContainer.classList.add('ring-primary/50');
+
+                        // 4. Scroll to top
+                        window.scrollTo({top: 0, behavior: 'smooth'});
+                    } else {
+                        // 1. Layout: Trả về bình thường
+                        leftCol.classList.remove('lg:col-span-4');
+                        leftCol.classList.add('lg:col-span-3');
+
+                        // 2. Height Control: Trả về tỷ lệ 16:9 tự động
+                        video.classList.add('aspect-video');
+                        video.classList.remove('h-[80vh]');
+
+                        // 3. UI Styles
+                        theaterBtn.classList.remove('text-primary');
+                        videoContainer.classList.remove('ring-primary/50');
+                    }
+
+                    // Cập nhật lại kích thước Ambient Light sau khi layout đổi (chờ hiệu ứng CSS 500ms)
+                    setTimeout(() => {
+                        if (isAmbientOn && !video.paused)
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    }, 550);
+                }
+
+                // Init Theater
+                applyTheaterState();
+
+                theaterBtn.addEventListener('click', () => {
+                    isTheater = !isTheater;
+                    localStorage.setItem('isTheater', isTheater);
+                    applyTheaterState();
+                });
+
+                // --- 3. ENDED EVENT LOGIC (LOOP -> AUTOPLAY -> STOP) ---
+                function playNextVideo() {
+                    // Logic tìm video tiếp theo (Tái sử dụng logic của phím 'E')
+                    const visibleItems = Array.from(document.querySelectorAll('.playlist-item.visible-item'));
+                    const currentIndex = visibleItems.findIndex(item => item.getAttribute('data-active') === 'true');
+
+                    if (currentIndex !== -1 && currentIndex < visibleItems.length - 1) {
+                        const nextItem = visibleItems[currentIndex + 1];
+                        // Visual Feedback
+                        nextItem.style.backgroundColor = 'rgba(131, 60, 246, 0.4)';
+                        nextItem.scrollIntoView({block: 'center', behavior: 'smooth'});
+
+                        // Delay chút để người dùng thấy hiệu ứng chuyển
+                        setTimeout(() => nextItem.click(), 1000);
+                        return true;
+                    }
+                    return false;
+                }
+
+                video.addEventListener('ended', () => {
+                    if (isLoop) {
+                        // 1. Nếu Loop bật -> Phát lại ngay
+                        video.currentTime = 0;
+                        video.play();
+                    } else if (isAutoplay) {
+                        // 2. Nếu Autoplay bật -> Chuyển bài
+                        const hasNext = playNextVideo();
+                        if (!hasNext) {
+                            // Hết bài -> Hiện UI Replay
+                            playIcon.innerText = 'replay';
+                            centerPlayBtn.classList.remove('hidden');
+                            stopAmbientLoop();
+                            videoWrapper.classList.remove('idle-mode');
+                        }
+                    } else {
+                        // 3. Bình thường -> Dừng
+                        playIcon.innerText = 'replay';
+                        centerPlayBtn.classList.remove('hidden');
+                        stopAmbientLoop();
+                        videoWrapper.classList.remove('idle-mode');
                     }
                 });
 
-                // Init
-                ambientSwitchBg.classList.replace('bg-gray-600', 'bg-primary');
-                ambientSwitchKnob.classList.add('translate-x-5');
+                // --- 7. NAVIGATION SHORTCUTS (UPDATED) ---
+                document.addEventListener('keydown', (e) => {
+                    if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName))
+                        return;
+                    const key = e.key.toLowerCase();
+                    resetIdleTimer();
+
+                    switch (key) {
+                        case ' ':
+                        case 'k':
+                            e.preventDefault();
+                            togglePlay();
+                            break;
+                        case 'arrowleft':
+                        case 'a':
+                            performSeek(-seekStep);
+                            break;
+                        case 'arrowright':
+                        case 'd':
+                            performSeek(seekStep);
+                            break;
+                        case 'e': // NEXT
+                        case 'q': // PREV
+                            // Logic: Tìm danh sách các item ĐANG HIỆN (visible)
+                            const visibleItems = Array.from(document.querySelectorAll('.playlist-item.visible-item'));
+                            // Tìm index của video hiện tại trong danh sách visible
+                            const currentIndex = visibleItems.findIndex(item => item.getAttribute('data-active') === 'true');
+
+                            if (currentIndex !== -1) {
+                                let targetItem;
+                                if ((key === 'e' || key === 'n') && currentIndex < visibleItems.length - 1) {
+                                    targetItem = visibleItems[currentIndex + 1]; // Next
+                                } else if ((key === 'q' || key === 'p') && currentIndex > 0) {
+                                    targetItem = visibleItems[currentIndex - 1]; // Prev
+                                }
+
+                                if (targetItem) {
+                                    // Visual click effect
+                                    targetItem.style.backgroundColor = 'rgba(131, 60, 246, 0.4)';
+                                    setTimeout(() => targetItem.click(), 100);
+                                }
+                            }
+                            break;
+                        case 'f':
+                            fullscreenBtn.click();
+                            break;
+                        case 'm':
+                            muteBtn.click();
+                            break;
+                        case 't': // Shortcut T cho Theater
+                            theaterBtn.click();
+                            break;
+                    }
+                });
             });
         </script>
     </th:block>
