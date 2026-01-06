@@ -85,7 +85,7 @@
                                th:data-id="${file.id}"
                                th:data-has-thumb="true"
                                oncontextmenu="openContextMenu(event, this)"
-                               class="snap-start shrink-0 w-[220px] aspect-[4/3] relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5 group/card hover:border-primary/50 transition-all shadow-lg">
+                               class="snap-start shrink-0 w-[350px] aspect-[5/3] relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5 group/card hover:border-primary/50 transition-all shadow-lg">
 
                                 <img loading="lazy"
                                      th:src="@{/api/file/thumbnail/{id}(id=${file.id})}" 

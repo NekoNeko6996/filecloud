@@ -1014,9 +1014,7 @@
                         loadSocialLinks(); // Reload list
                         resetSocialForm(); // Reset form
                         // Optional: Reload page to update main view header
-                        if (confirm("Saved! Reload page to update header links?")) {
-                            window.location.reload();
-                        }
+//                        window.location.reload();
                     } else {
                         alert("Save failed: " + await res.text());
                     }

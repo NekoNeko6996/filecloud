@@ -14,12 +14,11 @@
 
             <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div th:each="sub : ${subjects}" 
+                    <a th:each="sub : ${subjects}" 
                          class="group relative h-40 rounded-xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20"
-                         th:data-url="@{/subjects/{id}(id=${sub.id})}"
+                         th:href="@{/subjects/{id}(id=${sub.id})}"
                          th:data-id="${sub.id}"
                          th:data-name="${sub.mainName}"
-                         onclick="window.location.href = this.getAttribute('data-url')"
                          oncontextmenu="showContextMenu(event, this.getAttribute('data-id'), this.getAttribute('data-name'))">
                         <div class="absolute inset-0 z-0">
                             <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover opacity-60 blur-sm scale-110 transition-transform duration-700">
@@ -62,7 +61,7 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </a>
                 </div>
 
                 <div th:if="${subjects.isEmpty()}" class="flex flex-col items-center justify-center h-64 text-gray-500">
