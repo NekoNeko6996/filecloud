@@ -413,6 +413,12 @@
                 <button onclick="toggleSelectionMode()" class="w-full text-left px-4 py-2.5 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
                     <span class="material-symbols-outlined text-[18px]">checklist</span> Select Multiple
                 </button>
+                <button onclick="downloadSingleMedia()" class="w-full text-left px-4 py-2.5 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">download</span> Download
+                </button>
+                <button onclick="openRenameModal()" class="w-full text-left px-4 py-2.5 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">edit_document</span> Rename
+                </button>
                 <div class="h-px bg-white/10 my-1 mx-2"></div>
                 <button onclick="confirmDeleteMedia()" class="w-full text-left px-4 py-2.5 text-sm text-red-400 rounded hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2 transition-colors">
                     <span class="material-symbols-outlined text-[18px]">delete</span> Delete
@@ -421,6 +427,10 @@
 
             <div id="selectionToolbar" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#1e1e1e] border border-white/10 rounded-full shadow-2xl px-6 py-3 flex items-center gap-6 animate-bounce-up">
                 <span class="text-white font-bold text-sm"><span id="selectedCount" class="text-primary">0</span> Selected</span>
+                <div class="h-4 w-px bg-white/20"></div>
+                <button onclick="downloadBatchMedia()" class="text-green-400 hover:text-green-300 flex items-center gap-1 text-sm font-bold disabled:opacity-50" id="btnBatchDownload">
+                    <span class="material-symbols-outlined text-[18px]">download</span> Download
+                </button>
                 <div class="h-4 w-px bg-white/20"></div>
                 <button onclick="confirmDeleteMedia()" class="text-red-400 hover:text-red-300 flex items-center gap-1 text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed" id="btnBatchDelete">
                     <span class="material-symbols-outlined text-[18px]">delete</span> Delete
@@ -458,6 +468,37 @@
                 </div>
             </dialog>
 
+            <dialog id="renameMediaModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-sm">
+                <div class="flex flex-col gap-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-lg">Rename File</h3>
+                        <button onclick="document.getElementById('renameMediaModal').close()" class="text-gray-400 hover:text-white">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">New Filename</label>
+                        <input type="text" id="inputNewFileName" class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-primary">
+                        <p class="text-[10px] text-gray-500 mt-1 italic">File extension will be preserved automatically.</p>
+                    </div>
+
+                    <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-white/10 hover:bg-white/5 transition-colors has-[:checked]:border-primary/50 has-[:checked]:bg-primary/10">
+                        <input type="checkbox" id="checkRenamePhysical" class="mt-1 rounded bg-gray-700 border-gray-600 text-primary focus:ring-primary">
+                        <div>
+                            <span class="font-bold text-white block text-sm">Rename on Disk</span>
+                            <span class="text-xs text-gray-500 block mt-0.5">
+                                Change the actual filename on the hard drive.
+                            </span>
+                        </div>
+                    </label>
+
+                    <div class="flex justify-end gap-2 mt-2">
+                        <button onclick="document.getElementById('renameMediaModal').close()" class="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
+                        <button onclick="executeRenameMedia()" id="btnExecRename" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg">Save</button>
+                    </div>
+                </div>
+            </dialog>
 
             <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-80 flex flex-col border-l border-white/10 overflow-y-auto no-scrollbar z-50 bg-[#171022] shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
                 <div class="p-6 flex flex-col gap-6">
@@ -1534,6 +1575,153 @@
                 } catch (e) {
                     console.error(e);
                     alert("Failed to create tag");
+                }
+            }
+        </script>
+        <script>
+            // --- DOWNLOAD LOGIC ---
+
+// 1. Tải 1 file (Từ context menu)
+            function downloadSingleMedia() {
+                mediaMenu.classList.add('hidden');
+                if (!rightClickedFileId)
+                    return;
+
+                // Tạo thẻ a ảo để trigger download
+                const link = document.createElement('a');
+                link.href = `/subjects/media/download/${rightClickedFileId}`;
+                link.target = '_blank'; // Mở tab mới để tải tránh gián đoạn UI
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+// 2. Tải nhiều file (Từ toolbar)
+            async function downloadBatchMedia() {
+                const ids = getSelectedIds();
+                if (ids.length === 0)
+                    return;
+
+                const btn = document.getElementById('btnBatchDownload');
+                const oldHtml = btn.innerHTML;
+                btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> Zipping...';
+                btn.disabled = true;
+
+                try {
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+
+                    const response = await fetch('/subjects/media/download-batch', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: JSON.stringify(ids)
+                    });
+
+                    if (response.ok) {
+                        // Nhận blob từ response (file zip)
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `batch_download_${new Date().getTime()}.zip`; // Tên file zip
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        a.remove();
+                    } else {
+                        alert("Batch download failed.");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Download error.");
+                } finally {
+                    btn.innerHTML = oldHtml;
+                    btn.disabled = false;
+                    exitSelectionMode(); // Thoát chế độ chọn sau khi tải
+                }
+            }
+
+// Helper: Lấy list ID đang chọn
+            function getSelectedIds() {
+                let ids = [];
+                if (isSelectionMode) {
+                    document.querySelectorAll('.selection-checkbox input:checked').forEach(cb => {
+                        const parentA = cb.closest('a');
+                        if (parentA)
+                            ids.push(parentA.getAttribute('data-id'));
+                    });
+                } else if (rightClickedFileId) {
+                    ids.push(rightClickedFileId);
+                }
+                return ids;
+            }
+
+// --- RENAME LOGIC ---
+
+            function openRenameModal() {
+                mediaMenu.classList.add('hidden');
+                if (!rightClickedFileId)
+                    return;
+
+                // Lấy tên hiện tại từ UI để điền vào input
+                const card = document.getElementById('file-card-' + rightClickedFileId);
+                const currentName = card.querySelector('.file-name').innerText;
+
+                document.getElementById('inputNewFileName').value = currentName;
+                document.getElementById('checkRenamePhysical').checked = true; // Reset checkbox
+                document.getElementById('renameMediaModal').showModal();
+            }
+
+            async function executeRenameMedia() {
+                const newName = document.getElementById('inputNewFileName').value.trim();
+                if (!newName)
+                    return alert("Filename cannot be empty");
+
+                const physical = document.getElementById('checkRenamePhysical').checked;
+                const btn = document.getElementById('btnExecRename');
+                btn.disabled = true;
+                btn.innerText = "Saving...";
+
+                try {
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                    const formData = new FormData();
+                    formData.append('fileId', rightClickedFileId);
+                    formData.append('newName', newName);
+                    formData.append('renamePhysical', physical);
+
+                    const res = await fetch('/subjects/media/rename', {
+                        method: 'POST',
+                        headers: {'X-CSRF-TOKEN': csrfToken},
+                        body: formData
+                    });
+
+                    if (res.ok) {
+                        const finalName = await res.text();
+
+                        // Cập nhật UI ngay lập tức
+                        const card = document.getElementById('file-card-' + rightClickedFileId);
+                        if (card) {
+                            card.querySelector('.file-name').innerText = finalName;
+                            // Update EXT badge nếu cần thiết
+                            if (finalName.includes('.')) {
+                                const ext = finalName.split('.').pop();
+                                // Tìm badge ext (div absolute top-2)
+                                // Ở đây update đơn giản, nếu cấu trúc HTML phức tạp hơn thì querySelector chính xác hơn
+                            }
+                        }
+
+                        document.getElementById('renameMediaModal').close();
+                    } else {
+                        alert("Rename failed: " + await res.text());
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Error renaming file");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = "Save";
                 }
             }
         </script>

@@ -19,6 +19,7 @@ import com.app.filecloud.repository.UserRepository;
 import com.app.filecloud.service.FileStorageService;
 import com.app.filecloud.service.MediaService;
 import com.app.filecloud.service.StorageVolumeService;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,7 +39,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -522,5 +528,130 @@ public class SubjectController {
     // Helper tạo slug (copy từ TagController qua nếu chưa có)
     private String toSlug(String input) {
         return input.toLowerCase().replaceAll("[^a-z0-9]", "-").replaceAll("-+", "-");
+    }
+
+    @GetMapping("/media/download/{fileId}")
+    public ResponseEntity<Resource> downloadSingleFile(@PathVariable String fileId) {
+        try {
+            FileNode fileNode = fileNodeRepository.findById(fileId).orElseThrow();
+            StorageVolume vol = storageVolumeService.getVolumeById(fileNode.getVolumeId());
+
+            if (vol == null) {
+                throw new RuntimeException("Volume not found");
+            }
+
+            Path path = Paths.get(vol.getMountPoint(), fileNode.getRelativePath());
+            Resource resource = new UrlResource(path.toUri());
+
+            if (resource.exists() || resource.isReadable()) {
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileNode.getName() + "\"")
+                        .body(resource);
+            } else {
+                throw new RuntimeException("Could not read the file!");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // === 2. API TẢI XUỐNG NHIỀU FILE (ZIP) ===
+    @PostMapping("/media/download-batch")
+    public void downloadBatchFiles(@RequestBody List<String> fileIds, HttpServletResponse response) {
+        try {
+            response.setContentType("application/zip");
+            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"download_batch.zip\"");
+
+            try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
+                List<FileNode> files = fileNodeRepository.findAllById(fileIds);
+
+                for (FileNode fileNode : files) {
+                    StorageVolume vol = storageVolumeService.getVolumeById(fileNode.getVolumeId());
+                    if (vol != null) {
+                        Path path = Paths.get(vol.getMountPoint(), fileNode.getRelativePath());
+                        if (Files.exists(path)) {
+                            // Tạo entry trong file zip
+                            ZipEntry entry = new ZipEntry(fileNode.getName());
+                            // Xử lý trùng tên trong zip nếu cần (ở đây làm đơn giản)
+                            entry.setSize(Files.size(path));
+                            zos.putNextEntry(entry);
+                            Files.copy(path, zos);
+                            zos.closeEntry();
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Handle error (không thể return ResponseEntity vì response stream đã mở)
+            e.printStackTrace();
+        }
+    }
+
+    // === 3. API ĐỔI TÊN FILE ===
+    @PostMapping("/media/rename")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> renameFile(@RequestParam("fileId") String fileId,
+            @RequestParam("newName") String newName,
+            @RequestParam(value = "renamePhysical", defaultValue = "false") boolean renamePhysical) {
+        try {
+            FileNode fileNode = fileNodeRepository.findById(fileId)
+                    .orElseThrow(() -> new IllegalArgumentException("File not found"));
+
+            // Kiểm tra phần mở rộng (Extension) để tránh user xóa mất đuôi file
+            String oldName = fileNode.getName();
+            String extension = "";
+            if (oldName.contains(".")) {
+                extension = oldName.substring(oldName.lastIndexOf("."));
+            }
+
+            // Nếu tên mới không có đuôi, tự động thêm đuôi cũ vào
+            String finalName = newName;
+            if (!newName.toLowerCase().endsWith(extension.toLowerCase())) {
+                finalName += extension;
+            }
+
+            // 1. Đổi tên vật lý (Nếu được yêu cầu)
+            if (renamePhysical) {
+                StorageVolume vol = storageVolumeService.getVolumeById(fileNode.getVolumeId());
+                if (vol != null) {
+                    Path oldPath = Paths.get(vol.getMountPoint(), fileNode.getRelativePath());
+                    Path newPath = oldPath.resolveSibling(finalName); // Cùng thư mục cha, tên mới
+
+                    if (Files.exists(newPath)) {
+                        return ResponseEntity.badRequest().body("File name already exists on disk!");
+                    }
+
+                    // Thực hiện rename trên đĩa
+                    Files.move(oldPath, newPath);
+
+                    // Cập nhật Relative Path trong DB
+                    // relativePath cũ: \Folder\OldName.mp4 -> lấy parent folder
+                    String parentRelPath = fileNode.getRelativePath().substring(0, fileNode.getRelativePath().lastIndexOf(File.separator));
+                    // Handle trường hợp file ở root
+                    if (fileNode.getRelativePath().lastIndexOf(File.separator) == -1) {
+                        parentRelPath = "";
+                    }
+
+                    String separator = File.separator; // hoặc dùng "\\" hoặc "/" tùy OS, tốt nhất dùng hằng số chuẩn
+                    if (!parentRelPath.endsWith(separator) && !parentRelPath.isEmpty()) {
+                        parentRelPath += separator;
+                    }
+
+                    // Fix path string logic đơn giản hơn: Replace tên cuối
+                    String newRelPath = fileNode.getRelativePath().replace(oldName, finalName);
+                    fileNode.setRelativePath(newRelPath);
+                }
+            }
+
+            // 2. Cập nhật DB
+            fileNode.setName(finalName);
+            fileNodeRepository.save(fileNode);
+
+            return ResponseEntity.ok(finalName);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+        }
     }
 }
