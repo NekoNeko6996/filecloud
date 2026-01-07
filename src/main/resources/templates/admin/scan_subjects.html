@@ -30,24 +30,50 @@
                 </div>
 
                 <div id="resultArea" class="hidden">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold text-white">Found <span id="countFound" class="text-primary">0</span> folders</h3>
-                        <button onclick="executeImport()" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2">
+                    <div class="flex justify-between items-center mb-4 gap-4">
+                        <div class="flex items-center gap-4 flex-1">
+                            <h3 class="text-lg font-bold text-white shrink-0">Found <span id="countFound" class="text-primary">0</span> folders</h3>
+
+                            <div class="relative w-full max-w-sm">
+                                <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-500 text-sm">search</span>
+                                <input type="text" id="searchInput" oninput="handleSearch()" 
+                                       class="w-full bg-[#1e1926] border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:outline-none focus:border-primary placeholder-gray-600"
+                                       placeholder="Filter by name, alias...">
+                            </div>
+                        </div>
+
+                        <button onclick="executeImport()" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shrink-0">
                             <span class="material-symbols-outlined">save_alt</span> Import Selected
                         </button>
                     </div>
 
                     <div class="bg-[#2e2839] rounded-xl border border-white/5 overflow-hidden">
                         <table class="w-full text-left text-sm text-gray-300">
-                            <thead class="bg-[#1e1926] text-xs uppercase font-bold text-gray-400">
+                            <thead class="bg-[#1e1926] text-xs uppercase font-bold text-gray-400 select-none">
                                 <tr>
                                     <th class="px-6 py-4 w-10">
-                                        <input type="checkbox" onchange="toggleAll(this)" class="rounded bg-gray-700 border-gray-600 text-primary focus:ring-0">
+                                        <input type="checkbox" id="selectAllCheckbox" onchange="toggleAll(this)" class="rounded bg-gray-700 border-gray-600 text-primary focus:ring-0">
                                     </th>
-                                    <th class="px-6 py-4">Status</th>
-                                    <th class="px-6 py-4">Folder Name</th>
-                                    <th class="px-6 py-4">Parsed Name</th>
-                                    <th class="px-6 py-4 text-center">Media Files</th>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors group" onclick="handleSort('existsInDb')">
+                                        <div class="flex items-center gap-1">
+                                            Status <span id="sortIcon_existsInDb" class="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-50">unfold_more</span>
+                                        </div>
+                                    </th>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors group" onclick="handleSort('folderName')">
+                                        <div class="flex items-center gap-1">
+                                            Folder Name <span id="sortIcon_folderName" class="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-50">unfold_more</span>
+                                        </div>
+                                    </th>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors group" onclick="handleSort('parsedMainName')">
+                                        <div class="flex items-center gap-1">
+                                            Parsed Name <span id="sortIcon_parsedMainName" class="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-50">unfold_more</span>
+                                        </div>
+                                    </th>
+                                    <th class="px-6 py-4 text-center cursor-pointer hover:text-white transition-colors group" onclick="handleSort('mediaCount')">
+                                        <div class="flex items-center gap-1 justify-center">
+                                            Media Files <span id="sortIcon_mediaCount" class="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-50">unfold_more</span>
+                                        </div>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody id="scanTableBody" class="divide-y divide-white/5"></tbody>
@@ -129,6 +155,9 @@
             let duplicateGroups = [];
             let eventSource = null;
 
+            let sortConfig = {key: null, direction: 'asc'}; // 'asc' or 'desc'
+            let currentFilterData = []; // Dữ liệu đang hiển thị trên bảng (đã lọc/sort)
+
             // --- SCAN PREVIEW ---
             async function scanPreview() {
                 const path = document.getElementById('rootPath').value;
@@ -146,8 +175,24 @@
                     });
 
                     if (res.ok) {
-                        scanResults = await res.json();
-                        renderTable(scanResults);
+                        const rawData = await res.json();
+                        // Lưu data gốc
+                        scanResults = rawData.map((item, index) => ({
+                                ...item,
+                                originalIndex: index,
+                                // Tạo chuỗi search trước để tìm kiếm nhanh hơn (tránh toLowerCase nhiều lần)
+                                _searchText: (item.folderName + ' ' + item.parsedMainName + ' ' + (item.parsedAliases || []).join(' ')).toLowerCase()
+                            }));
+
+                        // Reset UI
+                        document.getElementById('searchInput').value = '';
+                        document.getElementById('selectAllCheckbox').checked = false;
+                        sortConfig = {key: null, direction: 'asc'};
+                        resetSortIcons();
+
+                        // Render toàn bộ 1 lần duy nhất
+                        renderFullTable(scanResults);
+
                         document.getElementById('resultArea').classList.remove('hidden');
                     } else {
                         alert("Error scanning directory");
@@ -160,26 +205,242 @@
                 }
             }
 
+            function renderFullTable(data) {
+                const tbody = document.getElementById('scanTableBody');
+                tbody.innerHTML = ''; // Clear cũ
+                document.getElementById('countFound').innerText = data.length;
+
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No folders match your search.</td></tr>';
+                    return;
+                }
+
+                // Dùng DocumentFragment để append 1 lần vào DOM -> Hiệu năng cao
+                const fragment = document.createDocumentFragment();
+
+                data.forEach((item) => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 group-row";
+                    tr.id = `row-${item.originalIndex}`; // Đánh ID để dễ tìm
+                    tr.dataset.index = item.originalIndex; // Lưu index vào dataset
+
+                    const statusBadge = item.existsInDb
+                            ? '<span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs border border-yellow-500/30">Update</span>'
+                            : '<span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs border border-green-500/30">New</span>';
+
+                    tr.innerHTML = `
+                        <td class="px-6 py-4">
+                            <input type="checkbox" value="${item.originalIndex}" class="item-check rounded bg-gray-700 border-gray-600 text-primary focus:ring-0">
+                        </td>
+                        <td class="px-6 py-4">${statusBadge}</td>
+                        <td class="px-6 py-4 font-mono text-white text-sm truncate max-w-[200px]" title="${item.folderName}">${item.folderName}</td>
+                        <td class="px-6 py-4">
+                            <div class="font-bold text-white">${item.parsedMainName}</div>
+                            <div class="text-xs text-gray-500">${item.parsedAliases.join(', ')}</div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs font-bold border border-blue-500/30">${item.mediaCount}</span>
+                        </td>
+                    `;
+                    fragment.appendChild(tr);
+                });
+
+                tbody.appendChild(fragment);
+            }
+
+            function handleSearch() {
+                const term = document.getElementById('searchInput').value.toLowerCase().trim();
+                const rows = document.querySelectorAll('#scanTableBody tr.group-row');
+                let visibleCount = 0;
+
+                // Loop qua DOM thật thay vì loop qua Data
+                rows.forEach(row => {
+                    const index = row.dataset.index;
+                    const item = scanResults[index]; // Lấy data tương ứng
+
+                    // Kiểm tra điều kiện tìm kiếm
+                    const isMatch = !term || item._searchText.includes(term);
+
+                    if (isMatch) {
+                        row.classList.remove('hidden');
+                        visibleCount++;
+                    } else {
+                        row.classList.add('hidden');
+                    }
+                });
+
+                document.getElementById('countFound').innerText = visibleCount;
+
+                // Reset select all nếu đang check
+                const selectAll = document.getElementById('selectAllCheckbox');
+                if (selectAll.checked)
+                    selectAll.checked = false;
+            }
+
+            function handleSort(key) {
+                // Logic đổi hướng sort
+                if (sortConfig.key === key) {
+                    sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortConfig.key = key;
+                    sortConfig.direction = 'asc';
+                }
+                updateSortIcons(key, sortConfig.direction);
+
+                // 1. Sort mảng dữ liệu gốc
+                scanResults.sort((a, b) => {
+                    let valA = a[sortConfig.key];
+                    let valB = b[sortConfig.key];
+                    if (typeof valA === 'string')
+                        valA = valA.toLowerCase();
+                    if (typeof valB === 'string')
+                        valB = valB.toLowerCase();
+
+                    if (valA < valB)
+                        return sortConfig.direction === 'asc' ? -1 : 1;
+                    if (valA > valB)
+                        return sortConfig.direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+
+                // 2. Sắp xếp lại DOM (Re-append)
+                // appendChild một node đang tồn tại sẽ tự động di chuyển nó (move) chứ không tạo mới
+                const tbody = document.getElementById('scanTableBody');
+                const fragment = document.createDocumentFragment();
+
+                scanResults.forEach(item => {
+                    const row = document.getElementById(`row-${item.originalIndex}`);
+                    if (row) {
+                        fragment.appendChild(row);
+                    }
+                });
+
+                tbody.appendChild(fragment);
+            }
+
+            function toggleAll(source) {
+                // Chỉ chọn những dòng không bị ẩn (class hidden)
+                const visibleCheckboxes = document.querySelectorAll('#scanTableBody tr:not(.hidden) .item-check');
+                visibleCheckboxes.forEach(cb => cb.checked = source.checked);
+            }
+
+            // --- HELPER: SORT ICONS ---
+            function updateSortIcons(activeKey, direction) {
+                resetSortIcons();
+                const icon = document.getElementById(`sortIcon_${activeKey}`);
+                if (icon) {
+                    icon.innerText = direction === 'asc' ? 'arrow_upward' : 'arrow_downward';
+                    icon.classList.remove('opacity-0', 'group-hover:opacity-50');
+                    icon.classList.add('opacity-100', 'text-primary');
+                }
+            }
+
+            function resetSortIcons() {
+                const icons = document.querySelectorAll('[id^="sortIcon_"]');
+                icons.forEach(icon => {
+                    icon.innerText = 'unfold_more';
+                    icon.classList.add('opacity-0', 'group-hover:opacity-50');
+                    icon.classList.remove('opacity-100', 'text-primary');
+                });
+            }
+
+            // --- HÀM FILTER & SORT LOGIC (MỚI) ---
+            function applyTableFilters() {
+                const term = document.getElementById('searchInput').value.toLowerCase();
+
+                // 1. Filter
+                let filtered = scanResults.filter(item => {
+                    return item.folderName.toLowerCase().includes(term) ||
+                            item.parsedMainName.toLowerCase().includes(term) ||
+                            (item.parsedAliases && item.parsedAliases.some(a => a.toLowerCase().includes(term)));
+                });
+
+                // 2. Sort
+                if (sortConfig.key) {
+                    filtered.sort((a, b) => {
+                        let valA = a[sortConfig.key];
+                        let valB = b[sortConfig.key];
+
+                        // Xử lý chuỗi để sort chính xác
+                        if (typeof valA === 'string')
+                            valA = valA.toLowerCase();
+                        if (typeof valB === 'string')
+                            valB = valB.toLowerCase();
+
+                        if (valA < valB)
+                            return sortConfig.direction === 'asc' ? -1 : 1;
+                        if (valA > valB)
+                            return sortConfig.direction === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+
+                currentFilterData = filtered; // Lưu lại để dùng cho render
+                renderTable(filtered);
+            }
+
+            function handleSort(key) {
+                // Đổi hướng nếu click vào cùng 1 cột, ngược lại reset về asc
+                if (sortConfig.key === key) {
+                    sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortConfig.key = key;
+                    sortConfig.direction = 'asc';
+                }
+
+                updateSortIcons(key, sortConfig.direction);
+                applyTableFilters();
+            }
+
+            function updateSortIcons(activeKey, direction) {
+                resetSortIcons();
+                const icon = document.getElementById(`sortIcon_${activeKey}`);
+                if (icon) {
+                    icon.innerText = direction === 'asc' ? 'arrow_upward' : 'arrow_downward'; // Hoặc 'north' / 'south'
+                    icon.classList.remove('opacity-0', 'group-hover:opacity-50');
+                    icon.classList.add('opacity-100', 'text-primary');
+                }
+            }
+
+            function resetSortIcons() {
+                const icons = document.querySelectorAll('[id^="sortIcon_"]');
+                icons.forEach(icon => {
+                    icon.innerText = 'unfold_more';
+                    icon.classList.add('opacity-0', 'group-hover:opacity-50');
+                    icon.classList.remove('opacity-100', 'text-primary');
+                });
+            }
+
             function renderTable(data) {
                 const tbody = document.getElementById('scanTableBody');
                 document.getElementById('countFound').innerText = data.length;
                 tbody.innerHTML = '';
 
-                data.forEach((item, index) => {
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No folders match your search.</td></tr>';
+                    return;
+                }
+
+                data.forEach((item) => {
                     const statusBadge = item.existsInDb
                             ? '<span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs border border-yellow-500/30">Update</span>'
                             : '<span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs border border-green-500/30">New</span>';
 
+                    // QUAN TRỌNG: value checkbox là originalIndex
                     const row = `
-                        <tr class="hover:bg-white/5 transition-colors">
-                            <td class="px-6 py-4"><input type="checkbox" value="${index}" class="item-check rounded bg-gray-700 border-gray-600 text-primary focus:ring-0" checked></td>
+                        <tr class="hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
+                            <td class="px-6 py-4">
+                                <input type="checkbox" value="${item.originalIndex}" class="item-check rounded bg-gray-700 border-gray-600 text-primary focus:ring-0">
+                            </td>
                             <td class="px-6 py-4">${statusBadge}</td>
-                            <td class="px-6 py-4 font-mono text-white">${item.folderName}</td>
+                            <td class="px-6 py-4 font-mono text-white text-sm truncate max-w-[200px]" title="${item.folderName}">${item.folderName}</td>
                             <td class="px-6 py-4">
                                 <div class="font-bold text-white">${item.parsedMainName}</div>
                                 <div class="text-xs text-gray-500">${item.parsedAliases.join(', ')}</div>
                             </td>
-                            <td class="px-6 py-4 text-center"><span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs font-bold">${item.mediaCount}</span></td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs font-bold border border-blue-500/30">${item.mediaCount}</span>
+                            </td>
                         </tr>
                     `;
                     tbody.innerHTML += row;
@@ -262,7 +523,7 @@
                 document.getElementById('progCount').innerText = `${data.currentFileIndex} / ${data.totalFiles}`;
 
                 // Fix lỗi hiển thị khi chưa có file nào (0 chia 0)
-                let percent = Math.floor(data.currentFileIndex/data.totalFiles);
+                let percent = Math.floor(data.currentFileIndex / data.totalFiles);
                 if (data.totalFiles === 0 || isNaN(percent)) {
                     percent = 0;
                 }
