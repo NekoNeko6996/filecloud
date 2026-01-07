@@ -73,7 +73,9 @@ public class FileResourceController {
                 "size", node.getReadableSize(), // Sử dụng hàm helper đã tạo ở bước trước
                 "type", node.getMimeType() != null ? node.getMimeType() : "Unknown",
                 "created", node.getCreatedAt().toString(),
-                "meta", meta != null ? meta : "N/A"
+                "meta", meta != null ? meta : "N/A",
+                "relative", node.getRelativePath(),
+                "hash", node.getFileHash()
         ));
     }
 }
