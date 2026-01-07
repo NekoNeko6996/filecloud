@@ -367,39 +367,71 @@
                     </div>
 
                     <div class="w-1/2 flex flex-col p-6 bg-[#1e1e1e]">
-                        <h3 class="font-bold text-lg mb-4" id="socialFormTitle">Add New Link</h3>
 
-                        <form id="socialForm" onsubmit="saveSocialLink(event)" class="flex flex-col gap-4 flex-1">
+                        <form id="socialForm" onsubmit="saveSocialLink(event)" class="flex flex-col gap-4 flex-1 h-full overflow-hidden">
                             <input type="hidden" name="linkId" id="inputLinkId">
                             <input type="hidden" name="subjectId" th:value="${subject.id}">
+                            <input type="hidden" name="platformId" id="inputPlatformId" required>
 
-                            <div>
-                                <label class="text-xs text-gray-400 mb-1 block">Platform</label>
-                                <select name="platformId" id="selectPlatform" required 
-                                        class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary">
-                                </select>
+                            <div class="flex-1 flex flex-col min-h-0">
+                                <div class="flex justify-between items-center mb-2">
+                                    <label class="text-xs text-gray-400 font-bold uppercase">Select Platform</label>
+                                    <div class="relative w-32">
+                                        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 material-symbols-outlined text-[14px]">search</span>
+                                        <input type="text" oninput="searchPlatforms(this.value)" 
+                                               class="w-full bg-black/30 border border-white/10 rounded px-2 py-1 pl-7 text-[10px] text-white focus:outline-none focus:border-primary placeholder-gray-600"
+                                               placeholder="Filter...">
+                                    </div>
+                                </div>
+
+                                <div id="platformGrid" class="grid grid-cols-3 gap-2 overflow-y-auto p-1 custom-scrollbar content-start">
+                                    <p class="text-xs text-gray-500 col-span-3 text-center py-4">Loading platforms...</p>
+                                </div>
                             </div>
 
-                            <div>
-                                <label class="text-xs text-gray-400 mb-1 block">Profile Path / Username</label>
-                                <input type="text" name="profilePath" id="inputProfilePath" required placeholder="e.g. username123"
-                                       class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary">
-                                <p class="text-[10px] text-gray-500 mt-1">Appended to Base URL</p>
+                            <div id="socialInputFields" class="hidden flex flex-col gap-4 border-t border-white/10 pt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <div>
+                                    <label class="text-xs text-gray-400 mb-1 block font-bold uppercase">Profile Path</label>
+
+                                    <div class="mb-1.5 flex items-center gap-1.5 text-xs text-primary font-mono bg-primary/10 border border-primary/20 px-2 py-1 rounded w-fit max-w-full">
+                                        <span class="material-symbols-outlined text-[14px]">public</span>
+                                        <span id="baseUrlDisplay" class="truncate text-white">https://example.com/</span>
+                                    </div>
+
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 material-symbols-outlined text-[18px]">person</span>
+                                        <input type="text" name="profilePath" id="inputProfilePath" required placeholder="username123"
+                                               class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 pl-9 text-sm text-white focus:outline-none focus:border-primary transition-colors">
+                                    </div>
+                                    <p class="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-[10px]">link</span>
+                                        Result: <span id="urlPreview" class="text-gray-300 truncate">...</span>
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <button type="button" onclick="document.getElementById('overrideGroup').classList.toggle('hidden')" class="text-[11px] text-gray-400 hover:text-white underline flex items-center gap-1">
+                                        Advanced: Override Full URL
+                                    </button>
+                                    <div id="overrideGroup" class="hidden mt-2">
+                                        <input type="text" name="fullUrl" id="inputFullUrl" placeholder="https://custom-url.com/..."
+                                               class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono placeholder-gray-700">
+                                    </div>
+                                </div>
                             </div>
 
-                            <div>
-                                <label class="text-xs text-gray-400 mb-1 block">Full URL Override (Optional)</label>
-                                <input type="text" name="fullUrl" id="inputFullUrl" placeholder="https://..."
-                                       class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary font-mono">
-                                <p class="text-[10px] text-gray-500 mt-1">Use specific URL instead of auto-generated one</p>
-                            </div>
-
-                            <div class="mt-auto flex justify-end gap-2 pt-4 border-t border-white/5">
+                            <div class="mt-auto flex justify-end gap-2 pt-4 border-t border-white/5 shrink-0">
                                 <button type="button" onclick="document.getElementById('socialModal').close()" class="px-3 py-2 text-sm text-gray-400 hover:text-white">Close</button>
-                                <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded text-sm font-bold shadow-lg">Save</button>
+                                <button type="submit" id="btnSaveSocial" disabled class="bg-primary hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-bold shadow-lg transition-all">Save</button>
                             </div>
                         </form>
                     </div>
+                </div>
+
+                <div id="globalPlatformTooltip" class="fixed z-[9999] bg-black/90 border border-white/20 rounded px-3 py-2 text-center shadow-2xl backdrop-blur-md pointer-events-none max-w-[200px] animate-in fade-in zoom-in-95 duration-150">
+                    <p class="text-xs font-bold text-white mb-0.5" id="gptName">Name</p>
+                    <p class="text-[10px] text-gray-400 font-mono break-all leading-tight" id="gptUrl">URL</p>
+                    <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-white/20"></div>
                 </div>
             </dialog>
 
@@ -585,6 +617,23 @@
                 <span class="text-sm font-bold">Copied to clipboard!</span>
             </div>
         </section>
+
+        <style>
+            /* Tùy chỉnh thanh cuộn cho Grid Platform */
+            .custom-scrollbar::-webkit-scrollbar {
+                width: 4px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+                background: #333;
+                border-radius: 4px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                background: #555;
+            }
+        </style>
 
         <script th:inline="javascript">
             // --- JS TÌM KIẾM FILE (CLIENT SIDE) ---
@@ -956,6 +1005,7 @@
             // --- SOCIAL LINKS LOGIC ---
             const subjectId = /*[[${subject.id}]]*/ 0;
             let allPlatforms = [];
+            let selectedPlatformBaseUrl = "";
 
             function openSocialModal() {
                 document.getElementById('socialModal').showModal();
@@ -966,18 +1016,165 @@
 
             // 1. Load Platforms cho Dropdown
             async function loadPlatforms() {
-                if (allPlatforms.length > 0)
-                    return; // Cache
+                if (allPlatforms.length > 0) {
+                    // Reset search input khi mở lại modal
+                    const searchInput = document.querySelector('input[oninput^="searchPlatforms"]');
+                    if (searchInput) {
+                        searchInput.value = '';
+                        renderPlatformGrid(allPlatforms);
+                    }
+                    return;
+                }
+
                 try {
                     const res = await fetch('/subjects/platforms');
                     allPlatforms = await res.json();
-                    const select = document.getElementById('selectPlatform');
-                    select.innerHTML = allPlatforms.map(p =>
-                            `<option value="${p.id}">${p.name} (${p.baseUrl})</option>`
-                    ).join('');
+                    renderPlatformGrid();
                 } catch (e) {
                     console.error(e);
+                    document.getElementById('platformGrid').innerHTML = '<p class="text-red-400 text-xs col-span-3 text-center">Error loading platforms</p>';
                 }
+            }
+
+            function renderPlatformGrid(data = allPlatforms) {
+                const grid = document.getElementById('platformGrid');
+
+                if (data.length === 0) {
+                    grid.innerHTML = '<p class="text-xs text-gray-500 col-span-3 text-center py-4">No platforms found.</p>';
+                    return;
+                }
+
+                grid.innerHTML = data.map(p => `
+                    <div onclick="selectPlatform(${p.id}, '${p.baseUrl}')" 
+                         onmouseenter="showPlatformTooltip(event, '${p.name}', '${p.baseUrl}')"
+                         onmouseleave="hidePlatformTooltip()"
+                         id="plat-card-${p.id}"
+                         class="platform-card cursor-pointer bg-[#2e2839] border border-white/5 rounded-lg p-2 flex flex-col items-center gap-2 hover:bg-white/10 hover:border-white/20 transition-all select-none group relative">
+                        
+                        <div class="w-8 h-8 rounded-full bg-black/20 flex items-center justify-center p-1 group-hover:scale-110 transition-transform">
+                            ${p.iconUrl
+                            ? `<img src="${p.iconUrl}" class="w-full h-full object-contain">`
+                            : `<span class="material-symbols-outlined text-gray-400 text-sm">public</span>`
+                            }
+                        </div>
+                        
+                        <span class="text-[10px] font-bold text-gray-300 text-center truncate w-full group-hover:text-white">${p.name}</span>
+                        
+                        <div class="absolute top-1 right-1 hidden active-indicator">
+                            <span class="material-symbols-outlined text-primary text-[14px]">check_circle</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Re-highlight nếu đang có item được chọn trong list đã filter
+                const currentId = document.getElementById('inputPlatformId').value;
+                if (currentId) {
+                    const card = document.getElementById(`plat-card-${currentId}`);
+                    if (card) {
+                        card.classList.add('ring-2', 'ring-primary', 'bg-primary/10');
+                        card.querySelector('.active-indicator').classList.remove('hidden');
+                    }
+            }
+            }
+
+            // --- 2. SEARCH LOGIC ---
+            function searchPlatforms(query) {
+                const term = query.toLowerCase().trim();
+                if (!term) {
+                    renderPlatformGrid(allPlatforms);
+                    return;
+                }
+
+                const filtered = allPlatforms.filter(p =>
+                    p.name.toLowerCase().includes(term) ||
+                            p.baseUrl.toLowerCase().includes(term)
+                );
+                renderPlatformGrid(filtered);
+            }
+
+            function showPlatformTooltip(e, name, url) {
+                const tooltip = document.getElementById('globalPlatformTooltip');
+                document.getElementById('gptName').innerText = name;
+                document.getElementById('gptUrl').innerText = url;
+
+                tooltip.classList.remove('hidden');
+
+                // Tính toán vị trí
+                const rect = e.currentTarget.getBoundingClientRect(); // Vị trí thẻ card
+                const ttRect = tooltip.getBoundingClientRect(); // Kích thước tooltip
+
+                // Mặc định: Hiển thị ở trên (Top)
+                let top = rect.top - ttRect.height - 10;
+                let left = rect.left + (rect.width / 2) - (ttRect.width / 2);
+
+                // Logic chống tràn màn hình (Smart Position)
+                // 1. Nếu tràn lên trên -> Đổi xuống dưới
+                if (top < 0) {
+                    top = rect.bottom + 10;
+                }
+
+                // 2. Nếu tràn sang trái
+                if (left < 10)
+                    left = 10;
+
+                // 3. Nếu tràn sang phải
+                if (left + ttRect.width > window.innerWidth) {
+                    left = window.innerWidth - ttRect.width - 10;
+                }
+
+                tooltip.style.top = `${top}px`;
+                tooltip.style.left = `${left}px`;
+            }
+
+            function hidePlatformTooltip() {
+                document.getElementById('globalPlatformTooltip').classList.add('hidden');
+            }
+
+            function selectPlatform(id, baseUrl) {
+                // Update UI Cards (Highlight active)
+                document.querySelectorAll('.platform-card').forEach(c => {
+                    c.classList.remove('ring-2', 'ring-primary', 'bg-primary/10');
+                    c.querySelector('.active-indicator').classList.add('hidden');
+                });
+
+                const card = document.getElementById(`plat-card-${id}`);
+                if (card) {
+                    card.classList.add('ring-2', 'ring-primary', 'bg-primary/10');
+                    card.querySelector('.active-indicator').classList.remove('hidden');
+                }
+
+                // Update Form Data
+                document.getElementById('inputPlatformId').value = id;
+                selectedPlatformBaseUrl = baseUrl || "";
+
+                // CẬP NHẬT HIỂN THỊ BASE URL TRÊN UI
+                const displayBaseUrl = selectedPlatformBaseUrl;
+                document.getElementById('baseUrlDisplay').innerText = displayBaseUrl;
+                document.getElementById('baseUrlDisplay').title = displayBaseUrl; // Tooltip native khi hover text dài
+
+                // Show Inputs
+                document.getElementById('socialInputFields').classList.remove('hidden');
+                document.getElementById('btnSaveSocial').disabled = false;
+
+                // Focus vào ô nhập liệu
+                setTimeout(() => document.getElementById('inputProfilePath').focus(), 100);
+                updateUrlPreview();
+            }
+
+            document.getElementById('inputProfilePath').addEventListener('input', updateUrlPreview);
+
+            function updateUrlPreview() {
+                const path = document.getElementById('inputProfilePath').value;
+                const previewEl = document.getElementById('urlPreview');
+                if (!path) {
+                    previewEl.innerText = "...";
+                    return;
+                }
+                // Ghép BaseURL + Path (cắt bỏ dấu / thừa nếu có)
+                const base = selectedPlatformBaseUrl.endsWith('/') ? selectedPlatformBaseUrl : selectedPlatformBaseUrl + '/';
+                const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+                previewEl.innerText = base + cleanPath;
+                previewEl.title = base + cleanPath; // Tooltip full url
             }
 
             // 2. Load danh sách Link hiện tại
@@ -1025,16 +1222,40 @@
             function resetSocialForm() {
                 document.getElementById('socialForm').reset();
                 document.getElementById('inputLinkId').value = '';
-                document.getElementById('socialFormTitle').innerText = 'Add New Link';
+                document.getElementById('inputPlatformId').value = ''; // Reset ID platform
+
+                // Reset UI Grid
+                document.querySelectorAll('.platform-card').forEach(c => {
+                    c.classList.remove('ring-2', 'ring-primary', 'bg-primary/10');
+                    c.querySelector('.active-indicator').classList.add('hidden');
+                });
+
+                // Ẩn Input Fields
+                document.getElementById('socialInputFields').classList.add('hidden');
+                document.getElementById('btnSaveSocial').disabled = true;
+                document.getElementById('urlPreview').innerText = "...";
+                document.getElementById('overrideGroup').classList.add('hidden');
             }
 
             // 4. Edit Mode
             function editSocialLink(link) {
+                // Reset form trước
+                resetSocialForm();
+
                 document.getElementById('inputLinkId').value = link.id;
-                document.getElementById('selectPlatform').value = link.platformId;
+
+                // Điền dữ liệu text
                 document.getElementById('inputProfilePath').value = link.profilePath;
-                document.getElementById('inputFullUrl').value = link.fullUrlOverride || '';
-                document.getElementById('socialFormTitle').innerText = 'Edit Link: ' + link.platformName;
+                if (link.fullUrlOverride) {
+                    document.getElementById('inputFullUrl').value = link.fullUrlOverride;
+                    document.getElementById('overrideGroup').classList.remove('hidden');
+                }
+
+                // Kích hoạt lại Platform trên Grid (Tìm base url trong mảng allPlatforms để pass vào)
+                const platform = allPlatforms.find(p => p.id === link.platformId);
+                const baseUrl = platform ? platform.baseUrl : "";
+
+                selectPlatform(link.platformId, baseUrl);
             }
 
             // 5. Save Action
