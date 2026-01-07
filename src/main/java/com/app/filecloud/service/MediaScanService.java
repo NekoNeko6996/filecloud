@@ -620,17 +620,26 @@ public class MediaScanService {
     }
 
     private String ensureFileHash(FileNode fileNode) {
-        if (fileNode.getFileHash() != null && !fileNode.getFileHash().isEmpty()) {
+        // 1. Kiểm tra: Nếu đã có Hash VÀ Hash đó là chuẩn mới (bắt đầu bằng QUICK_)
+        if (fileNode.getFileHash() != null && fileNode.getFileHash().startsWith("QUICK_")) {
             return fileNode.getFileHash();
         }
+
+        // 2. Nếu chưa có Hash HOẶC Hash là chuẩn cũ (không có QUICK_) -> Tính lại
+        log.info("Refreshing Hash for file: {} (Old Hash: {})", fileNode.getName(), fileNode.getFileHash());
+
         StorageVolume vol = storageVolumeService.getVolumeById(fileNode.getVolumeId());
         if (vol != null) {
             Path path = Paths.get(vol.getMountPoint(), fileNode.getRelativePath());
             if (Files.exists(path)) {
-                String hash = calculateQuickHash(path); // Dùng bản không progress cho nhanh gọn
-                fileNode.setFileHash(hash);
+                // Tính Hash mới (Rất nhanh)
+                String newHash = calculateQuickHash(path);
+
+                // Cập nhật vào DB ngay lập tức
+                fileNode.setFileHash(newHash);
                 fileNodeRepository.save(fileNode);
-                return hash;
+
+                return newHash;
             }
         }
         return "MISSING_FILE";
