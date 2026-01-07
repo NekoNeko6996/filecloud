@@ -63,7 +63,7 @@ public class MediaService {
                 processVideo(file, fileNode);
             }
         } catch (Exception e) {
-            log.error("Lỗi xử lý media (" + fileNode.getType() + "): " + fileNode.getName(), e);
+            log.error("Media processing error" + fileNode.getType() + "): " + fileNode.getName(), e);
         }
     }
 
@@ -79,25 +79,27 @@ public class MediaService {
     // --- XỬ LÝ VIDEO ---
     private void processVideo(File file, FileNode fileNode) {
         try {
-            // 1. Lấy Metadata bằng FFprobe
+            // 1. Lấy Metadata (Giữ nguyên)
             FFmpegProbeResult probeResult = ffprobe.probe(file.getAbsolutePath());
             FFmpegStream videoStream = probeResult.getStreams().stream()
                     .filter(s -> s.codec_type == FFmpegStream.CodecType.VIDEO)
                     .findFirst().orElse(null);
 
             if (videoStream != null) {
+                double duration = probeResult.getFormat().duration;
+
+                // Save Metadata to DB ... (Giữ nguyên code của bạn đoạn này)
                 MediaMetadata meta = MediaMetadata.builder()
                         .fileId(fileNode.getId())
                         .width(videoStream.width)
                         .height(videoStream.height)
-                        .durationSeconds((int) probeResult.getFormat().duration)
+                        .durationSeconds((int) duration)
                         .videoCodec(videoStream.codec_name)
                         .frameRate(videoStream.avg_frame_rate.doubleValue())
                         .build();
                 metadataRepository.saveAndFlush(meta);
-                log.info("Đã lưu metadata Video: " + fileNode.getName());
 
-                // 2. Tạo Thumbnail từ Video
+                // 2. TỐI ƯU TẠO THUMBNAIL
                 Path cacheDir = Paths.get(rootUploadDir, ".cache", "temp_frames");
                 if (!Files.exists(cacheDir)) {
                     Files.createDirectories(cacheDir);
@@ -105,35 +107,61 @@ public class MediaService {
 
                 String tempFrameName = fileNode.getId() + "_source.jpg";
                 Path tempFramePath = cacheDir.resolve(tempFrameName);
-                
-                double duration = probeResult.getFormat().duration;
-                long midPointMillis = (duration > 0) ? (long) ((duration / 2) * 1000) : 1000;
 
-                // Dùng FFmpeg chụp ảnh thumbnail
+                // --- CHIẾN THUẬT CHỌN THỜI GIAN (OPTIMIZATION 1) ---
+                long targetMillis = calculateSmartTimestamp(duration);
+
+                // --- FFMPEG BUILDER (OPTIMIZATION 2) ---
+                // Resize ảnh ngay lúc chụp xuống độ rộng 800 (Medium) để nhẹ file
+                // Dùng scale=800:-1 (giữ tỷ lệ khung hình)
                 FFmpegBuilder builder = new FFmpegBuilder()
                         .setInput(file.getAbsolutePath())
                         .addOutput(tempFramePath.toString())
                         .setFrames(1)
-                        .setStartOffset(midPointMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                        // Input seeking (-ss trước -i) nhanh hơn nhiều so với Output seeking
+                        .setStartOffset(targetMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                        .setVideoFilter("scale=800:-1") // Resize ngay lập tức!
                         .setFormat("image2")
                         .done();
 
                 FFmpegExecutor executor = new FFmpegExecutor(ffmpeg, ffprobe);
                 executor.createJob(builder).run();
 
-                // Resize ảnh thumbnail vừa chụp (Sửa tên hàm cho khớp)
+                // 3. Tạo các phiên bản thumbnail từ file tạm
                 File sourceFrame = tempFramePath.toFile();
                 if (sourceFrame.exists()) {
-                    generateThumbnail(sourceFrame, fileNode.getId(), FileThumbnail.ThumbType.SMALL, 200);
+                    // File tạm giờ chỉ nặng vài chục KB thay vì vài MB -> Resize cực nhanh
                     generateThumbnail(sourceFrame, fileNode.getId(), FileThumbnail.ThumbType.MEDIUM, 800);
+                    generateThumbnail(sourceFrame, fileNode.getId(), FileThumbnail.ThumbType.SMALL, 200);
 
-                    // Xóa file tạm (Optional)
+                    // Xóa file tạm
                     Files.deleteIfExists(tempFramePath);
                 }
             }
         } catch (Exception e) {
-            log.error("Lỗi xử lý Video: " + e.getMessage());
+            log.error("Video processing error: " + e.getMessage());
         }
+    }
+
+    /**
+     * Tính toán thời điểm chụp ảnh thông minh
+     */
+    private long calculateSmartTimestamp(double durationSeconds) {
+        if (durationSeconds <= 0) {
+            return 0;
+        }
+
+        // Nếu video ngắn dưới 30s: Lấy chính giữa (50%) để an toàn
+        if (durationSeconds < 30) {
+            return (long) ((durationSeconds / 2) * 1000);
+        }
+
+        // Nếu video dài (> 30s):
+        // Thường intro/giới thiệu nằm ở 0-10% đầu.
+        // Lấy ở mốc 20% là an toàn để qua intro nhưng vẫn nắm bắt nội dung.
+        // Tuy nhiên, nếu 20% vẫn quá nhỏ (ví dụ video 1 tiếng, 20% là 12 phút), có thể giới hạn max.
+        double percent = 0.20; // 20%
+        return (long) ((durationSeconds * percent) * 1000);
     }
 
     // --- CÁC HÀM HELPER (Đổi tên về chuẩn: extractMetadata & generateThumbnail) ---
@@ -166,10 +194,10 @@ public class MediaService {
             }
 
             metadataRepository.save(mediaMeta);
-            log.info("Đã lưu metadata cho file: " + fileId);
+            log.info("Metadata has been saved for the file.: " + fileId);
 
         } catch (Exception e) {
-            log.error("Lỗi trích xuất metadata: " + e.getMessage());
+            log.error("Metadata extraction error: " + e.getMessage());
         }
     }
 
@@ -233,10 +261,10 @@ public class MediaService {
                 thumbnailRepository.saveAndFlush(thumb);
             }
         } catch (Exception e) {
-            log.error("Lỗi tạo thumbnail " + type + ": " + e.getMessage());
+            log.error("Thumbnail creation error " + type + ": " + e.getMessage());
         }
     }
-    
+
     // === THÊM HÀM LƯU AVATAR ===
     public String saveAvatar(MultipartFile file) {
         try {

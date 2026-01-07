@@ -6,8 +6,8 @@
             <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
                 <a th:href="@{/subjects}">
                     <h2 class="text-xl font-bold text-white flex items-center">
-                    <span class="material-symbols-outlined">keyboard_backspace</span> Return to Subject
-                </h2>
+                        <span class="material-symbols-outlined">keyboard_backspace</span> Return to Subject
+                    </h2>
                 </a>
             </header>
 
@@ -73,6 +73,20 @@
                     <div class="p-6 border-t border-white/10 flex justify-end gap-3 bg-[#171022] shrink-0">
                         <button onclick="document.getElementById('duplicateModal').close()" class="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel Import</button>
                         <button onclick="confirmResolvedImport()" class="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-bold shadow-lg">Confirm & Import</button>
+                    </div>
+                </div>
+            </dialog>
+
+            <dialog id="checkingModal" class="p-0 rounded-xl shadow-2xl backdrop:bg-black/80 w-full max-w-sm bg-transparent">
+                <div class="flex flex-col w-full bg-[#1e1e1e] text-white rounded-xl border border-gray-700 p-6 items-center text-center gap-4">
+                    <div class="relative w-16 h-16">
+                        <div class="absolute inset-0 rounded-full border-4 border-white/10"></div>
+                        <div class="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+                        <span class="material-symbols-outlined absolute inset-0 flex items-center justify-center text-2xl text-primary">search_check</span>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-xl">Checking Duplicates...</h3>
+                        <p class="text-sm text-gray-400 mt-1">Analyzing file hashes and metadata.</p>
                     </div>
                 </div>
             </dialog>
@@ -179,37 +193,63 @@
             // --- HÀM KẾT NỐI SSE (ĐÃ SỬA LỖI TREO) ---
             function connectProgress() {
                 return new Promise((resolve, reject) => {
-                    if (eventSource)
+                    if (eventSource) {
                         eventSource.close();
+                        eventSource = null;
+                    }
 
                     console.log("Connecting to SSE...");
                     eventSource = new EventSource('/admin/scan-subjects/progress');
 
-                    // 1. Timeout an toàn: Nếu 3s không kết nối được -> bỏ qua để chạy tiếp
                     const timeout = setTimeout(() => {
                         if (eventSource.readyState !== EventSource.OPEN) {
-                            console.warn("SSE Connection timed out. Proceeding without progress UI.");
+                            console.warn("SSE Connection timed out (5s).");
                             eventSource.close();
-                            resolve(); // Resolve để không chặn luồng chính
+                            resolve();
                         }
-                    }, 3000);
+                    }, 5000);
 
                     eventSource.onopen = function (e) {
                         clearTimeout(timeout);
-                        console.log("SSE Connected successfully.");
+                        console.log("SSE Connected successfully (onopen).");
                         resolve();
                     };
 
-                    eventSource.onmessage = function (event) {
+                    // 1. Lắng nghe sự kiện INIT (để debug)
+                    eventSource.addEventListener('init', function (e) {
+                        console.log("SSE Init received:", e.data);
+                    });
+
+                    // 2. QUAN TRỌNG: SỬA TỪ 'onmessage' THÀNH 'addEventListener' CHO SỰ KIỆN 'progress'
+                    eventSource.addEventListener('progress', function (event) {
                         const data = JSON.parse(event.data);
                         updateProgressUI(data);
+
+                        // THÊM ĐOẠN NÀY: Tự động ngắt kết nối khi hoàn thành
+                        if (data.status === 'COMPLETED') {
+                            console.log("All folders imported. Closing SSE.");
+                            eventSource.close();
+
+                            // Đợi 1 chút cho thanh progress đầy 100% rồi mới đóng
+                            setTimeout(() => {
+                                document.getElementById('progressModal').close();
+                                alert("All selected folders have been imported successfully!");
+                                window.location.href = "/subjects";
+                            }, 500);
+                        }
+                    });
+
+                    // (Optional) Giữ lại onmessage để bắt các lỗi chung nếu server gửi text thuần
+                    eventSource.onmessage = function (event) {
+                        console.log("Received unnamed message:", event.data);
                     };
 
                     eventSource.onerror = function (err) {
                         clearTimeout(timeout);
-                        console.error("SSE Connection Error/Closed:", err);
+                        if (eventSource.readyState !== EventSource.CONNECTING) {
+                            // console.error("SSE Error:", err); // Tắt bớt log đỏ nếu muốn
+                        }
                         eventSource.close();
-                        // QUAN TRỌNG: Phải resolve ngay cả khi lỗi để code phía sau chạy tiếp
                         resolve();
                     };
                 });
@@ -220,8 +260,15 @@
                 document.getElementById('progFile').innerText = data.fileName || '...';
                 document.getElementById('progStatus').innerText = data.status || 'Processing';
                 document.getElementById('progCount').innerText = `${data.currentFileIndex} / ${data.totalFiles}`;
-                document.getElementById('progBar').style.width = `${data.filePercent}%`;
-                document.getElementById('progPercent').innerText = `${data.filePercent}%`;
+
+                // Fix lỗi hiển thị khi chưa có file nào (0 chia 0)
+                let percent = Math.floor(data.currentFileIndex/data.totalFiles);
+                if (data.totalFiles === 0 || isNaN(percent)) {
+                    percent = 0;
+                }
+
+                document.getElementById('progBar').style.width = `${percent}%`;
+                document.getElementById('progPercent').innerText = `${percent}%`;
             }
 
             // --- EXECUTE IMPORT (ĐÃ SỬA LỖI STREAM READ) ---
@@ -230,13 +277,20 @@
                 if (selectedIndices.length === 0)
                     return alert("Select at least one folder!");
 
+                await document.getElementById('checkingModal').showModal();
+
                 currentPathsToImport = selectedIndices.map(i => scanResults[i].fullPath);
 
-                document.getElementById('progressModal').showModal();
+                // 1. Kết nối SSE trước để lắng nghe tiến trình (cho cả check duplicate lẫn import)
+                try {
+                    // 2. Hiện Modal Checking
+                    await connectProgress();
+                } catch (e) {
+                    alert("Error connect to SSE!");
+                    console.warn("SSE Connect Warning:", e);
+                }
 
                 try {
-                    await connectProgress();
-
                     console.log("Sending check-duplicates request...");
 
                     const res = await fetch('/admin/scan-subjects/check-duplicates', {
@@ -245,50 +299,72 @@
                         body: JSON.stringify(currentPathsToImport)
                     });
 
-                    // 1. Đọc text response một lần duy nhất
+                    // Đọc response
                     const responseText = await res.text();
-                    console.log("Raw Server Response:", responseText);
 
-                    if (!res.ok) {
-                        throw new Error(`Server Error (${res.status}): ${responseText}`);
-                    }
+                    // 3. Ẩn Modal Checking ngay khi có kết quả
+                    document.getElementById('checkingModal').close();
 
-                    if (!responseText) {
-                        throw new Error("Server returned empty response");
-                    }
+                    if (!res.ok)
+                        throw new Error(`Server Error: ${responseText}`);
 
-                    // 2. Parse JSON thủ công từ text đã đọc
                     try {
                         duplicateGroups = JSON.parse(responseText);
                     } catch (e) {
-                        console.error("JSON Parse Error:", responseText);
-                        throw new Error("Invalid JSON from server.");
+                        duplicateGroups = []; // Nếu rỗng hoặc lỗi parse
                     }
 
-                    // 3. Xử lý logic (KHÔNG GỌI res.json() NỮA)
-                    document.getElementById('progressModal').close();
-
-                    if (duplicateGroups.length > 0) {
-                        // Trường hợp có trùng lặp -> Hiện bảng so sánh
+                    if (duplicateGroups && duplicateGroups.length > 0) {
+                        // Có trùng -> Hiện bảng giải quyết
                         renderDuplicateModal(duplicateGroups);
                         document.getElementById('duplicateModal').showModal();
                     } else {
-                        // Trường hợp không trùng (Mảng rỗng []) -> Hỏi và Import thẳng
-                        if (confirm(`No duplicates found. Import ${currentPathsToImport.length} folders?`)) {
-                            document.getElementById('progressModal').showModal();
-                            callImportApi({safePaths: currentPathsToImport, actions: []});
-                        } else {
-                            if (eventSource)
-                                eventSource.close();
-                        }
+                        runImportProcess({safePaths: currentPathsToImport, actions: []});
                     }
 
                 } catch (e) {
+                    document.getElementById('checkingModal').close(); // Đảm bảo đóng nếu lỗi
                     console.error("Execute Import Error:", e);
+                    alert("Failed: " + e.message);
+                    if (eventSource)
+                        eventSource.close();
+                }
+            }
+
+            async function runImportProcess(payload) {
+                document.getElementById('progressModal').showModal(); // Hiện thanh tiến trình
+
+                // Reset UI tiến trình
+                updateProgressUI({
+                    subject: 'Initializing...',
+                    fileName: 'Starting background job...',
+                    status: 'Starting',
+                    filePercent: 0, currentFileIndex: 0, totalFiles: 0
+                });
+
+                try {
+                    const res = await fetch('/admin/scan-subjects/execute-resolved', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', [getHeader()]: getToken()},
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res.ok) {
+                        console.log("Job started in background.");
+                        // --- QUAN TRỌNG: ĐÃ XÓA eventSource.close() Ở ĐÂY ---
+                        // Để kết nối mở cho SSE cập nhật tiếp
+                    } else {
+                        alert("Failed to start import job.");
+                        document.getElementById('progressModal').close();
+                        if (eventSource)
+                            eventSource.close();
+                    }
+                } catch (e) {
+                    console.error(e);
                     document.getElementById('progressModal').close();
                     if (eventSource)
                         eventSource.close();
-                    alert("Failed: " + e.message);
+                    alert("Error calling API");
                 }
             }
 
@@ -364,37 +440,12 @@
                 });
 
                 document.getElementById('duplicateModal').close();
-                document.getElementById('progressModal').showModal(); // Hiện lại progress cho bước execute
 
-                await callImportApi({
+                // Gọi hàm runImportProcess tách riêng
+                await runImportProcess({
                     safePaths: currentPathsToImport,
                     actions: actions
                 });
-            }
-
-            async function callImportApi(payload) {
-                try {
-                    const res = await fetch('/admin/scan-subjects/execute-resolved', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json', [getHeader()]: getToken()},
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (res.ok) {
-                        document.getElementById('progressModal').close();
-                        if (eventSource)
-                            eventSource.close();
-                        alert("Import successful!");
-                        window.location.href = "/subjects";
-                    } else {
-                        document.getElementById('progressModal').close();
-                        alert("Import failed. Check server logs.");
-                    }
-                } catch (e) {
-                    console.error(e);
-                    document.getElementById('progressModal').close();
-                    alert("Error calling import API");
-                }
             }
 
             function getToken() {
@@ -403,6 +454,12 @@
             function getHeader() {
                 return document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
             }
+
+            window.addEventListener('beforeunload', () => {
+                if (eventSource) {
+                    eventSource.close();
+                }
+            });
         </script>
     </body>
 </html>

@@ -88,7 +88,7 @@ public class FileStorageService {
         try {
             Files.createDirectories(fullFolderPath);
         } catch (IOException e) {
-            log.error("Không thể tạo folder vật lý: " + fullFolderPath, e);
+            log.error("Cannot create physical folder: " + fullFolderPath, e);
             // Vẫn tiếp tục tạo DB hoặc ném lỗi tùy bạn
         }
 

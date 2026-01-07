@@ -6,7 +6,6 @@ import com.app.filecloud.dto.SubjectScanResult;
 import com.app.filecloud.repository.UserRepository;
 import com.app.filecloud.service.MediaScanService;
 import com.app.filecloud.service.ScanProgressService;
-import static java.lang.Math.log;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -14,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.catalina.connector.Response;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -38,14 +36,21 @@ public class SubjectScanController {
     @PostMapping("/execute")
     @ResponseBody
     public ResponseEntity<String> executeImport(@RequestBody List<String> paths) {
-        try {
-            // ĐỔI TỪ importSubjects -> importWithMapping
-            mediaScanService.importWithMapping(paths);
-            return ResponseEntity.ok("Đã import và map thành công!");
-        } catch (Exception e) { // In lỗi ra console server để debug
-            // In lỗi ra console server để debug
-            return ResponseEntity.internalServerError().body("Lỗi: " + e.getMessage());
+        String userId = getCurrentUserId();
+        if (userId == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
         }
+
+        // Chạy Async thủ công bằng Thread mới để trả response ngay cho Client
+        new Thread(() -> {
+            try {
+                mediaScanService.importWithMapping(paths, userId);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+
+        return ResponseEntity.ok("Import started in background...");
     }
 
     @PostMapping("/preview")
@@ -57,6 +62,17 @@ public class SubjectScanController {
             return ResponseEntity.badRequest().build();
         }
     }
+    
+    @GetMapping("/progress")
+    public SseEmitter subscribe() {
+        String userId = getCurrentUserId();
+        if (userId == null) {
+            // Nếu chưa login, trả về null hoặc throw lỗi tùy bạn
+            return null; 
+        }
+        // Gọi service để tạo và lưu emitter
+        return progressService.subscribe(userId);
+    }
 
     @PostMapping("/check-duplicates")
     @ResponseBody
@@ -65,8 +81,7 @@ public class SubjectScanController {
             List<DuplicateFileGroup> dup = mediaScanService.checkDuplicates(paths);
             System.out.println(dup.size());
             return ResponseEntity.ok(dup);
-        }
-        catch(Exception e) {
+        } catch (Exception e) {
             System.out.println(e.getMessage());
             return ResponseEntity.ok(null);
         }
@@ -75,21 +90,21 @@ public class SubjectScanController {
     @PostMapping("/execute-resolved")
     @ResponseBody
     public ResponseEntity<String> executeResolved(@RequestBody ImportResolution resolution) {
-        try {
-            mediaScanService.executeResolvedImport(resolution);
-            return ResponseEntity.ok("Import completed successfully!");
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
-        }
-    }
-
-    @GetMapping(value = "/progress", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamProgress() {
         String userId = getCurrentUserId();
         if (userId == null) {
-            return null;
+            return ResponseEntity.status(401).body("Unauthorized");
         }
-        return progressService.subscribe(userId);
+
+        // Chạy Async
+        new Thread(() -> {
+            try {
+                mediaScanService.executeResolvedImport(resolution, userId);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+
+        return ResponseEntity.ok("Import started in background...");
     }
 
     private String getCurrentUserId() {
