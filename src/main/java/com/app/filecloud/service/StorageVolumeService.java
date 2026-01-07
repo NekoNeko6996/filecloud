@@ -27,7 +27,7 @@ public class StorageVolumeService {
 
     @PostConstruct
     public void syncVolumes() {
-        log.info("--- BẮT ĐẦU QUÉT Ổ CỨNG VẬT LÝ ---");
+        log.info("--- START SCANNING THE PHYSICAL HARD DRIVE ---");
         for (Path root : FileSystems.getDefault().getRootDirectories()) {
             try {
                 FileStore store = Files.getFileStore(root);
@@ -42,15 +42,15 @@ public class StorageVolumeService {
                 // Nếu không lấy được Serial, dùng hashCode của mountPoint làm tạm (để không null)
                 String uuid = (info.serial != null && !info.serial.isEmpty()) ? info.serial : "UNKNOWN-" + Math.abs(mountPoint.hashCode());
 
-                log.info("Đã quét ổ {}: Label='{}', Serial='{}'", mountPoint, label, uuid);
+                log.info("Drive scanned: Label='{}', Serial='{}'", mountPoint, label, uuid);
 
                 updateVolumeInDb(label, mountPoint, uuid, store.getTotalSpace(), store.getUsableSpace());
 
             } catch (Exception e) {
-                log.warn("Lỗi đọc ổ {}: {}", root, e.getMessage());
+                log.warn("Error reading drive {}: {}", root, e.getMessage());
             }
         }
-        log.info("--- KẾT THÚC QUÉT ---");
+        log.info("--- SCAN END ---");
     }
 
     private void updateVolumeInDb(String label, String mountPoint, String uuid, long total, long available) {
@@ -61,7 +61,7 @@ public class StorageVolumeService {
             vol = volOpt.get();
             // Nếu ổ đổi ký tự (VD: F: -> G:), cập nhật lại
             if (!vol.getMountPoint().equals(mountPoint)) {
-                log.info("Cập nhật MountPoint: {} -> {}", vol.getMountPoint(), mountPoint);
+                log.info("Update MountPoint: {} -> {}", vol.getMountPoint(), mountPoint);
                 vol.setMountPoint(mountPoint);
             }
         } else {
@@ -130,7 +130,7 @@ public class StorageVolumeService {
                 }
             }
         } catch (Exception e) {
-            log.error("Không thể chạy lệnh vol {}", driveLetter);
+            log.error("The vol {} command could not be executed.", driveLetter);
         }
         return info;
     }
