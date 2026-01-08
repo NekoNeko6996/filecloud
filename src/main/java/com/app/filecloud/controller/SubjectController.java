@@ -12,6 +12,7 @@ import com.app.filecloud.repository.ContentSubjectRepository;
 import com.app.filecloud.repository.FileNodeRepository;
 import com.app.filecloud.repository.FileTagRepository;
 import com.app.filecloud.repository.SocialPlatformRepository;
+import com.app.filecloud.repository.StorageVolumeRepository;
 import com.app.filecloud.repository.SubjectFolderMappingRepository;
 import com.app.filecloud.repository.SubjectSocialLinkRepository;
 import com.app.filecloud.repository.TagRepository;
@@ -73,6 +74,7 @@ public class SubjectController {
     private final SubjectSocialLinkRepository socialLinkRepository;
 
     private final TagRepository tagRepository;
+    private final StorageVolumeRepository volumeRepository;
 
     // root path
     @Value("${app.storage.root:uploads}")
@@ -86,66 +88,82 @@ public class SubjectController {
     }
 
     @GetMapping("/{id}")
-    public String subjectProfilePage(@PathVariable("id") Integer id, Model model) {
-        // 1. Lấy thông tin Subject
+    public String subjectProfile(@PathVariable Integer id, Model model) {
         ContentSubject subject = subjectRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Subject not found"));
 
-        // 2. Lấy danh sách file media
+        // Lấy danh sách Files
         List<FileNode> files = fileNodeRepository.findBySubjectId(id);
 
-        // 3. Tính toán thống kê
-        long totalSize = files.stream().mapToLong(FileNode::getSize).sum();
-        String formattedSize = formatSize(totalSize);
-
-        List<SubjectFolderMapping> rawMappings = mappingRepository.findBySubjectId(id);
-
-        List<Map<String, Object>> mappingsDto = rawMappings.stream().map(m -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", m.getId());
-            map.put("relativePath", m.getRelativePath());
-
-            // Chỉ lấy info Volume cần thiết, tránh lấy cả object Volume to đùng
-            Map<String, Object> volMap = new HashMap<>();
-            volMap.put("id", m.getVolume().getId());
-            volMap.put("label", m.getVolume().getLabel());
-            map.put("volume", volMap);
-
-            return map;
-        }).collect(Collectors.toList());
-
-        model.addAttribute("mappings", mappingsDto);
-
-        // === THÊM LOGIC LẤY TAG ===
+        // --- XỬ LÝ TAGS ---
         List<String> fileIds = files.stream().map(FileNode::getId).toList();
-
-        // Lấy tất cả liên kết File-Tag
         List<FileTag> allFileTags = fileIds.isEmpty() ? List.of() : fileTagRepository.findByFileIdIn(fileIds);
 
-        // 1. Danh sách tất cả Tag Unique có trong Subject này (để hiển thị bộ lọc)
         Set<Integer> uniqueTagIds = allFileTags.stream().map(FileTag::getTagId).collect(Collectors.toSet());
         List<Tag> subjectTags = tagRepository.findAllById(uniqueTagIds);
 
-        // 2. Map dữ liệu: FileId -> Chuỗi các TagId (VD: "1 5 8") để gắn vào HTML attribute
         Map<String, String> fileTagMap = new HashMap<>();
         for (FileNode f : files) {
             String tagsStr = allFileTags.stream()
                     .filter(ft -> ft.getFileId().equals(f.getId()))
                     .map(ft -> String.valueOf(ft.getTagId()))
-                    .collect(Collectors.joining(" ")); // Cách nhau bằng dấu cách
+                    .collect(Collectors.joining(" "));
             fileTagMap.put(f.getId(), tagsStr);
         }
 
+        // --- XỬ LÝ MAPPINGS (Cập nhật logic tính size) ---
+        List<SubjectFolderMapping> mappingEntities = mappingRepository.findBySubjectId(id);
+        
+        List<Map<String, Object>> safeMappings = mappingEntities.stream().map(m -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", m.getId());
+            map.put("relativePath", m.getRelativePath());
+            
+            // 1. Tính dung lượng thư mục này đang dùng (Tổng size file)
+            // Lưu ý: m.getVolume().getId() là ID của ổ đĩa
+            long usedByFolder = fileNodeRepository.sumSizeByMappingId(m.getId());
+            map.put("folderUsage", usedByFolder);
+
+            // 2. Thông tin ổ đĩa (để tính % hiển thị nếu cần)
+            if (m.getVolume() != null) {
+                Map<String, Object> vol = new HashMap<>();
+                vol.put("id", m.getVolume().getId());
+                vol.put("label", m.getVolume().getLabel());
+                vol.put("mountPoint", m.getVolume().getMountPoint());
+                vol.put("totalCapacity", m.getVolume().getTotalCapacity());
+                vol.put("availableCapacity", m.getVolume().getAvailableCapacity());
+                map.put("volume", vol);
+            }
+            return map;
+        }).collect(Collectors.toList());
+        
+        // --- ADD ATTRIBUTES ---
+        model.addAttribute("subject", subject);
+        model.addAttribute("files", files);
+
+        // Stats
+        long totalSize = files.stream().mapToLong(FileNode::getSize).sum();
+        model.addAttribute("totalFiles", files.size());
+        model.addAttribute("totalSize", formatSize(totalSize));
+
+        // Tags
         model.addAttribute("subjectTags", subjectTags);
         model.addAttribute("fileTagMap", fileTagMap);
 
-        // 4. Đẩy dữ liệu ra View
-        model.addAttribute("subject", subject);
-        model.addAttribute("files", files);
-        model.addAttribute("totalFiles", files.size());
-        model.addAttribute("totalSize", formattedSize);
+        // Mappings (Dùng bản safe đã convert)
+        model.addAttribute("mappings", safeMappings);
 
         return "subject-profile";
+    }
+
+    // Helper format size (để tính tổng dung lượng hiển thị)
+    private String formatSize(long size) {
+        if (size <= 0) {
+            return "0 MB";
+        }
+        final String[] units = new String[]{"B", "KB", "MB", "GB", "TB"};
+        int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
+        return new java.text.DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " " + units[digitGroups];
     }
 
     // API tạo nhanh Subject
@@ -221,16 +239,6 @@ public class SubjectController {
         data.put("percent", (int) ((double) (total - free) / total * 100));
 
         return ResponseEntity.ok(data);
-    }
-
-    // Helper format dung lượng
-    private String formatSize(long size) {
-        if (size <= 0) {
-            return "0 MB";
-        }
-        final String[] units = new String[]{"B", "KB", "MB", "GB", "TB"};
-        int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
-        return new DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " " + units[digitGroups];
     }
 
     private String getCurrentUserId() {

@@ -118,7 +118,7 @@
                                   style="font-variation-settings: 'FILL' 1;">public</span>
                             <p class="text-sm font-medium">Social Platforms</p>
                         </a>
-                        
+
                         <a th:href="@{/admin/tags}" 
                            class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group"
                            th:classappend="${activePage == 'tags'} ? 'bg-primary/20 text-white border border-primary/20' : 'text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50'">
@@ -131,17 +131,95 @@
 
                     <div class="h-px bg-white/10 w-full"></div>
 
-                    <div class="flex flex-col gap-4">
-                        <p class="px-3 text-[#a79cba] text-xs font-bold uppercase tracking-wider">Storage</p>
-                        <div class="flex flex-col gap-2 px-3">
-                            <div class="flex justify-between items-end">
-                                <span class="text-white text-sm font-medium">HDD Local</span>
-                                <span class="text-primary text-xs font-bold">75%</span>
+                    <p class="px-3 text-[#a79cba] text-xs font-bold uppercase tracking-wider">STORAGE VOLUMNE</p>
+                    <div class="flex flex-col gap-3 mt-auto mb-4">
+
+                        <div class="flex items-center gap-4 px-3 border-b border-white/5 pb-2">
+                            <button onclick="switchStorageTab('system')" 
+                                    id="tabBtn-system"
+                                    class="text-xs font-bold uppercase tracking-wider text-white transition-colors border-b-2 border-primary pb-0.5 outline-none">
+                                System
+                            </button>
+
+                            <button th:if="${mappings != null}" 
+                                    onclick="switchStorageTab('subject')" 
+                                    id="tabBtn-subject"
+                                    class="text-xs font-bold uppercase tracking-wider text-gray-500 hover:text-gray-300 transition-colors border-b-2 border-transparent pb-0.5 outline-none">
+                                Subject
+                            </button>
+                        </div>
+
+                        <div class="px-3 min-h-[100px] max-h-48 overflow-y-auto custom-scrollbar pr-1 relative">
+
+                            <div id="tabContent-system" class="flex flex-col gap-4 animate-in fade-in duration-300" th:if="${not #lists.isEmpty(activeVolumes)}">
+                                <div th:each="vol : ${activeVolumes}" class="flex flex-col gap-1 group">
+                                    <div class="flex justify-between items-end"
+                                         th:with="percent=${vol.totalCapacity > 0 ? (1.0 - (vol.availableCapacity * 1.0 / vol.totalCapacity)) * 100 : 0}">
+
+                                        <div class="flex items-center gap-1.5 overflow-hidden">
+                                            <span class="material-symbols-outlined text-gray-500 text-[14px] group-hover:text-white transition-colors">hard_drive</span>
+                                            <span class="text-white text-xs font-medium truncate max-w-[100px]" th:text="${vol.label}">Volume</span>
+                                        </div>
+                                        <span class="text-primary text-[10px] font-bold" th:text="${#numbers.formatDecimal(percent, 0, 0) + '%'}">50%</span>
+                                    </div>
+
+                                    <div class="h-1.5 w-full rounded-full bg-[#2e2839] overflow-hidden"
+                                         th:with="percent=${vol.totalCapacity > 0 ? (1.0 - (vol.availableCapacity * 1.0 / vol.totalCapacity)) * 100 : 0}">
+                                        <div class="h-full rounded-full transition-all duration-1000"
+                                             th:style="'width: ' + ${percent} + '%;'"
+                                             th:classappend="${percent > 90 ? 'bg-red-500' : (percent > 75 ? 'bg-yellow-500' : 'bg-primary')}">
+                                        </div>
+                                    </div>
+
+                                    <div class="flex justify-between text-[10px] text-[#a79cba]">
+                                        <span th:text="${vol.mountPoint}">C:</span>
+                                        <span class="size-format-free-system" 
+                                              th:data-free="${vol.availableCapacity}" 
+                                              th:data-total="${vol.totalCapacity}">...</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="h-1.5 w-full rounded-full bg-[#2e2839] overflow-hidden">
-                                <div class="h-full bg-primary rounded-full" style="width: 75%;"></div>
+
+                            <div id="tabContent-subject" class="hidden flex-col gap-4 animate-in fade-in duration-300" th:if="${mappings != null}">
+                                <div th:if="${#lists.isEmpty(mappings)}" class="text-xs text-gray-500 italic text-center py-2">
+                                    No folders mapped.
+                                </div>
+
+                                <div th:each="map : ${mappings}" class="flex flex-col gap-1 group">
+
+                                    <div class="flex justify-between items-center gap-2">
+                                        <div class="flex items-center gap-1.5 overflow-hidden min-w-0">
+                                            <span class="material-symbols-outlined text-yellow-500 text-[14px] shrink-0">folder</span>
+                                            <span class="text-white text-xs font-medium truncate" 
+                                                  th:text="${map.relativePath}" 
+                                                  th:title="${map.volume.mountPoint + map.relativePath}">Path</span>
+                                        </div>
+
+                                        <span class="text-primary text-[10px] font-bold whitespace-nowrap size-format-simple shrink-0" 
+                                              th:data-size="${map.folderUsage}">0 MB</span>
+                                    </div>
+
+                                    <div class="relative h-1.5 w-full rounded-full bg-[#2e2839] overflow-hidden mt-0.5">
+
+                                        <div class="absolute top-0 left-0 h-full bg-gray-600 rounded-full transition-all duration-1000"
+                                             th:with="volPercent=${map.volume.totalCapacity > 0 ? (1.0 - (map.volume.availableCapacity * 1.0 / map.volume.totalCapacity)) * 100 : 0}"
+                                             th:style="'width: ' + ${volPercent} + '%;'"
+                                             title="Total Volume Usage">
+                                        </div>
+
+                                        <div class="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(131,60,246,0.6)]"
+                                             th:with="folderPercent=${map.volume.totalCapacity > 0 ? (map.folderUsage * 1.0 / map.volume.totalCapacity) * 100 : 0}"
+                                             th:style="'width: ' + ${folderPercent} + '%;'"
+                                             title="Folder Usage">
+                                        </div>
+                                    </div>
+
+                                    <div class="flex justify-between text-[10px] text-[#a79cba]">
+                                        <span th:text="${map.volume.label}">Vol</span>
+                                        <span class="size-format-free" th:data-free="${map.volume.availableCapacity}">Free: ...</span>
+                                    </div>
+                                </div>
                             </div>
-                            <p class="text-[#a79cba] text-xs">3TB / 4TB used</p>
                         </div>
                     </div>
                 </div>
@@ -153,6 +231,75 @@
         </div>
 
         <div th:replace="${pageScripts}"></div>
+        <script>
+            // --- 1. LOGIC CHUYỂN TAB ---
+            function switchStorageTab(tabName) {
+                // Ẩn tất cả nội dung
+                document.querySelectorAll('[id^="tabContent-"]').forEach(el => el.classList.add('hidden'));
 
+                // Reset style nút bấm (về màu xám)
+                document.querySelectorAll('[id^="tabBtn-"]').forEach(el => {
+                    el.className = "text-xs font-bold uppercase tracking-wider text-gray-500 hover:text-gray-300 transition-colors border-b-2 border-transparent pb-0.5 outline-none";
+                });
+
+                // Hiện nội dung tab được chọn
+                const content = document.getElementById('tabContent-' + tabName);
+                if (content)
+                    content.classList.remove('hidden');
+
+                // Highlight nút bấm (màu trắng, gạch chân)
+                const btn = document.getElementById('tabBtn-' + tabName);
+                if (btn) {
+                    btn.className = "text-xs font-bold uppercase tracking-wider text-white transition-colors border-b-2 border-primary pb-0.5 outline-none";
+                }
+            }
+
+            // --- 2. FORMAT DUNG LƯỢNG (JS Client-side) ---
+            function formatBytes(bytes, decimals = 1) {
+                if (!+bytes)
+                    return '0 B';
+                const k = 1024;
+                const dm = decimals < 0 ? 0 : decimals;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                // Format dạng: "10 GB / 100 GB"
+                document.querySelectorAll('.size-format-free-system').forEach(el => {
+                    const free = el.getAttribute('data-free');
+                    const total = el.getAttribute('data-total');
+                    if (free && total) {
+                        el.innerText = `Free: ${formatBytes(free)} / ${formatBytes(total)}`;
+                    }
+                });
+
+                // Format dạng: "Free: 50 GB"
+                document.querySelectorAll('.size-format-free').forEach(el => {
+                    const free = el.getAttribute('data-free');
+                    if (free)
+                        el.innerText = `Free: ${formatBytes(free)}`;
+                });
+
+                document.querySelectorAll('.size-format-simple').forEach(el => {
+                    const size = el.getAttribute('data-size');
+                    if (size)
+                        el.innerText = formatBytes(size);
+                });
+
+                // 2. AUTO SWITCH TAB LOGIC (MỚI THÊM)
+                // Kiểm tra xem nút tab Subject có tồn tại không (do Thymeleaf render có điều kiện)
+                const subjectTabBtn = document.getElementById('tabBtn-subject');
+
+                if (subjectTabBtn) {
+                    // Nếu đang ở trang Profile (có nút Subject) -> Chuyển sang tab Subject
+                    switchStorageTab('subject');
+                } else {
+                    // Nếu ở các trang khác (Dashboard...) -> Mặc định tab System
+                    switchStorageTab('system');
+                }
+            });
+        </script>
     </body>
 </html>

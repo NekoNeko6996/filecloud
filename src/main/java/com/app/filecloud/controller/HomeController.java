@@ -2,8 +2,10 @@ package com.app.filecloud.controller;
 
 import com.app.filecloud.entity.ContentSubject;
 import com.app.filecloud.entity.FileNode;
+import com.app.filecloud.entity.StorageVolume;
 import com.app.filecloud.repository.ContentSubjectRepository;
 import com.app.filecloud.repository.FileNodeRepository;
+import com.app.filecloud.repository.StorageVolumeRepository;
 import com.app.filecloud.repository.SubjectFolderMappingRepository;
 import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class HomeController {
     private final ContentSubjectRepository subjectRepository;
     private final FileNodeRepository fileNodeRepository;
     private final SubjectFolderMappingRepository mappingRepository;
+    private final StorageVolumeRepository volumeRepository;
 
     @GetMapping("/")
     public String dashboard(Model model) {
@@ -37,7 +40,9 @@ public class HomeController {
                 FileNode.Type.FILE,
                 PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"))
         );
-
+        
+        List<StorageVolume> activeVolumes = volumeRepository.findVolumesInUse();
+        model.addAttribute("activeVolumes", activeVolumes);
         model.addAttribute("recentSubjects", recentSubjects);
         model.addAttribute("recentFiles", recentMedia);
 
