@@ -1,5 +1,6 @@
 package com.app.filecloud.controller;
 
+import com.app.filecloud.dto.SubjectCardDTO;
 import com.app.filecloud.entity.ContentSubject;
 import com.app.filecloud.entity.FileNode;
 import com.app.filecloud.entity.FileTag;
@@ -25,7 +26,8 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -81,9 +83,73 @@ public class SubjectController {
     private String rootUploadDir;
 
     @GetMapping
-    public String subjectsPage(Model model) {
-        List<ContentSubject> subjects = subjectRepository.findAll();
+    public String subjectsPage(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer platformId,
+            @RequestParam(required = false, defaultValue = "name_asc") String sort,
+            Model model) {
+
+        // 1. Lấy dữ liệu thô (Object Array) từ DB
+        List<Object[]> rawResults = subjectRepository.searchSubjectsWithStats(
+                (keyword != null && !keyword.isBlank()) ? keyword : null,
+                platformId
+        );
+
+        // 2. Map từ Object[] sang DTO
+        List<SubjectCardDTO> subjects = new ArrayList<>();
+        for (Object[] row : rawResults) {
+            ContentSubject sub = (ContentSubject) row[0];
+            Long fileCount = (Long) row[1];
+            Long totalSize = (Long) row[2];
+
+            // Tạo DTO thủ công (An toàn hơn dùng JPQL constructor)
+            SubjectCardDTO dto = new SubjectCardDTO();
+            dto.setId(sub.getId());
+            dto.setMainName(sub.getMainName());
+            dto.setAliasName1(sub.getAliasName1());
+            dto.setAliasName2(sub.getAliasName2());
+            dto.setAvatarUrl(sub.getAvatarUrl());
+            dto.setUpdatedAt(sub.getUpdatedAt());
+
+            dto.setFileCount(fileCount);
+            dto.setTotalSize(totalSize);
+
+            // Hibernate sẽ tự fetch socialLinks khi gọi getter (Lazy Loading)
+            // Vì đang trong session (OpenEntityManagerInView mặc định true), điều này hoạt động tốt.
+            dto.setSocialLinks(sub.getSocialLinks());
+
+            subjects.add(dto);
+        }
+
+        // 3. Xử lý Sắp xếp (In-Memory Sorting)
+        switch (sort) {
+            case "name_desc" ->
+                subjects.sort(Comparator.comparing(SubjectCardDTO::getMainName, String.CASE_INSENSITIVE_ORDER).reversed());
+            case "size_desc" ->
+                subjects.sort(Comparator.comparing(SubjectCardDTO::getTotalSize).reversed());
+            case "size_asc" ->
+                subjects.sort(Comparator.comparing(SubjectCardDTO::getTotalSize));
+            case "files_desc" ->
+                subjects.sort(Comparator.comparing(SubjectCardDTO::getFileCount).reversed());
+            case "newest" ->
+                subjects.sort(Comparator.comparing(SubjectCardDTO::getUpdatedAt).reversed());
+            case "oldest" ->
+                subjects.sort(Comparator.comparing(SubjectCardDTO::getUpdatedAt));
+            default ->
+                subjects.sort(Comparator.comparing(SubjectCardDTO::getMainName, String.CASE_INSENSITIVE_ORDER)); // name_asc
+        }
+
+        // 4. Truyền dữ liệu bổ trợ
+        List<SocialPlatform> platforms = platformRepository.findAll();
+
         model.addAttribute("subjects", subjects);
+        model.addAttribute("platforms", platforms);
+
+        model.addAttribute("paramKeyword", keyword);
+        model.addAttribute("paramPlatformId", platformId);
+        model.addAttribute("paramSort", sort);
+        model.addAttribute("totalCount", subjects.size());
+
         return "subjects";
     }
 
@@ -113,12 +179,12 @@ public class SubjectController {
 
         // --- XỬ LÝ MAPPINGS (Cập nhật logic tính size) ---
         List<SubjectFolderMapping> mappingEntities = mappingRepository.findBySubjectId(id);
-        
+
         List<Map<String, Object>> safeMappings = mappingEntities.stream().map(m -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", m.getId());
             map.put("relativePath", m.getRelativePath());
-            
+
             // 1. Tính dung lượng thư mục này đang dùng (Tổng size file)
             // Lưu ý: m.getVolume().getId() là ID của ổ đĩa
             long usedByFolder = fileNodeRepository.sumSizeByMappingId(m.getId());
@@ -136,7 +202,7 @@ public class SubjectController {
             }
             return map;
         }).collect(Collectors.toList());
-        
+
         // --- ADD ATTRIBUTES ---
         model.addAttribute("subject", subject);
         model.addAttribute("files", files);

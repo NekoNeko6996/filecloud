@@ -4,32 +4,51 @@
     <body>
 
         <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
-            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
-                <h2 class="text-xl font-bold text-white">Subjects Library</h2>
-                <div class="relative group">
-                    <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-500">search</span>
-                    <input type="text" placeholder="Search people..." class="bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-primary outline-none w-64">
+            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0 gap-4">
+                <div class="flex items-center gap-4">
+                    <h2 class="text-xl font-bold text-white">Subjects Library</h2>
+                    <span class="px-2 py-0.5 rounded-full bg-white/10 font-bold text-primary" th:text="'Total ' + ${totalCount} + ' Subject'">0 items</span>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <form action="/subjects" method="get" id="searchForm" class="relative group">
+                        <input type="hidden" name="platformId" th:value="${paramPlatformId}">
+                        <input type="hidden" name="sort" th:value="${paramSort}">
+
+                        <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-500 text-[18px]">search</span>
+                        <input type="text" name="keyword" th:value="${paramKeyword}" 
+                               placeholder="Search name..." 
+                               class="bg-[#1e1926] border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-sm text-white focus:ring-1 focus:ring-primary outline-none w-64 transition-all focus:w-72 shadow-sm">
+                    </form>
+
+                    <button onclick="document.getElementById('filterModal').showModal()" 
+                            class="flex items-center gap-2 px-3 py-1.5 bg-[#2e2839] border border-white/10 rounded-full text-sm text-gray-300 hover:text-white hover:border-primary/50 transition-all shadow-sm">
+                        <span class="material-symbols-outlined text-[18px]">tune</span>
+                        <span class="hidden md:inline text-xs font-bold uppercase tracking-wide">Filter & Sort</span>
+                        <span th:if="${paramPlatformId != null or (paramSort != null and paramSort != 'name_asc')}" class="w-2 h-2 rounded-full bg-primary"></span>
+                    </button>
                 </div>
             </header>
 
-            <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="flex-1 overflow-y-auto p-8 scroll-smooth custom-scrollbar">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     <a th:each="sub : ${subjects}" 
-                         class="group relative h-40 rounded-xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20"
-                         th:href="@{/subjects/{id}(id=${sub.id})}"
-                         th:data-id="${sub.id}"
-                         th:data-name="${sub.mainName}"
-                         oncontextmenu="showContextMenu(event, this.getAttribute('data-id'), this.getAttribute('data-name'))">
+                       class="group relative h-40 rounded-xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20 bg-[#1e1e1e]"
+                       th:href="@{/subjects/{id}(id=${sub.id})}"
+                       th:data-id="${sub.id}"
+                       th:data-name="${sub.mainName}"
+                       oncontextmenu="showContextMenu(event, this.getAttribute('data-id'), this.getAttribute('data-name'))">
+
                         <div class="absolute inset-0 z-0">
                             <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover opacity-60 blur-sm scale-110 transition-transform duration-700">
                             <div class="absolute inset-0 bg-gradient-to-r from-[#171022] via-[#171022]/80 to-transparent"></div>
                         </div>
 
                         <div class="relative z-10 h-full flex items-center p-4 gap-4">
-
-                            <div class="shrink-0 w-24 h-24 rounded-lg overflow-hidden border-2 border-white/20 shadow-2xl bg-gray-800">
-                                <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover">
-                                <div th:unless="${sub.avatarUrl != null}" class="w-full h-full flex items-center justify-center bg-gray-700 text-2xl font-bold">
+                            <div class="shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 border-white/10 shadow-2xl bg-black/50 group-hover:border-primary/50 transition-colors">
+                                <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover" 
+                                     onerror="this.src='https://ui-avatars.com/api/?name=User&background=random'">
+                                <div th:unless="${sub.avatarUrl != null}" class="w-full h-full flex items-center justify-center bg-gray-700 text-2xl font-bold text-gray-400">
                                     <span th:text="${#strings.substring(sub.mainName,0,1)}">A</span>
                                 </div>
                             </div>
@@ -37,43 +56,105 @@
                             <div class="flex flex-col justify-center flex-1 min-w-0">
 
                                 <div class="flex flex-wrap gap-2 mb-1">
-                                    <span th:each="link : ${sub.socialLinks}" 
-                                          class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide text-white bg-slate-700/80 backdrop-blur border border-white/10 flex items-center gap-1">
-                                        <i th:if="${link.platform.name == 'Pixiv'}" class="w-2 h-2 rounded-full bg-blue-500 inline-block"></i>
-                                        <i th:if="${link.platform.name == 'Patreon'}" class="w-2 h-2 rounded-full bg-red-500 inline-block"></i>
-                                        <span th:text="${link.platform.name}">Platform</span>
-                                    </span>
-
-                                    <span th:if="${#lists.isEmpty(sub.socialLinks)}" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide text-gray-400 bg-black/40 border border-white/5">
-                                        Artist
-                                    </span>
+                                        <span th:if="${#lists.isEmpty(sub.socialLinks)}" class="text-[10px] text-white italic ">No links</span>
+                                    </div>
                                 </div>
 
-                                <h3 class="text-white text-xl font-bold leading-tight truncate drop-shadow-md" th:text="${sub.mainName}">Name</h3>
+                                <h3 class="text-white text-lg font-bold leading-tight truncate group-hover:text-primary transition-colors" th:text="${sub.mainName}">Name</h3>
 
-                                <div class="flex items-center gap-3 mt-1 text-xs text-gray-300 font-medium">
-                                    <span class="flex items-center gap-1">
-                                        <span class="text-white font-bold">2.4k</span> items    
-                                    </span>
-                                    <span class="w-1 h-1 rounded-full bg-gray-500"></span>
-                                    <span class="truncate max-w-[120px]" 
-                                          th:text="${sub.aliasName1 != null} ? ${sub.aliasName1} : 'No alias'">Alias</span>
+                                <span class="flex row overflow-hidden w-full" 
+                                      th:if="${(sub.aliasName1 != null && !#strings.isEmpty(sub.aliasName1)) || sub.aliasName2 != null && !#strings.isEmpty(sub.aliasName2)}">
+                                    <p class="text-xs text-gray-500 truncate mb-2" th:text="${sub.aliasName1 != null} ? ${sub.aliasName1} : ''">Alias</p>
+                                    <p th:if="${(sub.aliasName2 != null && !#strings.isEmpty(sub.aliasName2))}"  class="text-xs text-gray-500 truncate mb-2" 
+                                       th:text="${sub.aliasName2 != null} ? ${' | ' + sub.aliasName2} : ''">Alias</p>
+                                </span>
+
+                                <div class="flex items-center gap-3 text-[11px] text-gray-300 font-mono bg-black/40 rounded border border-white/5 w-fit p-1 mt-1">
+                                    <div class="flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-[12px] text-yellow-500">folder</span>
+                                        <span class="font-bold" th:text="${sub.fileCount}">0</span> Items
+                                    </div>
+                                    <div class="w-px h-3 bg-white/20"></div>
+                                    <div class="flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-[12px] text-green-500">hard_drive</span>
+                                        <span class="font-bold" th:text="${sub.readableSize}">0 MB</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </a>
                 </div>
 
-                <div th:if="${subjects.isEmpty()}" class="flex flex-col items-center justify-center h-64 text-gray-500">
-                    <span class="material-symbols-outlined text-5xl mb-2">person_off</span>
-                    <p>No subjects found.</p>
+                <div th:if="${subjects.isEmpty()}" class="flex flex-col items-center justify-center h-96 text-gray-500">
+                    <div class="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                        <span class="material-symbols-outlined text-4xl opacity-50">search_off</span>
+                    </div>
+                    <p class="text-lg font-medium text-gray-400">No subjects found</p>
+                    <p class="text-sm">Try adjusting your filters or search keyword.</p>
+                    <a href="/subjects" class="mt-4 text-primary text-sm hover:underline">Clear all filters</a>
                 </div>
 
-                <button onclick="document.getElementById('createSubjectModal').showModal()" class="fixed bottom-8 right-8 bg-primary text-white p-4 rounded-full shadow-2xl hover:bg-primary-dark transition-all z-30"
-                        style="height: 55px; aspect-ratio: 1/1">
-                    <span class="material-symbols-outlined">person_add</span>
+                <button onclick="document.getElementById('createSubjectModal').showModal()" class="fixed bottom-8 right-8 bg-primary text-white p-4 rounded-full shadow-2xl hover:bg-primary-dark hover:scale-110 transition-all z-30 flex items-center justify-center" style="width: 56px; height: 56px;">
+                    <span class="material-symbols-outlined text-2xl">person_add</span>
                 </button>
             </div>
+
+            <dialog id="filterModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-sm">
+                <form action="/subjects" method="get" class="flex flex-col gap-6">
+                    <div class="flex justify-between items-center pb-2 border-b border-white/10">
+                        <h3 class="font-bold text-lg flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">tune</span> Filter & Sort
+                        </h3>
+                        <button type="button" onclick="this.closest('dialog').close()" class="text-gray-400 hover:text-white">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+
+                    <input type="hidden" name="keyword" th:value="${paramKeyword}">
+
+                    <div>
+                        <label class="text-xs text-gray-400 font-bold uppercase block mb-2">Social Platform</label>
+                        <select name="platformId" class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary appearance-none">
+                            <option value="">All Platforms</option>
+                            <option th:each="plat : ${platforms}" 
+                                    th:value="${plat.id}" 
+                                    th:text="${plat.name}"
+                                    th:selected="${paramPlatformId != null and paramPlatformId == plat.id}"></option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-gray-400 font-bold uppercase block mb-2">Sort Order</label>
+                        <div class="grid grid-cols-1 gap-2">
+                            <label class="flex items-center gap-3 p-2 rounded border border-white/5 hover:bg-white/5 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/10">
+                                <input type="radio" name="sort" value="name_asc" class="text-primary bg-transparent focus:ring-0" th:checked="${paramSort == 'name_asc' || paramSort == null}">
+                                <span class="text-sm">Name (A-Z)</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-2 rounded border border-white/5 hover:bg-white/5 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/10">
+                                <input type="radio" name="sort" value="name_desc" class="text-primary bg-transparent focus:ring-0" th:checked="${paramSort == 'name_desc'}">
+                                <span class="text-sm">Name (Z-A)</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-2 rounded border border-white/5 hover:bg-white/5 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/10">
+                                <input type="radio" name="sort" value="size_desc" class="text-primary bg-transparent focus:ring-0" th:checked="${paramSort == 'size_desc'}">
+                                <span class="text-sm">Total Size (High to Low)</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-2 rounded border border-white/5 hover:bg-white/5 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/10">
+                                <input type="radio" name="sort" value="files_desc" class="text-primary bg-transparent focus:ring-0" th:checked="${paramSort == 'files_desc'}">
+                                <span class="text-sm">File Count (High to Low)</span>
+                            </label>
+                            <label class="flex items-center gap-3 p-2 rounded border border-white/5 hover:bg-white/5 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/10">
+                                <input type="radio" name="sort" value="newest" class="text-primary bg-transparent focus:ring-0" th:checked="${paramSort == 'newest'}">
+                                <span class="text-sm">Last Updated (Newest)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 pt-2">
+                        <a href="/subjects" class="flex-1 px-4 py-2 text-sm text-gray-400 hover:text-white font-medium text-center border border-white/10 rounded hover:bg-white/5">Clear</a>
+                        <button type="submit" class="flex-1 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded text-sm font-bold shadow-lg">Apply</button>
+                    </div>
+                </form>
+            </dialog>
 
             <dialog id="createSubjectModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/50">
                 <form th:action="@{/subjects/create}" method="post" class="flex flex-col gap-4 w-80">
