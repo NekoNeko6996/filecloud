@@ -4,14 +4,20 @@
     <body>
 
         <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
-            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-primary text-2xl">grid_view</span>
-                    <h2 class="text-xl font-bold text-white">Dashboard</h2>
+            <header class="glass-header h-16 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10 sticky top-0 gap-2">
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white transition-colors p-1">
+                        <span class="material-symbols-outlined text-2xl">menu</span>
+                    </button>
+
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-lg sm:text-xl font-bold text-white">Dashboard</h2>
+                    </div>
                 </div>
-                <div class="relative group w-64">
+
+                <div class="relative group w-32 sm:w-64 transition-all duration-300 focus-within:w-48 sm:focus-within:w-72">
                     <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-500">search</span>
-                    <input type="text" placeholder="Search library..." class="w-full bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-primary outline-none">
+                    <input type="text" placeholder="Search..." class="w-full bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-primary outline-none">
                 </div>
             </header>
 
@@ -24,15 +30,15 @@
 
                     <div class="relative group">
                         <button onclick="scrollCarousel('subjectCarousel', -1)" 
-                                class="absolute left-0 top-1/2 -translate-y-1/2 z-30 w-12 h-full flex items-center justify-center text-white translate-x-0">
+                                class="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-30 w-12 h-full items-center justify-center text-white translate-x-0 bg-gradient-to-r from-black/50 to-transparent rounded-l-xl">
                             <span class="material-symbols-outlined text-3xl">chevron_left</span>
                         </button>
 
-                        <div id="subjectCarousel" class="flex overflow-x-auto gap-5 px-1 no-scrollbar snap-x snap-mandatory scroll-smooth">
+                        <div id="subjectCarousel" class="flex overflow-x-auto gap-4 sm:gap-5 px-1 no-scrollbar snap-x snap-mandatory scroll-smooth">
                             <div th:each="sub : ${recentSubjects}" 
                                  onclick="window.location.href = this.getAttribute('data-url')"
                                  th:data-url="@{/subjects/{id}(id=${sub.id})}"
-                                 class="snap-start shrink-0 w-[280px] h-[350px] relative rounded-2xl overflow-hidden cursor-pointer group/card border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20">
+                                 class="snap-start shrink-0 w-[75vw] sm:w-[280px] h-[350px] relative rounded-2xl overflow-hidden cursor-pointer group/card border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20">
 
                                 <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110">
                                 <div th:unless="${sub.avatarUrl != null}" class="w-full h-full bg-gradient-to-br from-gray-800 to-black flex items-center justify-center">
@@ -61,7 +67,7 @@
                         </div>
 
                         <button onclick="scrollCarousel('subjectCarousel', 1)" 
-                                class="absolute right-0 top-1/2 -translate-y-1/2 z-30 w-12 h-full flex items-center justify-center text-white translate-x-0">
+                                class="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 z-30 w-12 h-full items-center justify-center text-white translate-x-0 bg-gradient-to-l from-black/50 to-transparent rounded-r-xl">
                             <span class="material-symbols-outlined text-3xl">chevron_right</span>
                         </button>
                     </div>
@@ -74,18 +80,18 @@
 
                     <div class="relative group">
                         <button onclick="scrollCarousel('mediaCarousel', -1)" 
-                                class="absolute left-0 top-1/2 -translate-y-1/2 z-30 bg-black/70 w-12 h-full flex items-center justify-center text-white -translate-x-full translate-x-0 rounded-l-xl">
+                                class="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-30 bg-black/70 w-12 h-full items-center justify-center text-white -translate-x-full translate-x-0 rounded-l-xl">
                             <span class="material-symbols-outlined text-3xl">chevron_left</span>
                         </button>
 
-                        <div id="mediaCarousel" class="flex overflow-x-auto gap-5 px-1 no-scrollbar snap-x snap-mandatory scroll-smooth">
+                        <div id="mediaCarousel" class="flex overflow-x-auto gap-4 sm:gap-5 px-1 no-scrollbar snap-x snap-mandatory scroll-smooth">
 
                             <a th:each="file : ${recentFiles}" 
                                th:href="${file.isVideo()} ? @{/video/{id}(id=${file.id})} : '#'"
                                th:data-id="${file.id}"
                                th:data-has-thumb="true"
                                oncontextmenu="openContextMenu(event, this)"
-                               class="snap-start shrink-0 w-[350px] aspect-[5/3] relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5 group/card hover:border-primary/50 transition-all shadow-lg">
+                               class="snap-start shrink-0 w-[85vw] sm:w-[350px] aspect-[5/3] relative rounded-xl overflow-hidden bg-[#2e2839] cursor-pointer border border-white/5 group/card hover:border-primary/50 transition-all shadow-lg">
 
                                 <img loading="lazy"
                                      th:src="@{/api/file/thumbnail/{id}(id=${file.id})}" 
@@ -117,7 +123,7 @@
                         </div>
 
                         <button onclick="scrollCarousel('mediaCarousel', 1)" 
-                                class="absolute right-0 top-1/2 bg-black/70 -translate-y-1/2 z-30 w-12 h-full flex items-center justify-center text-white translate-x-0">
+                                class="hidden sm:flex absolute right-0 top-1/2 bg-black/70 -translate-y-1/2 z-30 w-12 h-full items-center justify-center text-white translate-x-0 rounded-r-xl">
                             <span class="material-symbols-outlined text-3xl">chevron_right</span>
                         </button>
                     </div>
@@ -125,7 +131,7 @@
 
             </div>
 
-            <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-80 flex flex-col border-l border-white/10 overflow-y-auto no-scrollbar z-50 bg-[#171022] shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
+            <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-full sm:w-80 flex flex-col border-l border-white/10 overflow-y-auto no-scrollbar z-50 bg-[#171022] shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
                 <div class="p-6 flex flex-col gap-5">
                     <div class="flex items-center justify-between">
                         <h3 class="text-white font-bold text-base">File Details</h3>

@@ -5,18 +5,21 @@
 
         <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
 
-            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
-                <div class="flex items-center gap-2 text-sm">
+            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0 gap-4">
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white transition-colors p-1">
+                        <span class="material-symbols-outlined text-2xl">menu</span>
+                    </button>
                     <a th:href="@{/subjects}" class="text-[#a79cba] hover:text-white transition-colors">Subjects</a>
                     <span class="material-symbols-outlined text-[#a79cba] text-[16px]">chevron_right</span>
                     <span class="font-bold text-white bg-[#2e2839] px-2 py-1 rounded" th:text="${subject.mainName}">Name</span>
                 </div>
 
-                <div class="flex items-center gap-4 flex-1 justify-center max-w-lg mx-4">
-                    <div class="relative w-full group">
-                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#a79cba]">search</span>
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="relative group">
+                        <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-500 text-[18px]">search</span>
                         <input id="fileSearchInput" 
-                               class="w-full bg-[#1e1926] border border-white/5 rounded-full pl-10 pr-10 py-2 text-sm text-white placeholder-[#a79cba] focus:outline-none focus:ring-2 focus:ring-primary/50" 
+                               class="bg-[#1e1926] border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-sm text-white focus:ring-1 focus:ring-primary outline-none w-28 sm:w-64 transition-all focus:w-40 sm:focus:w-72 shadow-sm"
                                placeholder="Search files..." type="text"/>
                     </div>
                 </div>
@@ -59,7 +62,7 @@
 
                             <p class="text-gray-300 max-w-2xl leading-relaxed text-base" th:text="${subject.description ?: 'No description available.'}"></p>
 
-                            <div class="flex items-center gap-3 mt-3">
+                            <div class="flex items-center gap-3 mt-3 flex-wrap">
                                 <a th:each="link : ${subject.socialLinks}" 
                                    th:href="${(link.fullUrlOverride != null && link.fullUrlOverride != '') ? link.fullUrlOverride : link.platform.baseUrl + link.profilePath}" 
                                    target="_blank"
