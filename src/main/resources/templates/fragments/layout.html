@@ -185,7 +185,9 @@
                                     No folders mapped.
                                 </div>
 
-                                <div th:each="map : ${mappings}" class="flex flex-col gap-1 group">
+                                <div th:each="map, stat : ${mappings}" 
+                                     th:onclick="'if(typeof filterByFolder === \'function\') filterByFolder(' + ${map.id} + ', this)'"
+                                     class="mapping-item flex flex-col gap-1 group cursor-pointer hover:bg-white/5 border border-transparent rounded-lg p-2 transition-all">
 
                                     <div class="flex justify-between items-center gap-2">
                                         <div class="flex items-center gap-1.5 overflow-hidden min-w-0">
@@ -215,7 +217,10 @@
                                     </div>
 
                                     <div class="flex justify-between text-[10px] text-[#a79cba]">
-                                        <span th:text="${map.volume.label}">Vol</span>
+                                        <div>
+                                            <span th:text="${map.volume.mountPoint}">E:\</span>
+                                            <span th:text="${map.volume.label}">Vol</span>
+                                        </div>
                                         <span class="size-format-free" th:data-free="${map.volume.availableCapacity}">Free: ...</span>
                                     </div>
                                 </div>

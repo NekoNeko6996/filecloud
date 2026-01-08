@@ -121,8 +121,9 @@
                            th:id="'file-card-' + ${file.id}"
                            th:data-id="${file.id}"
                            th:data-is-video="${file.isVideo()}"
-                           onclick="handleFileClick(event, this.getAttribute('data-id'), this.getAttribute('data-is-video') === 'true')"
                            th:data-tag-ids="${fileTagMap.get(file.id)}"
+                           th:data-mapping-id="${file.subjectMappingId}"
+                           onclick="handleFileClick(event, this.getAttribute('data-id'), this.getAttribute('data-is-video') === 'true')"
                            th:href="${file.isVideo()} ? @{/video/{id}(id=${file.id})} : '#'"
                            oncontextmenu="showMediaContextMenu(event, this)"
                            target="_blank"
@@ -636,6 +637,33 @@
         </style>
 
         <script th:inline="javascript">
+            let activeTagIds = new Set();
+            let activeFolderId = null;
+
+            window.filterByFolder = function (mappingId, element) {
+                // Toggle logic: Nếu bấm lại cái đang chọn -> Hủy chọn
+                if (activeFolderId === mappingId) {
+                    activeFolderId = null;
+                    // Reset UI Active ở Sidebar
+                    element.classList.remove('bg-white/10', 'border-primary');
+                    element.classList.add('border-transparent');
+                } else {
+                    activeFolderId = mappingId;
+
+                    // Reset UI các item khác
+                    document.querySelectorAll('.mapping-item').forEach(el => {
+                        el.classList.remove('bg-white/10', 'border-primary');
+                        el.classList.add('border-transparent');
+                    });
+
+                    // Active item được bấm
+                    element.classList.remove('border-transparent');
+                    element.classList.add('bg-white/10', 'border-primary');
+                }
+
+                applyFilters(); // Chạy lại bộ lọc
+            };
+
             // --- JS TÌM KIẾM FILE (CLIENT SIDE) ---
             document.getElementById('fileSearchInput').addEventListener('keyup', function (e) {
                 const term = e.target.value.toLowerCase();
@@ -650,8 +678,6 @@
                     }
                 });
             });
-
-            let activeTagIds = new Set(); // Lưu các ID tag đang chọn
 
             // 1. Sự kiện Tìm kiếm (Replace code cũ của search input)
             document.getElementById('fileSearchInput').addEventListener('keyup', function (e) {
@@ -696,20 +722,18 @@
                 let visibleCount = 0;
 
                 items.forEach(item => {
-                    // Lọc theo Tên
+                    // A. Lọc Tên
                     const name = item.querySelector('.file-name').innerText.toLowerCase();
                     const matchesName = name.includes(searchVal);
 
-                    // Lọc theo Tag (Logic AND: File phải chứa TẤT CẢ tag đang chọn)
-                    // Nếu muốn Logic OR (Chứa 1 trong các tag) -> dùng activeTagIds.some(...)
+                    // B. Lọc Tag
                     let matchesTags = true;
                     if (activeTagIds.size > 0) {
-                        const fileTagsAttr = item.getAttribute('data-tag-ids'); // Chuỗi "1 5 9"
+                        const fileTagsAttr = item.getAttribute('data-tag-ids');
                         if (!fileTagsAttr) {
-                            matchesTags = false; // Không có tag nào thì auto fail nếu đang lọc
+                            matchesTags = false;
                         } else {
                             const fileTagArray = fileTagsAttr.split(' ').map(Number);
-                            // Kiểm tra xem file có chứa mọi tag đang active không
                             for (let tagId of activeTagIds) {
                                 if (!fileTagArray.includes(tagId)) {
                                     matchesTags = false;
@@ -719,17 +743,25 @@
                         }
                     }
 
-                    // Kết quả cuối cùng
-                    if (matchesName && matchesTags) {
-                        item.style.display = ''; // Hiện
+                    // C. Lọc Folder (MỚI)
+                    let matchesFolder = true;
+                    if (activeFolderId !== null) {
+                        // So sánh mappingId của file với folder đang chọn
+                        // Lưu ý: convert sang String/Number để so sánh chính xác
+                        const fileMapId = Number(item.getAttribute('data-mapping-id'));
+                        if (fileMapId !== activeFolderId) {
+                            matchesFolder = false;
+                        }
+                    }
+
+                    // KẾT QUẢ
+                    if (matchesName && matchesTags && matchesFolder) {
+                        item.style.display = '';
                         visibleCount++;
                     } else {
-                        item.style.display = 'none'; // Ẩn
+                        item.style.display = 'none';
                     }
                 });
-
-                // (Optional) Hiển thị thông báo nếu không tìm thấy
-                // console.log("Visible Items:", visibleCount);
             }
 
 
