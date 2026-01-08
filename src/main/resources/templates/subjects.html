@@ -55,8 +55,8 @@
 
                             <div class="flex flex-col justify-center flex-1 min-w-0">
 
-                                <div class="flex flex-wrap gap-2 mb-1">
-                                    <div class="flex flex-wrap gap-1 mb-1.5 h-5 overflow-hidden">
+                                <div class="flex flex-wrap gap-2 mb-1.5">
+                                    <div class="flex flex-wrap gap-1 overflow-hidden">
                                         <img th:each="link : ${sub.socialLinks}" 
                                              th:if="${link.platform.iconUrl}"
                                              th:src="${link.platform.iconUrl}" 
@@ -68,11 +68,11 @@
 
                                 <h3 class="text-white text-lg font-bold leading-tight truncate group-hover:text-primary transition-colors" th:text="${sub.mainName}">Name</h3>
 
-                                <span class="flex row overflow-hidden w-full" 
+                                <span class="flex row overflow-hidden w-full gap-1" 
                                       th:if="${(sub.aliasName1 != null && !#strings.isEmpty(sub.aliasName1)) || sub.aliasName2 != null && !#strings.isEmpty(sub.aliasName2)}">
-                                    <p class="text-xs text-gray-500 truncate mb-2" th:text="${sub.aliasName1 != null} ? ${sub.aliasName1} : ''">Alias</p>
-                                    <p th:if="${(sub.aliasName2 != null && !#strings.isEmpty(sub.aliasName2))}"  class="text-xs text-gray-500 truncate mb-2" 
-                                       th:text="${sub.aliasName2 != null} ? ${' | ' + sub.aliasName2} : ''">Alias</p>
+                                    <p class="text-xs text-gray-300 truncate border border-gray-500 px-1" th:text="${sub.aliasName1 != null} ? ${sub.aliasName1} : ''">Alias</p>
+                                    <p th:if="${(sub.aliasName2 != null && !#strings.isEmpty(sub.aliasName2))}"  class="text-xs text-gray-300 truncate border border-gray-500 px-1" 
+                                       th:text="${sub.aliasName2 != null} ? ${sub.aliasName2} : ''">Alias</p>
                                 </span>
 
                                 <div class="flex items-center gap-3 text-[11px] text-gray-300 font-mono bg-black/40 rounded border border-white/5 w-fit p-1 mt-1">
