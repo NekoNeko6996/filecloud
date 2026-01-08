@@ -139,13 +139,13 @@
                             <p class="text-sm font-medium">Movie</p>
                         </a>
 
-                        <a th:href="@{/}" 
+                        <a th:href="@{/manga}" 
                            class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group"
-                           th:classappend="${activePage == 'tags'} ? 'bg-primary/20 text-white border border-primary/20' : 'text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50'">
+                           th:classappend="${activePage == 'manga'} ? 'bg-primary/20 text-white border border-primary/20' : 'text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50'">
                             <span class="material-symbols-outlined" 
-                                  th:classappend="${activePage == 'tags'} ? 'text-white' : 'text-[#a79cba] group-hover:text-white'"
-                                  style="font-variation-settings: 'FILL' 1;">manga</span>
-                            <p class="text-sm font-medium">Manga</p>
+                                  th:classappend="${activePage == 'manga'} ? 'text-white' : 'text-[#a79cba] group-hover:text-white'"
+                                  style="font-variation-settings: 'FILL' 1;">menu_book</span>
+                            <p class="text-sm font-medium">Manga Library</p>
                         </a>
                         <div class="h-px bg-white/10 w-full"></div>
                         <a th:href="@{/admin/tags}" 

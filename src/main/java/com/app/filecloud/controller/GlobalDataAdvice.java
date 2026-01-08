@@ -13,6 +13,7 @@ import java.util.List;
     SubjectController.class,            // Subject Profile, List
     SocialPlatformController.class,     // Social Platform
     TagController.class,                // Tag
+    MangaController.class,              // Manga
     // Thêm các Controller quản lý khác nếu có (VD: AdminController, TagController...)
     // KHÔNG thêm VideoPageController nếu trang xem video không dùng chung Sidebar này
 })

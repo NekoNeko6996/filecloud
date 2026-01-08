@@ -52,5 +52,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
         registry.addResourceHandler("/avatars/**")
                 .addResourceLocations("file:/" + uploadPath + "/avatars/");
+        
+        registry.addResourceHandler("/manga/covers/**")
+                .addResourceLocations("file:/" + uploadPath + "/manga/covers/");
     }
 }

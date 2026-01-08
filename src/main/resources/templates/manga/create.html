@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Add Manga', 'manga', ~{::section}, ~{::script})}">
+    <body>
+        <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark p-8">
+            <h2 class="text-2xl font-bold text-white mb-6">Add New Manga Series</h2>
+
+            <form id="uploadMangaForm" class="max-w-2xl bg-[#1e1e1e] p-6 rounded-xl border border-white/10 flex flex-col gap-6">
+
+                <div class="p-6 border-2 border-dashed border-white/20 rounded-xl bg-white/5 text-center hover:border-primary/50 transition-colors cursor-pointer relative">
+                    <input type="file" id="folderInput" name="files" accept=".zip,image/*" multiple class="absolute inset-0 opacity-0 cursor-pointer" required>
+
+                    <span class="material-symbols-outlined text-4xl text-gray-400 mb-2">folder_zip</span>
+                    <p class="text-white font-bold">Select Manga (.ZIP) or Folder</p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Recommended: Compress your manga folder into a 
+                        <span class="text-primary font-bold">.ZIP file</span> to avoid upload limits.
+                    </p>
+                    <p id="selectedFolderInfo" class="text-primary text-sm mt-2 font-mono"></p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Title</label>
+                        <input type="text" name="title" required class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Author</label>
+                        <input type="text" name="author" required class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Description</label>
+                    <textarea name="description" rows="3" class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none"></textarea>
+                </div>
+
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Cover Image</label>
+                        <input type="file" name="cover" accept="image/*" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/20 file:text-primary hover:file:bg-primary/30">
+                    </div>
+                </div>
+
+                <button type="submit" id="btnSubmit" class="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-lg font-bold shadow-lg mt-2 flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined">cloud_upload</span> Upload & Process
+                </button>
+            </form>
+        </section>
+
+        <script>
+            document.getElementById('folderInput').addEventListener('change', function (e) {
+                const files = e.target.files;
+                if (files.length > 0) {
+                    const firstFile = files[0];
+                    document.getElementById('selectedFolderInfo').innerText =
+                            files.length === 1 ? `Selected: ${firstFile.name}` : `${files.length} files selected`;
+
+                    // Nếu là zip, lấy tên file làm Title (bỏ đuôi .zip)
+                    if (firstFile.name.toLowerCase().endsWith('.zip')) {
+                        const name = firstFile.name.substring(0, firstFile.name.lastIndexOf('.'));
+                        document.querySelector('input[name="title"]').value = name;
+                    }
+                    // Nếu là folder upload (webkitRelativePath có giá trị)
+                    else if (firstFile.webkitRelativePath) {
+                        const rootFolder = firstFile.webkitRelativePath.split('/')[0];
+                        document.querySelector('input[name="title"]').value = rootFolder;
+                    }
+                }
+            });
+
+            document.getElementById('uploadMangaForm').addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const btn = document.getElementById('btnSubmit');
+                const originalText = btn.innerHTML;
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Processing...';
+
+                const formData = new FormData(this);
+
+                // --- LẤY CSRF TOKEN TỪ LAYOUT ---
+                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+                try {
+                    const res = await fetch('/manga/upload', {
+                        method: 'POST',
+                        headers: {
+                            // Thêm header bảo mật
+                            [csrfHeader]: csrfToken
+                        },
+                        body: formData
+                    });
+
+                    const text = await res.text();
+
+                    if (res.ok) {
+                        alert(text);
+                        window.location.href = "/manga";
+                    } else {
+                        // Nếu server trả về lỗi (4xx, 5xx)
+                        alert("Upload failed: " + text);
+                    }
+                } catch (err) {
+                    alert("Network error: " + err);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            });
+        </script>
+    </body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Manga Detail', 'manga', ~{::section}, ~{::script})}">
+    <body>
+        <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
+
+            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0 gap-4">
+                <div class="flex items-center gap-4">
+                    <a th:href="@{/manga}" class="text-gray-400 hover:text-white transition-colors">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                    </a>
+                    <h2 class="text-lg font-bold text-white truncate" th:text="${manga.title}">Manga Title</h2>
+                </div>
+
+                <button onclick="document.getElementById('deleteModal').showModal()" 
+                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 transition-all text-sm font-bold">
+                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                    <span class="hidden sm:inline">Delete Series</span>
+                </button>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-8 scroll-smooth custom-scrollbar">
+                <div class="max-w-5xl mx-auto">
+
+                    <div class="flex flex-col md:flex-row gap-8 mb-10">
+                        <div class="w-full md:w-64 shrink-0">
+                            <div class="aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border border-white/10">
+                                <img th:if="${manga.coverPath != null}" 
+                                     th:src="${manga.coverPath}" 
+                                     class="w-full h-full object-cover">
+                                <div th:unless="${manga.coverPath != null}" class="w-full h-full bg-gray-800 flex items-center justify-center text-white/20 text-6xl font-bold">M</div>
+                            </div>
+                        </div>
+
+                        <div class="flex-1 flex flex-col gap-4">
+                            <h1 class="text-3xl md:text-4xl font-bold text-white leading-tight" th:text="${manga.title}">Title</h1>
+
+                            <div class="flex flex-wrap gap-2 text-sm">
+                                <span class="px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/20 font-bold" th:text="${manga.status}">ONGOING</span>
+                                <span class="px-3 py-1 rounded-full bg-white/5 text-gray-300 border border-white/10" th:text="${manga.releaseYear}">2023</span>
+                                <span class="px-3 py-1 rounded-full bg-white/5 text-gray-300 border border-white/10" 
+                                      th:if="${not #lists.isEmpty(manga.authors)}" 
+                                      th:text="${manga.authors[0].name}">Author</span>
+                            </div>
+
+                            <p class="text-gray-400 leading-relaxed text-sm md:text-base whitespace-pre-line" th:text="${manga.description}">No description.</p>
+
+                            <div class="mt-auto pt-4">
+                                <div class="text-xs text-gray-500 font-mono">ID: <span th:text="${manga.id}">UUID</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-4 border-b border-white/10 pb-2">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                            <span class="material-symbols-outlined">list</span> Chapters
+                            <span class="text-sm text-gray-500 font-normal ml-2" th:text="'(' + ${chapters.size()} + ')'"></span>
+                        </h3>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <a th:each="chap : ${chapters}" 
+                           th:href="@{/manga/read/{id}(id=${chap.id})}"
+                           class="flex items-center justify-between p-4 rounded-lg bg-[#2e2839] border border-white/5 hover:bg-[#362f42] hover:border-primary/50 transition-all group cursor-pointer">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-gray-500 group-hover:text-primary">folder_open</span>
+                                <span class="text-white font-medium group-hover:text-primary transition-colors" th:text="${chap.chapterName}">Chap 1</span>
+                            </div>
+                            <span class="text-xs text-gray-500 font-mono" th:text="${#temporals.format(chap.createdAt, 'dd/MM/yyyy')}">Date</span>
+                        </a>
+
+                        <div th:if="${chapters.isEmpty()}" class="col-span-full py-8 text-center text-gray-500 italic">
+                            No chapters uploaded yet.
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <dialog id="deleteModal" class="bg-[#1e1e1e] text-white p-0 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-md m-4">
+                <div class="p-6">
+                    <div class="flex items-center gap-4 mb-4 text-red-500">
+                        <span class="material-symbols-outlined text-4xl">warning</span>
+                        <h3 class="text-xl font-bold text-white">Delete Manga?</h3>
+                    </div>
+
+                    <p class="text-gray-300 mb-4 text-sm">
+                        You are about to delete <strong class="text-white" th:text="${manga.title}">...</strong>.
+                        This action cannot be undone.
+                    </p>
+
+                    <div class="bg-[#2e2839] p-4 rounded-lg border border-white/5 mb-6 text-sm space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Chapters:</span>
+                            <span class="font-bold text-white" th:text="${chapters.size()}">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Database Record:</span>
+                            <span class="text-red-400 font-bold">Will be removed</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-white/10 hover:bg-white/5 transition-colors has-[:checked]:border-red-500/50 has-[:checked]:bg-red-500/10">
+                            <input type="checkbox" id="checkDeletePhysical" class="mt-1 rounded bg-gray-700 border-gray-600 text-red-600 focus:ring-red-600">
+                            <div>
+                                <span class="font-bold text-white block text-sm">Delete physical files from Disk</span>
+                                <span class="text-xs text-gray-500 block mt-1">
+                                    If checked, all images and covers in <b>uploads/manga/...</b> will be PERMANENTLY deleted.
+                                </span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end gap-3">
+                        <button onclick="document.getElementById('deleteModal').close()" class="px-4 py-2 text-gray-400 hover:text-white font-medium text-sm">Cancel</button>
+                        <button onclick="confirmDelete()" id="btnConfirmDelete" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-colors flex items-center gap-2 text-sm">
+                            <span class="material-symbols-outlined text-sm">delete</span> Confirm Delete
+                        </button>
+                    </div>
+                </div>
+            </dialog>
+        </section>
+
+        <script th:inline="javascript">
+            async function confirmDelete() {
+                // Lấy ID từ Thymeleaf variable
+                const mangaId = /*[[${manga.id}]]*/ '';
+                const deletePhysical = document.getElementById('checkDeletePhysical').checked;
+
+                if (deletePhysical) {
+                    if (!confirm("ARE YOU SURE? All files on disk will be wiped out!"))
+                        return;
+                }
+
+                const btn = document.getElementById('btnConfirmDelete');
+                btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Deleting...';
+                btn.disabled = true;
+
+                try {
+                    const formData = new FormData();
+                    formData.append('id', mangaId);
+                    formData.append('deletePhysical', deletePhysical);
+
+                    // Lấy CSRF Token từ layout
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+                    const res = await fetch('/manga/delete', {
+                        method: 'POST',
+                        headers: {
+                            [csrfHeader]: csrfToken
+                        },
+                        body: formData
+                    });
+
+                    if (res.ok) {
+                        alert("Manga deleted successfully!");
+                        window.location.href = "/manga"; // Quay về trang danh sách
+                    } else {
+                        const txt = await res.text();
+                        alert("Delete failed: " + txt);
+                        btn.disabled = false;
+                        btn.innerHTML = 'Confirm Delete';
+                    }
+                } catch (e) {
+                    alert("Network error: " + e);
+                    btn.disabled = false;
+                }
+            }
+        </script>
+    </body>
+</html>
