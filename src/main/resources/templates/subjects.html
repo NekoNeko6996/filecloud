@@ -56,6 +56,12 @@
                             <div class="flex flex-col justify-center flex-1 min-w-0">
 
                                 <div class="flex flex-wrap gap-2 mb-1">
+                                    <div class="flex flex-wrap gap-1 mb-1.5 h-5 overflow-hidden">
+                                        <img th:each="link : ${sub.socialLinks}" 
+                                             th:if="${link.platform.iconUrl}"
+                                             th:src="${link.platform.iconUrl}" 
+                                             class="w-4 h-4 rounded-full object-contain"
+                                             th:title="${link.platform.name}">
                                         <span th:if="${#lists.isEmpty(sub.socialLinks)}" class="text-[10px] text-white italic ">No links</span>
                                     </div>
                                 </div>
