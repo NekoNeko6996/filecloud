@@ -1,47 +1,369 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{fragments/layout :: layout('Reading ' + ${chapter.chapterName}, 'manga', ~{::section}, ~{::script})}">
-    <body>
-        <section class="flex-1 flex flex-col relative overflow-hidden bg-black">
-            
-            <header class="h-14 flex items-center justify-between px-4 bg-[#171022] border-b border-white/10 shrink-0 z-50">
-                <div class="flex items-center gap-4">
-                    <a th:href="@{/manga/{id}(id=${chapter.manga.id})}" class="text-gray-400 hover:text-white transition-colors flex items-center gap-1">
-                        <span class="material-symbols-outlined">arrow_back</span> 
-                        <span class="hidden sm:inline text-sm font-bold">Back</span>
-                    </a>
-                    <div class="flex flex-col">
-                        <h2 class="text-sm font-bold text-white truncate max-w-[200px]" th:text="${chapter.manga.title}">Manga</h2>
-                        <span class="text-xs text-primary font-bold" th:text="${chapter.chapterName}">Chapter</span>
-                    </div>
-                </div>
-                
-                <div class="text-xs text-gray-500">
-                    <span th:text="${pages.size()}">0</span> pages
-                </div>
-            </header>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" class="dark">
+    <head>
+        <meta charset="utf-8"/>
+        <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+        <meta name="_csrf" th:content="${_csrf.token}"/>
+        <title th:text="${chapter.manga.title} + ' - ' + ${chapter.chapterName}">Reader</title>
 
-            <div class="flex-1 overflow-y-auto scroll-smooth custom-scrollbar flex flex-col items-center pb-20 bg-[#121212]">
-                
-                <div th:each="page : ${pages}" class="w-full max-w-3xl relative group">
-                    <img th:src="@{/manga/image/{id}(id=${page.id})}" 
-                         loading="lazy"
-                         class="w-full h-auto block"
-                         alt="Page Image">
-                         
-                    <div class="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span th:text="${page.pageOrder}">1</span>
-                    </div>
-                </div>
+        <link href="https://fonts.googleapis.com" rel="preconnect"/>
+        <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+        <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+        <script>
+            tailwind.config = {
+                darkMode: "class",
+                theme: {
+                    extend: {colors: {"primary": "#833cf6", "surface": "#1e1e1e"}, fontFamily: {"display": ["Space Grotesk", "sans-serif"]}},
+                },
+            }
+        </script>
+        <style>
+            .custom-scrollbar::-webkit-scrollbar {
+                width: 6px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-track {
+                background: #121212;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+                background: #333;
+                border-radius: 3px;
+            }
+            body {
+                background-color: #000;
+                overflow: hidden; /* Quan trọng cho Book Mode */
+            }
 
-                <div class="w-full max-w-3xl p-8 flex justify-between items-center mt-4 border-t border-white/10">
-                    <button class="px-4 py-2 rounded bg-white/10 text-white hover:bg-white/20">Prev Chapter</button>
-                    <a th:href="@{/manga/{id}(id=${chapter.manga.id})}" class="px-4 py-2 rounded bg-primary text-white hover:bg-primary-dark font-bold">Manga Info</a>
-                    <button class="px-4 py-2 rounded bg-white/10 text-white hover:bg-white/20">Next Chapter</button>
+            /* Hiệu ứng chuyển trang mượt */
+            .page-transition {
+                transition: opacity 0.3s ease-in-out;
+            }
+        </style>
+    </head>
+    <body class="bg-black text-white font-display h-screen flex flex-col relative">
+
+        <header id="readerHeader" class="fixed top-0 inset-x-0 h-14 bg-[#1e1e1e]/90 backdrop-blur-md border-b border-white/10 z-50 flex items-center justify-between px-4 transition-transform duration-300">
+            <div class="flex items-center gap-4 min-w-0">
+                <a th:href="@{/manga/{id}(id=${chapter.manga.id})}" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+                <div class="flex flex-col min-w-0">
+                    <h1 class="text-xs text-gray-400 font-bold truncate uppercase" th:text="${chapter.manga.title}">TITLE</h1>
+                    <span class="text-sm font-bold text-white truncate" th:text="${chapter.chapterName}">Chapter</span>
                 </div>
-                
             </div>
-        </section>
-        <script></script>
+
+            <button onclick="toggleViewMode()" class="flex justify-center items-center p-2 aspect-[1/1] w-[47px] rounded-full hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Switch View Mode">
+                <span id="viewModeIcon" class="material-symbols-outlined">auto_stories</span> 
+            </button>
+        </header>
+
+        <main id="readerContainer" onclick="toggleInterface()"
+              class="flex-1 w-full h-full pt-14 pb-0 outline-none transition-all duration-300
+              flex flex-col items-center overflow-y-auto scroll-smooth custom-scrollbar"> <div th:each="page, iterStat : ${pages}" 
+                                                                                         th:id="'page-' + ${iterStat.index}"
+                                                                                         class="manga-page relative group transition-all duration-300 w-full max-w-3xl"
+                                                                                         th:data-index="${iterStat.index}">
+
+                <img th:src="@{/manga/image/{id}(id=${page.id})}" 
+                     loading="lazy"
+                     class="w-full h-auto block select-none bg-[#121212] mx-auto object-contain"
+                     th:classappend="${iterStat.index > 0} ? 'mt-0' : ''"> </div>
+
+            <div id="verticalNav" class="w-full max-w-3xl p-10 flex flex-col items-center gap-6 mt-6 pb-24 border-t border-white/10 text-center">
+                <p class="text-gray-400 text-sm">End of Chapter</p>
+                <div class="flex gap-4">
+                    <a th:if="${prevChapter}" th:href="@{/manga/read/{id}(id=${prevChapter.id})}" class="px-6 py-2 rounded border border-white/20 hover:bg-white/10 text-sm font-bold">Prev</a>
+                    <a th:if="${nextChapter}" th:href="@{/manga/read/{id}(id=${nextChapter.id})}" class="px-8 py-2 rounded bg-primary hover:bg-primary-dark text-sm font-bold">Next</a>
+                </div>
+            </div>
+        </main>
+
+        <div id="readerControls" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md transition-all duration-300">
+            <div class="bg-[#1e1e1e]/95 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl p-1.5 flex items-center justify-between gap-1">
+
+                <button id="btnPrevControl" onclick="navigate('prev')" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors shrink-0">
+                    <span class="material-symbols-outlined">chevron_left</span>
+                </button>
+
+                <button onclick="document.getElementById('chapterModal').showModal()" 
+                        class="flex-1 flex flex-col items-center justify-center h-full px-2 border-x border-white/5 hover:bg-white/5 rounded transition-colors group">
+                    <div class="flex items-center gap-1 text-xs font-bold text-white group-hover:text-primary transition-colors">
+                        <span class="material-symbols-outlined text-[16px]">format_list_bulleted</span>
+                        <span class="truncate max-w-[120px]" th:text="${chapter.chapterName}">Chapter 1</span>
+                    </div>
+                    <div class="text-[10px] text-gray-500 font-mono">
+                        <span id="pageIndicator" class="text-primary font-bold">1</span> / <span th:text="${pages.size()}">20</span>
+                    </div>
+                </button>
+
+                <button id="btnNextControl" onclick="navigate('next')" class="w-10 h-10 flex items-center justify-center rounded-full bg-primary hover:bg-primary-dark text-white shadow-lg transition-all shrink-0 active:scale-95">
+                    <span class="material-symbols-outlined">chevron_right</span>
+                </button>
+            </div>
+        </div>
+
+        <dialog id="chapterModal" class="bg-transparent p-0 rounded-xl shadow-2xl backdrop:bg-black/80 w-full max-w-sm m-auto">
+
+            <div class="flex flex-col bg-[#1e1e1e] text-white border border-gray-700 rounded-xl max-h-[80vh] overflow-hidden">
+
+                <div class="p-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#2e2839]">
+                    <h3 class="font-bold">Select Chapter</h3>
+                    <button onclick="this.closest('dialog').close()" class="text-gray-400 hover:text-white">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+
+                <div class="p-2 border-b border-white/10 bg-[#1e1e1e] sticky top-0 z-10">
+                    <input type="text" id="chapterSearch" onkeyup="filterChapters()" placeholder="Search chapter..." 
+                           class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary">
+                </div>
+
+                <div class="overflow-y-auto p-2 flex-1 custom-scrollbar" id="chapterListContainer">
+                    <a th:each="c : ${allChapters}" 
+                       th:href="@{/manga/read/{id}(id=${c.id})}"
+                       class="chapter-item block px-4 py-3 rounded hover:bg-white/5 transition-colors border-l-2 border-transparent hover:border-primary"
+                       th:classappend="${c.id == chapter.id} ? 'bg-primary/10 border-primary text-primary font-bold' : 'text-gray-300'">
+                        <div class="flex justify-between items-center">
+                            <span th:text="${c.chapterName}">Chap 1</span>
+                            <span th:if="${c.id == chapter.id}" class="material-symbols-outlined text-[16px]">check</span>
+                        </div>
+                    </a>
+                </div>
+
+            </div>
+        </dialog>
+
+        <script th:inline="javascript">
+            const totalPages = /*[[${pages.size()}]]*/ 0;
+            const prevChapterUrl = /*[[${prevChapter != null ? '/manga/read/' + prevChapter.id : null}]]*/ null;
+            const nextChapterUrl = /*[[${nextChapter != null ? '/manga/read/' + nextChapter.id : null}]]*/ null;
+        </script>
+
+        <script th:inline="javascript">
+            // --- STATE MANAGEMENT ---
+            let currentMode = localStorage.getItem('mangaReaderMode') || 'vertical'; // 'vertical' | 'book'
+            let currentIndex = 0; // Trang hiện tại (index 0-based)
+            let isInterfaceVisible = true;
+
+            const container = document.getElementById('readerContainer');
+            const pageIndicator = document.getElementById('pageIndicator');
+            const icon = document.getElementById('viewModeIcon');
+            const pages = document.querySelectorAll('.manga-page');
+            const verticalNav = document.getElementById('verticalNav');
+
+            // --- INIT ---
+            document.addEventListener('DOMContentLoaded', () => {
+                applyViewMode(currentMode);
+            });
+
+            // --- VIEW MODES ---
+            function toggleViewMode() {
+                currentMode = currentMode === 'vertical' ? 'book' : 'vertical';
+                localStorage.setItem('mangaReaderMode', currentMode);
+                applyViewMode(currentMode);
+            }
+
+            function applyViewMode(mode) {
+                if (mode === 'vertical') {
+                    // UI Icon
+                    icon.innerText = 'auto_stories'; // Icon báo hiệu: bấm vào để chuyển sang Book
+                    icon.title = "Switch to Book Mode";
+
+                    // Container Styles
+                    container.className = "flex-1 w-full h-full pt-14 pb-0 outline-none flex flex-col items-center overflow-y-auto scroll-smooth custom-scrollbar";
+
+                    // Page Styles
+                    pages.forEach(p => {
+                        p.classList.remove('hidden', 'h-full', 'flex', 'items-center', 'justify-center');
+                        p.classList.add('w-full', 'max-w-3xl', 'block');
+                        p.querySelector('img').className = "w-full h-auto block select-none bg-[#121212] mx-auto";
+                    });
+
+                    // Show Footer Nav
+                    verticalNav.classList.remove('hidden');
+
+                    // Enable Intersection Observer for Vertical
+                    enableObserver();
+
+                } else { // BOOK MODE
+                    // UI Icon
+                    icon.innerText = 'scrollable_header'; // Icon báo hiệu: bấm vào để chuyển sang Scroll
+                    icon.title = "Switch to Vertical Scroll";
+
+                    // Container Styles: Khóa scroll, dùng Flex để căn giữa
+                    container.className = "fixed inset-0 w-full h-full bg-black z-0 flex items-center justify-center overflow-hidden pt-0 pb-0";
+
+                    // Page Styles
+                    pages.forEach(p => {
+                        p.classList.add('hidden', 'h-full', 'flex', 'items-center', 'justify-center'); // Ẩn hết, dùng Flex để căn giữa ảnh trong div
+                        p.classList.remove('w-full', 'max-w-3xl', 'block');
+                        // Ảnh trong chế độ Book phải fit chiều cao màn hình (h-full object-contain)
+                        p.querySelector('img').className = "max-w-full max-h-full object-contain select-none shadow-2xl";
+                    });
+
+                    // Hide Footer Nav (Dùng nút float để chuyển)
+                    verticalNav.classList.add('hidden');
+
+                    // Disable Observer -> Manual Pagination
+                    if (window.pageObserver)
+                        window.pageObserver.disconnect();
+
+                    renderBookSpread();
+                }
+            }
+
+            // --- BOOK MODE LOGIC ---
+            function renderBookSpread() {
+                // Ẩn tất cả trước
+                pages.forEach(p => p.classList.add('hidden'));
+
+                const isDesktop = window.innerWidth >= 768;
+
+                // Logic 2 trang (Spread)
+                // Nếu trang 1 (bìa) -> chỉ hiện 1 mình nó.
+                // Các trang sau: hiện cặp (2,3), (4,5)...
+
+                let p1 = pages[currentIndex];
+                let p2 = null;
+
+                if (isDesktop && currentIndex > 0 && currentIndex < totalPages - 1) {
+                    // Nếu không phải trang đầu và chưa tới trang cuối -> Check xem có lấy thêm trang sau không
+                    p2 = pages[currentIndex + 1];
+                }
+
+                // Hiển thị p1
+                if (p1) {
+                    p1.classList.remove('hidden');
+                    // Nếu có 2 trang, chỉnh width để chia đôi
+                    if (p2)
+                        p1.style.width = '50%';
+                    else
+                        p1.style.width = '100%';
+                }
+
+                // Hiển thị p2
+                if (p2) {
+                    p2.classList.remove('hidden');
+                    p2.style.width = '50%';
+                }
+
+                // Update Indicator
+                if (p2)
+                    pageIndicator.innerText = `${currentIndex + 1}-${currentIndex + 2}`;
+                else
+                    pageIndicator.innerText = `${currentIndex + 1}`;
+            }
+
+            // --- NAVIGATION LOGIC (Unified) ---
+            function navigate(dir) {
+                if (currentMode === 'vertical') {
+                    // Vertical: Scroll 1 khoảng hoặc nhảy trang (đơn giản là Next/Prev Chap)
+                    if (dir === 'next') {
+                        if (nextChapterUrl)
+                            window.location.href = nextChapterUrl;
+                    } else {
+                        if (prevChapterUrl)
+                            window.location.href = prevChapterUrl;
+                    }
+                } else {
+                    // Book Mode: Lật trang
+                    const isDesktop = window.innerWidth >= 768;
+                    let step = (isDesktop && currentIndex > 0) ? 2 : 1; // PC lật 2 trang, Mobile lật 1
+
+                    if (dir === 'next') {
+                        if (currentIndex + step < totalPages) {
+                            currentIndex += step;
+                            renderBookSpread();
+                        } else {
+                            // Hết trang -> Chuyển Chap
+                            if (nextChapterUrl)
+                                window.location.href = nextChapterUrl;
+                            else
+                                alert("Last Chapter");
+                        }
+                    } else {
+                        if (currentIndex - step >= 0) {
+                            currentIndex -= step;
+                            renderBookSpread();
+                        } else if (currentIndex > 0) {
+                            // Trường hợp còn lẻ 1 trang về 0
+                            currentIndex = 0;
+                            renderBookSpread();
+                        } else {
+                            // Về đầu -> Chuyển Chap trước
+                            if (prevChapterUrl)
+                                window.location.href = prevChapterUrl;
+                        }
+                    }
+                }
+            }
+
+            // --- VERTICAL OBSERVER ---
+            function enableObserver() {
+                if (window.pageObserver)
+                    window.pageObserver.disconnect();
+                window.pageObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const idx = parseInt(entry.target.getAttribute('data-index'));
+                            pageIndicator.innerText = idx + 1; // Display 1-based
+                            currentIndex = idx; // Sync index for switching mode
+                        }
+                    });
+                }, {root: container, threshold: 0.1, rootMargin: "-40% 0px -40% 0px"});
+
+                pages.forEach(p => window.pageObserver.observe(p));
+            }
+
+            // --- UTILS ---
+            function toggleInterface() {
+                const header = document.getElementById('readerHeader');
+                const controls = document.getElementById('readerControls');
+                isInterfaceVisible = !isInterfaceVisible;
+
+                if (!isInterfaceVisible) {
+                    header.classList.add('-translate-y-full');
+                    controls.classList.add('translate-y-[150%]', 'opacity-0');
+                } else {
+                    header.classList.remove('-translate-y-full');
+                    controls.classList.remove('translate-y-[150%]', 'opacity-0');
+                }
+            }
+
+            function filterChapters() {
+                const input = document.getElementById('chapterSearch');
+                const filter = input.value.toLowerCase();
+                const items = document.getElementsByClassName('chapter-item');
+
+                for (let i = 0; i < items.length; i++) {
+                    const txtValue = items[i].textContent || items[i].innerText;
+                    if (txtValue.toLowerCase().indexOf(filter) > -1) {
+                        items[i].style.display = "";
+                    } else {
+                        items[i].style.display = "none";
+                    }
+                }
+            }
+
+            // Keyboard Event
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight')
+                    navigate('next');
+                if (e.key === 'ArrowLeft')
+                    navigate('prev');
+                if (e.key.toLowerCase() === 'f') {
+                    !document.fullscreenElement ? document.documentElement.requestFullscreen() : document.exitFullscreen();
+                }
+            });
+
+            // Resize Event for Book Mode
+            window.addEventListener('resize', () => {
+                if (currentMode === 'book')
+                    renderBookSpread();
+            });
+
+        </script>
     </body>
 </html>

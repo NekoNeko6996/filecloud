@@ -288,14 +288,37 @@ public class MangaController {
     // 5. Màn hình Đọc (Xem ảnh trong chapter)
     @GetMapping("/read/{chapterId}")
     public String readChapter(@PathVariable String chapterId, Model model) {
-        MangaChapter chapter = chapterRepository.findById(chapterId)
+        MangaChapter currentChapter = chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new IllegalArgumentException("Chapter not found"));
 
-        // Lấy danh sách trang ảnh
+        // 1. Lấy danh sách chapter của truyện này và sort đúng thứ tự
+        List<MangaChapter> allChapters = chapterRepository.findByMangaIdOrderByChapterNameAsc(currentChapter.getManga().getId());
+        allChapters.sort((c1, c2) -> extractPageNumber(c1.getChapterName()) - extractPageNumber(c2.getChapterName()));
+
+        // 2. Tìm vị trí chapter hiện tại
+        int currentIndex = -1;
+        for (int i = 0; i < allChapters.size(); i++) {
+            if (allChapters.get(i).getId().equals(currentChapter.getId())) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        // 3. Xác định Next và Prev
+        // Giả sử list sort tăng dần: Chap 1 (idx 0), Chap 2 (idx 1)...
+        // Prev là index - 1, Next là index + 1
+        MangaChapter prevChapter = (currentIndex > 0) ? allChapters.get(currentIndex - 1) : null;
+        MangaChapter nextChapter = (currentIndex < allChapters.size() - 1) ? allChapters.get(currentIndex + 1) : null;
+
+        // 4. Lấy pages
         List<MangaPage> pages = pageRepository.findByChapterIdOrderByPageOrderAsc(chapterId);
 
-        model.addAttribute("chapter", chapter);
+        model.addAttribute("chapter", currentChapter);
         model.addAttribute("pages", pages);
+        model.addAttribute("prevChapter", prevChapter);
+        model.addAttribute("nextChapter", nextChapter);
+        model.addAttribute("allChapters", allChapters); // Để dùng cho Dropdown chọn nhanh
+
         return "manga/read";
     }
 
