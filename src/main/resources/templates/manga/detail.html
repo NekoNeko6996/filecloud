@@ -28,12 +28,17 @@
 
             <div class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth custom-scrollbar" onclick="hideChapterContextMenu()">
                 <div class="max-w-5xl mx-auto">
-
                     <div class="flex flex-col md:flex-row gap-6 md:gap-8 mb-8 md:mb-10">
                         <div class="w-full md:w-64 shrink-0 mx-auto md:mx-0 max-w-[200px] md:max-w-none">
-                            <div class="aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group">
-                                <img th:if="${manga.coverPath != null}" th:src="${manga.coverPath}" class="w-full h-full object-cover">
-                                <div th:unless="${manga.coverPath != null}" class="w-full h-full bg-gray-800 flex items-center justify-center text-white/20 text-6xl font-bold">M</div>
+                            <div class="aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group bg-gray-800">
+                                <img th:if="${manga.coverPath != null}" 
+                                     id="mangaCoverImg"
+                                     th:src="@{/manga/cover/{id}/thumb(id=${manga.id})}" 
+                                     th:data-src="${manga.coverPath}"
+                                     class="w-full h-full object-cover transition-all duration-700 filter blur-sm"
+                                     alt="Cover">
+
+                                <div th:unless="${manga.coverPath != null}" class="w-full h-full flex items-center justify-center text-white/20 text-6xl font-bold">M</div>
                             </div>
                         </div>
 
@@ -86,7 +91,7 @@
                                 <span class="text-xs text-gray-500 font-mono shrink-0 ml-2" th:text="${#temporals.format(chap.createdAt, 'dd/MM/yyyy')}">Date</span>
                             </a>
 
-                            <button class="btn-more-options absolute right-1 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors z-10"
+                            <button class="btn-more-options flex items-center absolute right-1 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors z-10"
                                     th:data-id="${chap.id}"
                                     th:data-name="${chap.chapterName}"
                                     onclick="showChapterContextMenu(event, this)">
@@ -126,13 +131,13 @@
                 <div class="flex flex-col bg-[#1e1e1e] text-white border border-gray-700 rounded-xl overflow-hidden h-full">
 
                     <div class="p-4 border-b border-white/10 bg-[#2e2839] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                        
+
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2">
                                 <h3 class="font-bold text-lg whitespace-nowrap">Edit Chap</h3>
                                 <div class="h-6 w-px bg-white/20 mx-2 hidden sm:block"></div>
                             </div>
-                            
+
                             <button onclick="this.closest('dialog').close()" class="text-gray-400 hover:text-white sm:hidden p-1">
                                 <span class="material-symbols-outlined">close</span>
                             </button>
@@ -140,11 +145,11 @@
 
                         <div class="flex items-center gap-2 w-full sm:w-auto flex-1 sm:justify-end">
                             <input type="text" id="editChapName" class="bg-black/30 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:border-primary outline-none w-full sm:w-64 transition-all">
-                            
+
                             <button onclick="saveChapterName()" class="text-primary hover:text-white text-xs font-bold px-3 py-1.5 rounded border border-primary/30 hover:bg-primary/20 whitespace-nowrap transition-colors">
                                 SAVE
                             </button>
-                            
+
                             <button onclick="this.closest('dialog').close()" class="text-gray-400 hover:text-white hidden sm:block ml-3">
                                 <span class="material-symbols-outlined">close</span>
                             </button>
@@ -499,7 +504,7 @@
 
                 previewLoading.style.display = 'flex';
                 previewImg.style.display = 'none';
-                previewImg.src = `/manga/image/${pageId}`;
+                previewImg.src = `/manga/image/${pageId}/thumb`;
                 previewImg.onload = () => {
                     previewLoading.style.display = 'none';
                     previewImg.style.display = 'block';
@@ -585,9 +590,10 @@
                     // Xóa 'transition-all' để tránh lỗi render khi cuộn
                     el.className = `relative group ${containerAspect} bg-gray-800 rounded overflow-hidden border border-white/10 cursor-move z-0 hover:z-10`;
                     el.setAttribute('data-id', page.id);
+                    const thumbUrl = `/manga/image/${page.id}/thumb`;
 
                     el.innerHTML = `
-                        <img src="${page.url}" class="${imgClass} pointer-events-none select-none bg-[#121212]">
+                        <img src="${thumbUrl}" class="${imgClass} pointer-events-none select-none bg-[#121212]">
                         
                         <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                              <button onclick="deletePage('${page.id}', this)" class="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg transform active:scale-95 transition-transform" title="Delete Page">
@@ -739,6 +745,21 @@
 
                 input.value = ''; // Reset input
             }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                const coverImg = document.getElementById('mangaCoverImg');
+                if (coverImg) {
+                    const fullSrc = coverImg.getAttribute('data-src');
+                    if (fullSrc) {
+                        const temp = new Image();
+                        temp.onload = () => {
+                            coverImg.src = fullSrc;
+                            coverImg.classList.remove('blur-sm'); // Xóa mờ khi ảnh nét đã tải xong
+                        };
+                        temp.src = fullSrc;
+                    }
+                }
+            });
         </script>
     </body>
 </html>

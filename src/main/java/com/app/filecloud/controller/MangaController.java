@@ -27,6 +27,8 @@ import java.io.InputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import net.coobird.thumbnailator.Thumbnails;
 
 @Controller
 @RequestMapping("/manga")
@@ -43,15 +45,73 @@ public class MangaController {
     private String rootUploadDir;
 
     @GetMapping
-    public String mangaList(Model model) {
-        List<MangaSeries> mangas = mangaRepository.findAll();
-        mangas.sort((a, b) -> {
-            if (b.getCreatedAt() == null || a.getCreatedAt() == null) {
-                return 0;
-            }
-            return b.getCreatedAt().compareTo(a.getCreatedAt());
-        });
-        model.addAttribute("mangas", mangas);
+    public String mangaList(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer tagId,
+            @RequestParam(required = false, defaultValue = "latest") String sort,
+            Model model) {
+
+        // 1. Lấy tất cả Manga (Nếu dữ liệu lớn nên dùng JPA Specification, ở đây dùng Stream cho đơn giản)
+        List<MangaSeries> allMangas = mangaRepository.findAll();
+        Stream<MangaSeries> stream = allMangas.stream();
+
+        // 2. Lọc theo Keyword (Tên truyện hoặc Tác giả)
+        if (keyword != null && !keyword.isBlank()) {
+            String k = keyword.toLowerCase();
+            stream = stream.filter(m -> m.getTitle().toLowerCase().contains(k)
+                    || m.getAuthors().stream().anyMatch(a -> a.getName().toLowerCase().contains(k)));
+        }
+
+        // 3. Lọc theo Tag
+        if (tagId != null) {
+            stream = stream.filter(m -> m.getTags().stream().anyMatch(t -> t.getId().equals(tagId)));
+        }
+
+        List<MangaSeries> filtered = stream.collect(Collectors.toList());
+
+        // 4. Sắp xếp
+        switch (sort) {
+            case "name_asc":
+                filtered.sort(Comparator.comparing(MangaSeries::getTitle));
+                break;
+            case "chapters_desc":
+                filtered.sort((a, b) -> Integer.compare(b.getChapters().size(), a.getChapters().size()));
+                break;
+            case "oldest":
+                filtered.sort(Comparator.comparing(MangaSeries::getCreatedAt));
+                break;
+            case "latest":
+            default:
+                // Ưu tiên ngày Update, nếu không có thì dùng ngày tạo
+                filtered.sort((a, b) -> {
+                    // SỬA: Đổi kiểu Date thành LocalDateTime
+                    java.time.LocalDateTime dateA = a.getUpdatedAt() != null ? a.getUpdatedAt() : a.getCreatedAt();
+                    java.time.LocalDateTime dateB = b.getUpdatedAt() != null ? b.getUpdatedAt() : b.getCreatedAt();
+
+                    if (dateA == null && dateB == null) {
+                        return 0;
+                    }
+                    if (dateA == null) {
+                        return 1;
+                    }
+                    if (dateB == null) {
+                        return -1;
+                    }
+
+                    return dateB.compareTo(dateA); // Mới nhất lên đầu
+                });
+                break;
+        }
+
+        // 5. Truyền dữ liệu xuống View
+        model.addAttribute("mangas", filtered);
+        model.addAttribute("tags", tagRepository.findAll()); // Để hiển thị Dropdown Tag
+
+        // Giữ lại trạng thái bộ lọc trên giao diện
+        model.addAttribute("keyword", keyword);
+        model.addAttribute("selectedTagId", tagId);
+        model.addAttribute("selectedSort", sort);
+
         return "manga/list";
     }
 
@@ -93,8 +153,23 @@ public class MangaController {
                     Files.createDirectories(coverDir);
                 }
 
-                cover.transferTo(coverDir.resolve(coverName));
+                // 1. Lưu ảnh gốc
+                Path destFile = coverDir.resolve(coverName);
+                cover.transferTo(destFile);
                 manga.setCoverPath("/manga/covers/" + coverName);
+
+                // 2. Tạo Thumbnail cho Cover (MỚI)
+                try {
+                    Path thumbDir = coverDir.resolve(".thumbs");
+                    if (!Files.exists(thumbDir)) {
+                        Files.createDirectories(thumbDir);
+                    }
+
+                    // Tạo thumb 400px
+                    createThumbnail(destFile.toFile(), thumbDir.resolve(coverName).toFile(), 400);
+                } catch (Exception e) {
+                    System.err.println("Failed to create cover thumbnail: " + e.getMessage());
+                }
             }
             manga = mangaRepository.save(manga);
 
@@ -145,18 +220,92 @@ public class MangaController {
 
         // Lưu file vào ổ cứng
         Path destFile = Paths.get(rootUploadDir, chapter.getFolderPath(), fileName);
-
-        // --- SỬA ĐỔI QUAN TRỌNG TẠI ĐÂY ---
-        // Files.copy trả về số byte thực tế đã ghi. Ta dùng giá trị này làm size chuẩn.
         long actualSize = Files.copy(inputStream, destFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
+        Path thumbDir = Paths.get(rootUploadDir, chapter.getFolderPath(), ".thumbs");
+        if (!Files.exists(thumbDir)) {
+            Files.createDirectories(thumbDir);
+        }
+
+        Path destThumb = thumbDir.resolve(fileName);
+        try {
+            createThumbnail(destFile.toFile(), destThumb.toFile(), 300); // Resize về width 300px
+        } catch (Exception e) {
+            System.err.println("Failed to create thumbnail for " + fileName + ": " + e.getMessage());
+            // Không throw lỗi chết chương trình, chỉ log lại.
+        }
+
+        // C. Lưu vào DB
         MangaPage page = MangaPage.builder()
                 .chapter(chapter)
                 .fileName(fileName)
-                .size(actualSize) // <--- Dùng size thực tế vừa ghi, không dùng tham số inputSize nữa
+                .size(actualSize)
                 .pageOrder(extractPageNumber(fileName))
                 .build();
         pageRepository.save(page);
+    }
+
+    private void createThumbnail(File source, File dest, int targetWidth) {
+        try {
+            Thumbnails.of(source)
+                    .size(targetWidth, targetWidth) // Kích thước tối đa (nó tự giữ tỷ lệ)
+                    .outputQuality(0.8) // Nén ảnh giảm dung lượng (80% chất lượng)
+                    .toFile(dest);
+        } catch (IOException e) {
+            System.err.println("Thumbnail error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/cover/{mangaId}/thumb")
+    @ResponseBody
+    public ResponseEntity<Resource> getCoverThumbnail(@PathVariable String mangaId) {
+        try {
+            MangaSeries manga = mangaRepository.findById(mangaId).orElseThrow();
+            if (manga.getCoverPath() == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Cover Path trong DB dạng: /manga/covers/abc.jpg
+            // Cần chuyển thành: {root}/manga/covers/.thumbs/abc.jpg
+            String relativePath = manga.getCoverPath().startsWith("/") ? manga.getCoverPath().substring(1) : manga.getCoverPath();
+            Path originalFile = Paths.get(rootUploadDir, relativePath);
+            Path thumbFile = originalFile.getParent().resolve(".thumbs").resolve(originalFile.getFileName());
+
+            Resource resource = new UrlResource(thumbFile.toUri());
+            if (resource.exists() && resource.isReadable()) {
+                return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(resource);
+            } else {
+                // Nếu chưa có thumb (ảnh cũ), trả về ảnh gốc (fallback)
+                Resource originalRes = new UrlResource(originalFile.toUri());
+                if (originalRes.exists()) {
+                    return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(originalRes);
+                }
+            }
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/image/{pageId}/thumb")
+    @ResponseBody
+    public ResponseEntity<Resource> getMangaThumbnail(@PathVariable String pageId) {
+        try {
+            MangaPage page = pageRepository.findById(pageId).orElseThrow();
+
+            // Đường dẫn đến file thumbnail: {root}/{chapterPath}/.thumbs/{fileName}
+            Path thumbPath = Paths.get(rootUploadDir, page.getChapter().getFolderPath(), ".thumbs", page.getFileName());
+
+            Resource resource = new UrlResource(thumbPath.toUri());
+            if (resource.exists() && resource.isReadable()) {
+                return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(resource);
+            } else {
+                // Fallback: Nếu không có thumb (do ảnh cũ), trả về ảnh gốc
+                return getMangaImage(pageId);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     // --- API ĐỌC ẢNH (Quan trọng: Ghép đường dẫn tương đối với Root) ---
@@ -351,13 +500,26 @@ public class MangaController {
 
                 // B. Xóa Ảnh bìa (nếu có)
                 if (manga.getCoverPath() != null) {
-                    // coverPath dạng "/manga/covers/abc.jpg" -> cần bỏ dấu "/" đầu để ghép với root
+                    // coverPath dạng "/manga/covers/abc.jpg" -> cần bỏ dấu "/" đầu
                     String relativeCover = manga.getCoverPath().startsWith("/")
                             ? manga.getCoverPath().substring(1)
                             : manga.getCoverPath();
 
                     Path coverFile = Paths.get(rootUploadDir, relativeCover);
+
+                    // 1. Xóa ảnh gốc
                     Files.deleteIfExists(coverFile);
+
+                    // 2. Xóa Thumbnail (MỚI)
+                    // Thumb nằm ở: .../covers/.thumbs/abc.jpg
+                    try {
+                        if (coverFile.getParent() != null) {
+                            Path thumbFile = coverFile.getParent().resolve(".thumbs").resolve(coverFile.getFileName());
+                            Files.deleteIfExists(thumbFile);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             }
 
@@ -532,21 +694,72 @@ public class MangaController {
             // Xử lý Cover: Ưu tiên File Upload -> Sau đó đến Chọn từ Chapter
             if (coverFile != null && !coverFile.isEmpty()) {
                 String coverName = System.currentTimeMillis() + "_" + coverFile.getOriginalFilename();
+
                 Path coverDir = Paths.get(rootUploadDir, "manga", "covers");
                 if (!Files.exists(coverDir)) {
                     Files.createDirectories(coverDir);
                 }
-                coverFile.transferTo(coverDir.resolve(coverName));
+
+                // --- SỬA Ở ĐÂY: Khai báo biến destFile rõ ràng ---
+                Path destFile = coverDir.resolve(coverName);
+                coverFile.transferTo(destFile); // Lưu ảnh gốc bằng biến này
+
+                // --- ĐOẠN TẠO THUMBNAIL (Sử dụng destFile vừa khai báo) ---
+                try {
+                    Path thumbDir = coverDir.resolve(".thumbs");
+                    if (!Files.exists(thumbDir)) {
+                        Files.createDirectories(thumbDir);
+                    }
+
+                    // Thư viện Thumbnails cần biết file gốc nằm ở đâu (destFile)
+                    Thumbnails.of(destFile.toFile())
+                            .size(400, 600)
+                            .outputQuality(0.8)
+                            .toFile(thumbDir.resolve(coverName).toFile());
+                } catch (Exception e) {
+                    System.err.println("Cover thumb error: " + e.getMessage());
+                }
+                // -------------------------------------
+
                 manga.setCoverPath("/manga/covers/" + coverName);
             } else if (coverPageId != null && !coverPageId.isEmpty()) {
                 // User chọn 1 trang làm bìa -> Copy trang đó ra folder covers
                 MangaPage page = pageRepository.findById(coverPageId).orElseThrow();
+
+                // 1. Xác định file nguồn (Ảnh trong chapter)
                 Path sourceImg = Paths.get(rootUploadDir, page.getChapter().getFolderPath(), page.getFileName());
 
+                // 2. Chuẩn bị đường dẫn đích (Folder covers)
                 String newCoverName = "cover_" + manga.getId() + "_" + System.currentTimeMillis() + ".jpg";
-                Path destImg = Paths.get(rootUploadDir, "manga", "covers", newCoverName);
+                Path coverDir = Paths.get(rootUploadDir, "manga", "covers");
+                if (!Files.exists(coverDir)) {
+                    Files.createDirectories(coverDir);
+                }
 
+                Path destImg = coverDir.resolve(newCoverName);
+
+                // 3. Copy ảnh gốc sang folder covers
                 Files.copy(sourceImg, destImg, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+                // --- 4. TẠO THUMBNAIL CHO COVER MỚI (Bổ sung phần này) ---
+                try {
+                    Path thumbDir = coverDir.resolve(".thumbs");
+                    if (!Files.exists(thumbDir)) {
+                        Files.createDirectories(thumbDir);
+                    }
+
+                    // Tạo thumb từ file vừa copy sang (destImg)
+                    Thumbnails.of(destImg.toFile())
+                            .size(400, 600) // Kích thước chuẩn cho cover thumb
+                            .outputQuality(0.8)
+                            .toFile(thumbDir.resolve(newCoverName).toFile());
+
+                } catch (Exception e) {
+                    System.err.println("Error creating thumb for selected cover: " + e.getMessage());
+                }
+                // ---------------------------------------------------------
+
+                // 5. Lưu đường dẫn vào DB
                 manga.setCoverPath("/manga/covers/" + newCoverName);
             }
 
@@ -560,7 +773,8 @@ public class MangaController {
 
     @GetMapping("/chapter/{id}/details")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> getChapterDetails(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> getChapterDetails(@PathVariable String id
+    ) {
         try {
             MangaChapter chapter = chapterRepository.findById(id).orElseThrow();
             List<MangaPage> pages = pageRepository.findByChapterIdOrderByPageOrderAsc(id);
@@ -585,7 +799,8 @@ public class MangaController {
     @PostMapping("/chapter/update-info")
     @ResponseBody
     @Transactional
-    public ResponseEntity<String> updateChapterInfo(@RequestParam("id") String id, @RequestParam("name") String name) {
+    public ResponseEntity<String> updateChapterInfo(@RequestParam("id") String id, @RequestParam("name") String name
+    ) {
         try {
             MangaChapter chapter = chapterRepository.findById(id).orElseThrow();
             chapter.setChapterName(name);
@@ -600,7 +815,8 @@ public class MangaController {
     @PostMapping("/chapter/reorder-pages")
     @ResponseBody
     @Transactional
-    public ResponseEntity<String> reorderPages(@RequestBody Map<String, List<String>> payload) {
+    public ResponseEntity<String> reorderPages(@RequestBody Map<String, List<String>> payload
+    ) {
         try {
             List<String> pageIds = payload.get("pageIds");
             for (int i = 0; i < pageIds.size(); i++) {
@@ -621,7 +837,8 @@ public class MangaController {
     @PostMapping("/page/delete")
     @ResponseBody
     @Transactional
-    public ResponseEntity<String> deletePage(@RequestParam("id") String id, @RequestParam(defaultValue = "true") boolean deletePhysical) {
+    public ResponseEntity<String> deletePage(@RequestParam("id") String id, @RequestParam(defaultValue = "true") boolean deletePhysical
+    ) {
         try {
             MangaPage page = pageRepository.findById(id).orElseThrow();
             if (deletePhysical) {
@@ -639,7 +856,8 @@ public class MangaController {
     @PostMapping("/chapter/{id}/add-images")
     @ResponseBody
     @Transactional
-    public ResponseEntity<String> addImagesToChapter(@PathVariable String id, @RequestParam("files") MultipartFile[] files) {
+    public ResponseEntity<String> addImagesToChapter(@PathVariable String id, @RequestParam("files") MultipartFile[] files
+    ) {
         try {
             MangaChapter chapter = chapterRepository.findById(id).orElseThrow();
             MangaSeries manga = chapter.getManga();

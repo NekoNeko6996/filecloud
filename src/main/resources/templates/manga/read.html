@@ -61,15 +61,18 @@
 
         <main id="readerContainer" onclick="toggleInterface()"
               class="flex-1 w-full h-full pt-14 pb-0 outline-none transition-all duration-300
-              flex flex-col items-center overflow-y-auto scroll-smooth custom-scrollbar"> <div th:each="page, iterStat : ${pages}" 
-                                                                                         th:id="'page-' + ${iterStat.index}"
-                                                                                         class="manga-page relative group transition-all duration-300 w-full max-w-3xl"
-                                                                                         th:data-index="${iterStat.index}">
+              flex flex-col items-center overflow-y-auto scroll-smooth custom-scrollbar"> 
+            <div th:each="page, iterStat : ${pages}" 
+                 th:id="'page-' + ${iterStat.index}"
+                 class="manga-page relative group transition-all duration-300 w-full max-w-3xl"
+                 th:data-index="${iterStat.index}">
 
-                <img th:src="@{/manga/image/{id}(id=${page.id})}" 
+                <img th:src="@{/manga/image/{id}/thumb(id=${page.id})}" 
+                     th:data-src="@{/manga/image/{id}(id=${page.id})}"
                      loading="lazy"
-                     class="w-full h-auto block select-none bg-[#121212] mx-auto object-contain"
-                     th:classappend="${iterStat.index > 0} ? 'mt-0' : ''"> </div>
+                     class="lazy-load w-full h-auto block select-none bg-[#121212] mx-auto object-contain transition-all duration-700 filter blur-sm data-[loaded=true]:blur-0"
+                     th:classappend="${iterStat.index > 0} ? 'mt-0' : ''">
+            </div>
 
             <div id="verticalNav" class="w-full max-w-3xl p-10 flex flex-col items-center gap-6 mt-6 pb-24 border-t border-white/10 text-center">
                 <p class="text-gray-400 text-sm">End of Chapter</p>
@@ -153,9 +156,129 @@
             const pages = document.querySelectorAll('.manga-page');
             const verticalNav = document.getElementById('verticalNav');
 
-            // --- INIT ---
+            // --- ADVANCED QUEUE LAZY LOAD (Single Thread + Priority) ---
+
+            let isWorkerBusy = false; // "Khóa" để đảm bảo chỉ tải 1 ảnh tại 1 thời điểm
+            const viewportImages = new Set(); // Set chứa các ảnh đang nằm trong vùng nhìn thấy (Priority Queue)
+
+            // 1. Hàm cốt lõi: Tải 1 ảnh và trả về Promise
+            function loadRealImage(img) {
+                return new Promise((resolve) => {
+                    const fullSrc = img.getAttribute('data-src');
+
+                    // Nếu không có src hoặc đã tải xong từ trước
+                    if (!fullSrc || img.getAttribute('data-loaded') === 'true') {
+                        resolve();
+                        return;
+                    }
+
+                    const tempImg = new Image();
+
+                    tempImg.onload = () => {
+                        img.src = fullSrc;         // Thay thế ảnh nét
+                        img.classList.remove('blur-sm'); // Xóa hiệu ứng mờ
+
+                        // Đánh dấu hoàn tất
+                        img.setAttribute('data-loaded', 'true');
+                        img.removeAttribute('data-src');
+                        img.removeAttribute('data-loading');
+
+                        // Xóa khỏi danh sách ưu tiên (vì đã xong)
+                        viewportImages.delete(img);
+                        resolve();
+                    };
+
+                    tempImg.onerror = () => {
+                        console.warn("Load failed:", fullSrc);
+                        // Nếu lỗi, bỏ đánh dấu loading để hệ thống không bị kẹt, 
+                        // nhưng vẫn giữ trong DOM để có thể thử lại sau (hoặc bỏ qua)
+                        img.removeAttribute('data-loading');
+                        viewportImages.delete(img); // Xóa khỏi ưu tiên để không chặn hàng đợi
+                        resolve();
+                    };
+
+                    // Bắt đầu tải
+                    tempImg.src = fullSrc;
+                });
+            }
+
+            // 2. Bộ điều phối (Scheduler): Quyết định tải ảnh nào tiếp theo
+            async function processQueue() {
+                // A. Kiểm tra trạng thái "Công nhân"
+                // Nếu đang bận tải 1 ảnh khác -> DỪNG LẠI NGAY (Nguyên tắc 1 luồng)
+                if (isWorkerBusy)
+                    return;
+
+                // B. Tìm ứng viên (Candidate) để tải
+                let candidate = null;
+
+                // ƯU TIÊN 1: Kiểm tra trong Viewport trước
+                // Duyệt qua Set để tìm ảnh nào chưa được đánh dấu đang tải ('data-loading')
+                for (const img of viewportImages) {
+                    if (!img.hasAttribute('data-loading') && !img.hasAttribute('data-loaded')) {
+                        candidate = img;
+                        break; // Tìm thấy 1 ảnh ưu tiên -> Chốt ngay
+                    }
+                }
+
+                // ƯU TIÊN 2: Nếu Viewport trống/đã xong hết -> Tìm ảnh nền (Background)
+                // (Đây chính là logic "Resume" tải ảnh còn lại)
+                if (!candidate) {
+                    // Query selector tìm ảnh đầu tiên trong trang chưa tải
+                    candidate = document.querySelector('img.lazy-load[data-src]:not([data-loaded]):not([data-loading])');
+                }
+
+                // C. Nếu không tìm thấy ảnh nào cần tải -> Nghỉ ngơi
+                if (!candidate)
+                    return;
+
+                // D. Bắt đầu tải
+                isWorkerBusy = true; // Khóa luồng
+                candidate.setAttribute('data-loading', 'true'); // Đánh dấu đang xử lý
+
+                try {
+                    await loadRealImage(candidate); // Đợi tải xong (hoặc lỗi) mới đi tiếp
+                } finally {
+                    isWorkerBusy = false; // Mở khóa
+                    // E. Đệ quy: Gọi lại chính nó để tìm việc tiếp theo ngay lập tức
+                    processQueue();
+                }
+            }
+
+            // 3. Observer: Chỉ nhiệm vụ cập nhật danh sách Viewport
             document.addEventListener('DOMContentLoaded', () => {
-                applyViewMode(currentMode);
+                const lazyImages = document.querySelectorAll('img.lazy-load');
+                const scrollContainer = document.getElementById('readerContainer');
+
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        const img = entry.target;
+
+                        if (entry.isIntersecting) {
+                            // ẢNH VÀO KHUNG HÌNH:
+                            // 1. Thêm vào danh sách ưu tiên
+                            if (!img.hasAttribute('data-loaded')) {
+                                viewportImages.add(img);
+                                // 2. Kích hoạt bộ điều phối ngay lập tức
+                                processQueue();
+                            }
+                        } else {
+                            // ẢNH RA KHỎI KHUNG HÌNH:
+                            // Xóa khỏi danh sách ưu tiên.
+                            // (Nếu ảnh này chưa kịp tải, nó sẽ bị đẩy xuống độ ưu tiên thấp - Background)
+                            viewportImages.delete(img);
+                        }
+                    });
+                }, {
+                    root: scrollContainer,
+                    rootMargin: "50px 0px", // Margin nhỏ để xác định chính xác ảnh đang xem
+                    threshold: 0.01
+                });
+
+                lazyImages.forEach(img => observer.observe(img));
+
+                // Kích hoạt lần đầu (để bắt đầu tải background nếu viewport trống)
+                setTimeout(processQueue, 500);
             });
 
             // --- VIEW MODES ---

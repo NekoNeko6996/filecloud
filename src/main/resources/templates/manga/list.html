@@ -4,54 +4,100 @@
     <body>
 
         <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
-            <header class="glass-header h-16 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10 sticky top-0 gap-2 sm:gap-4">
-                <div class="flex items-center gap-2 sm:gap-4">
-                    <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white transition-colors p-1">
-                        <span class="material-symbols-outlined text-2xl">menu</span>
-                    </button>
-                    <h2 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                        <span class="material-symbols-outlined text-yellow-500">menu_book</span> Manga Library
-                    </h2>
-                </div>
-                
-                <a th:href="@{/manga/create}" class="bg-primary hover:bg-primary-dark text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg shadow-primary/20">
-                    <span class="material-symbols-outlined text-[18px]">add</span> 
-                    <span class="hidden sm:inline">Add Manga</span>
-                </a>
-            </header>
 
-            <div class="flex-1 overflow-y-auto p-4 sm:p-8 scroll-smooth custom-scrollbar">
-                
+            <div class="glass-header shrink-0 z-20 sticky top-0 flex flex-col bg-background-dark backdrop-blur-md border-b border-white/10">
+
+                <div class="h-16 flex items-center justify-between px-4 sm:px-6">
+                    <div class="flex items-center gap-2 sm:gap-4">
+                        <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white transition-colors p-1">
+                            <span class="material-symbols-outlined text-2xl">menu</span>
+                        </button>
+                        <h2 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2">Manga Library</h2>
+                    </div>
+
+                    <a th:href="@{/manga/create}" class="bg-primary hover:bg-primary-dark text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg shadow-primary/20">
+                        <span class="material-symbols-outlined text-[18px]">add</span> 
+                        <span class="hidden sm:inline">Add Manga</span>
+                    </a>
+                </div>
+
+                <form action="/manga" method="GET" class="px-4 sm:px-6 pb-4 flex flex-wrap gap-3 items-center">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[20px]">search</span>
+                        <input type="text" name="keyword" th:value="${keyword}" placeholder="Search title, author..." 
+                               class="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:border-primary focus:ring-0 outline-none transition-colors">
+                    </div>
+
+                    <select name="tagId" onchange="this.form.submit()" class="bg-[#1e1e1e] border border-white/10 text-white text-sm rounded-lg px-3 py-2 focus:border-primary outline-none cursor-pointer">
+                        <option value="">All Tags</option>
+                        <option th:each="t : ${tags}" th:value="${t.id}" th:text="${t.name}" th:selected="${t.id == selectedTagId}">Action</option>
+                    </select>
+
+                    <select name="sort" onchange="this.form.submit()" class="bg-[#1e1e1e] border border-white/10 text-white text-sm rounded-lg px-3 py-2 focus:border-primary outline-none cursor-pointer">
+                        <option value="latest" th:selected="${selectedSort == 'latest'}">Latest Update</option>
+                        <option value="oldest" th:selected="${selectedSort == 'oldest'}">Oldest</option>
+                        <option value="name_asc" th:selected="${selectedSort == 'name_asc'}">Name (A-Z)</option>
+                        <option value="chapters_desc" th:selected="${selectedSort == 'chapters_desc'}">Most Chapters</option>
+                    </select>
+                </form>
+            </div>
+
+            <div id="mangaGridContainer" class="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth custom-scrollbar">
+
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
                     <a th:each="m : ${mangas}" 
                        th:href="@{/manga/{id}(id=${m.id})}"
-                       class="group relative aspect-[2/3] rounded-xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20 bg-[#1e1e1e]">
+                       class="relative group flex flex-col bg-[#1e1e1e] rounded-xl overflow-hidden border border-white/5 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/10 h-full">
 
-                        <img th:if="${m.coverPath != null}" 
-                             th:src="${m.coverPath}" 
-                             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                             onerror="this.src='https://placehold.co/400x600/1e1e1e/FFF?text=No+Cover'">
-                        
-                        <div th:unless="${m.coverPath != null}" class="w-full h-full bg-gradient-to-br from-gray-800 to-black flex items-center justify-center">
-                            <span class="text-4xl font-bold text-white/10">M</span>
-                        </div>
-
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-3 opacity-100 transition-opacity">
-                            
-                            <div class="absolute top-2 right-2">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide text-white border border-white/10 shadow-sm backdrop-blur-md"
-                                      th:classappend="${m.status.name() == 'ONGOING' ? 'bg-green-500/80' : (m.status.name() == 'COMPLETED' ? 'bg-blue-500/80' : 'bg-gray-500/80')}"
-                                      th:text="${m.status}">ONGOING</span>
+                        <div class="aspect-[2/3] relative overflow-hidden bg-gray-800">
+                            <div class="absolute inset-0 flex items-center justify-center text-white/10">
+                                <span class="material-symbols-outlined text-4xl animate-pulse">image</span>
                             </div>
 
-                            <h3 class="text-white font-bold text-sm sm:text-base leading-tight line-clamp-2 mb-1 group-hover:text-primary transition-colors" 
-                                th:text="${m.title}">Manga Title</h3>
-                            
-                            <div class="flex items-center justify-between text-[10px] text-gray-400">
+                            <img th:if="${m.coverPath != null}" 
+                                 th:data-src="@{/manga/cover/{id}/thumb(id=${m.id})}" 
+                                 class="lazy-load w-full h-full object-cover transition-all duration-700 opacity-0 group-hover:scale-105"
+                                 alt="Cover">
+
+                            <div th:unless="${m.coverPath != null}" class="absolute inset-0 bg-gradient-to-br from-gray-700 to-black flex items-center justify-center">
+                                <span class="text-4xl font-bold text-white/20">M</span>
+                            </div>
+
+                            <div class="absolute top-2 right-2">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide text-white border border-white/10 shadow-sm backdrop-blur-md"
+                                      th:classappend="${m.status.name() == 'ONGOING' ? 'bg-green-600/90' : (m.status.name() == 'COMPLETED' ? 'bg-blue-600/90' : 'bg-gray-600/90')}"
+                                      th:text="${m.status}">ONGOING</span>
+                            </div>
+                        </div>
+
+                        <div class="absolute bottom-0 left-0 w-full p-3 pt-12 flex flex-col gap-1.5 flex-1 bg-gradient-to-t from-black via-black/70 to-transparent">
+                            <div class="flex flex-wrap gap-1 mb-1 h-5 overflow-hidden">
+                                <span th:each="t, stat : ${m.tags}" 
+                                      th:if="${stat.index < 3}"
+                                      class="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-gray-200 border border-white/10 backdrop-blur-sm shadow-sm"
+                                      th:text="${t.name}">Action</span>
+                            </div>
+
+                            <h3 class="text-white font-bold text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors drop-shadow-md" 
+                                th:text="${m.title}" th:title="${m.title}">Manga Title</h3>
+
+                            <div class="text-[11px] text-gray-300 truncate drop-shadow-sm">
                                 <span th:if="${not #lists.isEmpty(m.authors)}" th:text="${m.authors[0].name}">Author</span>
                                 <span th:unless="${not #lists.isEmpty(m.authors)}">Unknown</span>
-                                
-                                <span th:text="${m.releaseYear}">2023</span>
+                                • <span th:text="${m.releaseYear}">2023</span>
+                            </div>
+
+                            <div class="h-px bg-white/20 my-1 shadow-sm"></div>
+
+                            <div class="flex items-center justify-between text-[11px] font-mono text-gray-300 mt-auto drop-shadow-sm">
+                                <div class="flex items-center gap-1 text-primary font-bold">
+                                    <span th:text="${m.chapters != null ? m.chapters.size() : 0}">20</span> Chapter
+                                </div>
+
+                                <div class="flex items-center gap-1" th:title="${#temporals.format(m.updatedAt != null ? m.updatedAt : m.createdAt, 'dd/MM/yyyy HH:mm')}">
+                                    <span class="material-symbols-outlined text-[14px]">schedule</span>
+                                    <span th:text="${#temporals.format(m.updatedAt != null ? m.updatedAt : m.createdAt, 'dd/MM/yyyy')}">12/10/2025</span>
+                                </div>
                             </div>
                         </div>
                     </a>
@@ -59,17 +105,47 @@
 
                 <div th:if="${mangas.isEmpty()}" class="flex flex-col items-center justify-center h-96 text-gray-500">
                     <div class="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                        <span class="material-symbols-outlined text-4xl opacity-50">auto_stories</span>
+                        <span class="material-symbols-outlined text-4xl opacity-50">search_off</span>
                     </div>
-                    <p class="text-lg font-medium text-gray-400">No manga added yet</p>
-                    <a th:href="@{/manga/create}" class="mt-4 text-primary text-sm hover:underline">Add your first manga</a>
+                    <p class="text-lg font-medium text-gray-400">No manga found</p>
+                    <a th:href="@{/manga}" th:if="${keyword != null or selectedTagId != null}" class="mt-4 text-primary text-sm hover:underline">Clear filters</a>
+                    <a th:href="@{/manga/create}" th:unless="${keyword != null or selectedTagId != null}" class="mt-4 text-primary text-sm hover:underline">Add your first manga</a>
                 </div>
             </div>
 
         </section>
 
         <script>
-            // Các script bổ sung nếu cần
+            document.addEventListener("DOMContentLoaded", () => {
+                const lazyImages = document.querySelectorAll('img.lazy-load');
+
+                // IntersectionObserver để load ảnh khi cuộn tới
+                const imageObserver = new IntersectionObserver((entries, observer) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            const src = img.getAttribute('data-src');
+
+                            if (src) {
+                                const temp = new Image();
+                                temp.onload = () => {
+                                    img.src = src;
+                                    img.classList.remove('opacity-0'); // Fade-in effect
+                                    img.removeAttribute('data-src');
+                                };
+                                temp.src = src;
+                            }
+                            observer.unobserve(img);
+                        }
+                    });
+                }, {
+                    root: document.getElementById('mangaGridContainer'), // Quan trọng: trỏ vào container scroll
+                    rootMargin: "100px 0px", // Load trước 100px
+                    threshold: 0.01
+                });
+
+                lazyImages.forEach(img => imageObserver.observe(img));
+            });
         </script>
     </body>
 </html>
