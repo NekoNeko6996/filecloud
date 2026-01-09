@@ -3,6 +3,7 @@ package com.app.filecloud.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -39,6 +40,14 @@ public class MangaSeries {
     )
     private Set<MangaAuthor> authors;
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "manga_tags",
+        joinColumns = @JoinColumn(name = "manga_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private Set<Tag> tags = new HashSet<>();
+    
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

@@ -2,171 +2,742 @@
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{fragments/layout :: layout('Manga Detail', 'manga', ~{::section}, ~{::script})}">
     <body>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
         <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
 
-            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0 gap-4">
-                <div class="flex items-center gap-4">
+            <header class="glass-header h-16 flex items-center justify-between px-4 md:px-6 shrink-0 z-10 sticky top-0 gap-4">
+                <div class="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
+                    <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white transition-colors p-1">
+                        <span class="material-symbols-outlined text-2xl">menu</span>
+                    </button>
                     <a th:href="@{/manga}" class="text-gray-400 hover:text-white transition-colors">
                         <span class="material-symbols-outlined">arrow_back</span>
                     </a>
                     <h2 class="text-lg font-bold text-white truncate" th:text="${manga.title}">Manga Title</h2>
                 </div>
 
-                <button onclick="document.getElementById('deleteModal').showModal()" 
-                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 transition-all text-sm font-bold">
-                    <span class="material-symbols-outlined text-[18px]">delete</span>
-                    <span class="hidden sm:inline">Delete Series</span>
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="openEditModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white border border-white/10 transition-all text-sm font-bold">
+                        <span class="material-symbols-outlined text-[18px]">edit</span> <span class="hidden sm:inline">Edit</span>
+                    </button>
+                    <button onclick="document.getElementById('deleteModal').showModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 transition-all text-sm font-bold">
+                        <span class="material-symbols-outlined text-[18px]">delete</span> <span class="hidden sm:inline">Delete</span>
+                    </button>
+                </div>
             </header>
 
-            <div class="flex-1 overflow-y-auto p-8 scroll-smooth custom-scrollbar">
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth custom-scrollbar" onclick="hideChapterContextMenu()">
                 <div class="max-w-5xl mx-auto">
 
-                    <div class="flex flex-col md:flex-row gap-8 mb-10">
-                        <div class="w-full md:w-64 shrink-0">
-                            <div class="aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border border-white/10">
-                                <img th:if="${manga.coverPath != null}" 
-                                     th:src="${manga.coverPath}" 
-                                     class="w-full h-full object-cover">
+                    <div class="flex flex-col md:flex-row gap-6 md:gap-8 mb-8 md:mb-10">
+                        <div class="w-full md:w-64 shrink-0 mx-auto md:mx-0 max-w-[200px] md:max-w-none">
+                            <div class="aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group">
+                                <img th:if="${manga.coverPath != null}" th:src="${manga.coverPath}" class="w-full h-full object-cover">
                                 <div th:unless="${manga.coverPath != null}" class="w-full h-full bg-gray-800 flex items-center justify-center text-white/20 text-6xl font-bold">M</div>
                             </div>
                         </div>
 
                         <div class="flex-1 flex flex-col gap-4">
-                            <h1 class="text-3xl md:text-4xl font-bold text-white leading-tight" th:text="${manga.title}">Title</h1>
-
-                            <div class="flex flex-wrap gap-2 text-sm">
+                            <h1 class="text-2xl md:text-4xl font-bold text-white leading-tight text-center md:text-left" th:text="${manga.title}">Title</h1>
+                            <div class="flex flex-wrap gap-2 text-sm justify-center md:justify-start">
                                 <span class="px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/20 font-bold" th:text="${manga.status}">ONGOING</span>
                                 <span class="px-3 py-1 rounded-full bg-white/5 text-gray-300 border border-white/10" th:text="${manga.releaseYear}">2023</span>
-                                <span class="px-3 py-1 rounded-full bg-white/5 text-gray-300 border border-white/10" 
-                                      th:if="${not #lists.isEmpty(manga.authors)}" 
-                                      th:text="${manga.authors[0].name}">Author</span>
+                                <span class="px-3 py-1 rounded-full bg-white/5 text-gray-300 border border-white/10" th:if="${not #lists.isEmpty(manga.authors)}" th:text="${manga.authors[0].name}">Author</span>
                             </div>
 
-                            <p class="text-gray-400 leading-relaxed text-sm md:text-base whitespace-pre-line" th:text="${manga.description}">No description.</p>
-
-                            <div class="mt-auto pt-4">
-                                <div class="text-xs text-gray-500 font-mono">ID: <span th:text="${manga.id}">UUID</span></div>
+                            <div class="flex flex-wrap gap-1.5 mt-2 justify-center md:justify-start">
+                                <span th:each="tag : ${manga.tags}" 
+                                      class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#333] text-gray-300 border border-white/10"
+                                      th:text="${tag.name}">
+                                    ACTION
+                                </span>
                             </div>
+                            <p class="text-gray-400 leading-relaxed text-sm md:text-base whitespace-pre-line text-justify md:text-left" th:text="${manga.description}">Desc</p>
                         </div>
                     </div>
 
                     <div class="flex items-center justify-between mb-4 border-b border-white/10 pb-2">
-                        <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        <h3 class="text-lg md:text-xl font-bold text-white flex items-center gap-2">
                             <span class="material-symbols-outlined">list</span> Chapters
                             <span class="text-sm text-gray-500 font-normal ml-2" th:text="'(' + ${chapters.size()} + ')'"></span>
                         </h3>
+                        <button onclick="document.getElementById('addChapterModal').showModal()" class="flex items-center gap-2 px-3 py-1.5 rounded bg-primary hover:bg-primary-dark text-white text-sm font-bold shadow-lg shadow-primary/20 transition-colors">
+                            <span class="material-symbols-outlined text-[18px]">add</span> <span class="hidden sm:inline">Add Chapter</span>
+                        </button>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <a th:each="chap : ${chapters}" 
-                           th:href="@{/manga/read/{id}(id=${chap.id})}"
-                           class="flex items-center justify-between p-4 rounded-lg bg-[#2e2839] border border-white/5 hover:bg-[#362f42] hover:border-primary/50 transition-all group cursor-pointer">
-                            <div class="flex items-center gap-3">
-                                <span class="material-symbols-outlined text-gray-500 group-hover:text-primary">folder_open</span>
-                                <span class="text-white font-medium group-hover:text-primary transition-colors" th:text="${chap.chapterName}">Chap 1</span>
-                            </div>
-                            <span class="text-xs text-gray-500 font-mono" th:text="${#temporals.format(chap.createdAt, 'dd/MM/yyyy')}">Date</span>
-                        </a>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 relative"> 
+                        <div th:each="chap : ${chapters}" 
+                             class="relative group bg-[#2e2839] rounded-lg border border-white/5 hover:bg-[#362f42] hover:border-primary/50 transition-all">
 
-                        <div th:if="${chapters.isEmpty()}" class="col-span-full py-8 text-center text-gray-500 italic">
-                            No chapters uploaded yet.
+                            <a th:href="@{/manga/read/{id}(id=${chap.id})}"
+                               th:data-id="${chap.id}"
+                               th:data-preview-id="${previewMap.get(chap.id)}"
+                               onmouseenter="showPreview(this)"
+                               onmousemove="movePreview(event)"
+                               onmouseleave="hidePreview()"
+                               oncontextmenu="handleRightClick(event, this.parentElement.querySelector('.btn-more-options'))"
+                               class="flex items-center justify-between p-4 pr-12 rounded-lg cursor-pointer h-full">
+
+                                <div class="flex items-center gap-3 overflow-hidden">
+                                    <span class="material-symbols-outlined text-gray-500 group-hover:text-primary shrink-0">folder_open</span>
+                                    <span class="text-white font-medium group-hover:text-primary transition-colors truncate" th:text="${chap.chapterName}">Chap 1</span>
+                                </div>
+                                <span class="text-xs text-gray-500 font-mono shrink-0 ml-2" th:text="${#temporals.format(chap.createdAt, 'dd/MM/yyyy')}">Date</span>
+                            </a>
+
+                            <button class="btn-more-options absolute right-1 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors z-10"
+                                    th:data-id="${chap.id}"
+                                    th:data-name="${chap.chapterName}"
+                                    onclick="showChapterContextMenu(event, this)">
+                                <span class="material-symbols-outlined">more_vert</span>
+                            </button>
                         </div>
                     </div>
 
+                    <div id="chapterPreviewPopup" class="fixed z-[100] hidden pointer-events-none rounded-lg overflow-hidden shadow-[0_0_15px_rgba(0,0,0,0.8)] border border-white/20 bg-[#1e1e1e] w-48 aspect-[2/3]">
+                        <img id="previewImage" src="" class="w-full h-full object-cover">
+                        <div id="previewLoading" class="absolute inset-0 flex items-center justify-center bg-[#1e1e1e] text-gray-500 text-xs">
+                            Loading...
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <dialog id="deleteModal" class="bg-[#1e1e1e] text-white p-0 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-md m-4">
-                <div class="p-6">
-                    <div class="flex items-center gap-4 mb-4 text-red-500">
-                        <span class="material-symbols-outlined text-4xl">warning</span>
-                        <h3 class="text-xl font-bold text-white">Delete Manga?</h3>
-                    </div>
-
-                    <p class="text-gray-300 mb-4 text-sm">
-                        You are about to delete <strong class="text-white" th:text="${manga.title}">...</strong>.
-                        This action cannot be undone.
-                    </p>
-
-                    <div class="bg-[#2e2839] p-4 rounded-lg border border-white/5 mb-6 text-sm space-y-2">
-                        <div class="flex justify-between">
-                            <span class="text-gray-400">Chapters:</span>
-                            <span class="font-bold text-white" th:text="${chapters.size()}">0</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-400">Database Record:</span>
-                            <span class="text-red-400 font-bold">Will be removed</span>
-                        </div>
-                    </div>
-
-                    <div class="mb-6">
-                        <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-white/10 hover:bg-white/5 transition-colors has-[:checked]:border-red-500/50 has-[:checked]:bg-red-500/10">
-                            <input type="checkbox" id="checkDeletePhysical" class="mt-1 rounded bg-gray-700 border-gray-600 text-red-600 focus:ring-red-600">
-                            <div>
-                                <span class="font-bold text-white block text-sm">Delete physical files from Disk</span>
-                                <span class="text-xs text-gray-500 block mt-1">
-                                    If checked, all images and covers in <b>uploads/manga/...</b> will be PERMANENTLY deleted.
-                                </span>
-                            </div>
-                        </label>
-                    </div>
-
+            <dialog id="deleteModal" class="bg-[#1e1e1e] text-white p-0 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-[90%] max-w-md m-auto">
+                <div class="flex items-center gap-4 mb-4 text-red-500 p-6 pb-0">
+                    <span class="material-symbols-outlined text-4xl">warning</span>
+                    <h3 class="text-xl font-bold text-white">Delete Manga?</h3>
+                </div>
+                <div class="p-6 pt-0">
+                    <p class="text-gray-300 mb-6 text-sm">Entire manga and all chapters will be removed.</p>
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-white/10 hover:bg-white/5 mb-6">
+                        <input type="checkbox" id="checkDeletePhysical" class="mt-1 rounded bg-gray-700 border-gray-600 text-red-600">
+                        <span class="text-sm font-bold text-white">Delete files from Disk</span>
+                    </label>
                     <div class="flex justify-end gap-3">
-                        <button onclick="document.getElementById('deleteModal').close()" class="px-4 py-2 text-gray-400 hover:text-white font-medium text-sm">Cancel</button>
-                        <button onclick="confirmDelete()" id="btnConfirmDelete" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-colors flex items-center gap-2 text-sm">
-                            <span class="material-symbols-outlined text-sm">delete</span> Confirm Delete
-                        </button>
+                        <button onclick="this.closest('dialog').close()" class="px-4 py-2 text-gray-400 hover:text-white text-sm">Cancel</button>
+                        <button onclick="confirmDeleteManga()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-bold text-sm">Delete</button>
                     </div>
                 </div>
             </dialog>
+
+            <dialog id="editChapterModal" class="bg-transparent p-0 rounded-xl shadow-2xl backdrop:bg-black/80 w-[95%] max-w-4xl m-auto h-[90vh]">
+                <div class="flex flex-col bg-[#1e1e1e] text-white border border-gray-700 rounded-xl overflow-hidden h-full">
+
+                    <div class="p-4 border-b border-white/10 bg-[#2e2839] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-bold text-lg whitespace-nowrap">Edit Chap</h3>
+                                <div class="h-6 w-px bg-white/20 mx-2 hidden sm:block"></div>
+                            </div>
+                            
+                            <button onclick="this.closest('dialog').close()" class="text-gray-400 hover:text-white sm:hidden p-1">
+                                <span class="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-2 w-full sm:w-auto flex-1 sm:justify-end">
+                            <input type="text" id="editChapName" class="bg-black/30 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:border-primary outline-none w-full sm:w-64 transition-all">
+                            
+                            <button onclick="saveChapterName()" class="text-primary hover:text-white text-xs font-bold px-3 py-1.5 rounded border border-primary/30 hover:bg-primary/20 whitespace-nowrap transition-colors">
+                                SAVE
+                            </button>
+                            
+                            <button onclick="this.closest('dialog').close()" class="text-gray-400 hover:text-white hidden sm:block ml-3">
+                                <span class="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-black/20 border-b border-white/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                        <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                            <label class="cursor-pointer bg-primary hover:bg-primary-dark text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-colors">
+                                <span class="material-symbols-outlined text-[16px]">add_photo_alternate</span> <span class="hidden sm:inline">Add Pages</span><span class="sm:hidden">Add</span>
+                                <input type="file" multiple accept="image/*" class="hidden" onchange="uploadMorePages(this)">
+                            </label>
+
+                            <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <input type="checkbox" id="globalDeletePhysical" checked class="rounded bg-gray-700 border-gray-600 text-red-600 focus:ring-0 w-4 h-4">
+                                <span class="text-xs text-gray-300">Del Files</span>
+                            </label>
+
+                            <div class="h-4 w-px bg-white/10 mx-1"></div> 
+
+                            <label class="flex items-center gap-2 cursor-pointer select-none bg-white/5 px-2 py-1 rounded border border-white/5 hover:bg-white/10 transition-colors">
+                                <input type="checkbox" id="toggleGridAspect" onchange="toggleGridMode(this)" class="rounded bg-gray-700 border-gray-600 text-primary focus:ring-0 w-4 h-4" checked="true">
+                                <span class="text-xs text-gray-300 font-bold">Square</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="pageSortableGrid" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-5 custom-scrollbar bg-[#121212]">
+                    </div>
+
+                </div>
+            </dialog>
+
+            <dialog id="addChapterModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-[90%] max-w-md m-auto">
+                <form onsubmit="submitAddChapter(event)" class="flex flex-col gap-4">
+                    <h3 class="font-bold text-lg text-white mb-2">Upload New Chapter</h3>
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Chapter Name</label>
+                        <input type="text" name="name" required placeholder="e.g. Chapter 10" class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">ZIP File</label>
+                        <div class="border-2 border-dashed border-white/20 rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer relative bg-white/5">
+                            <input type="file" name="file" accept=".zip" required class="absolute inset-0 opacity-0 cursor-pointer" onchange="this.nextElementSibling.innerText = this.files[0].name">
+                            <span class="text-sm text-gray-400 pointer-events-none truncate px-2">Click to select ZIP file</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3 mt-2">
+                        <button type="button" onclick="this.closest('dialog').close()" class="px-4 py-2 text-gray-400 hover:text-white text-sm">Cancel</button>
+                        <button type="submit" id="btnAddChapter" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded font-bold text-sm flex items-center gap-2">
+                            <span class="material-symbols-outlined text-sm">upload</span> Upload
+                        </button>
+                    </div>
+                </form>
+            </dialog>
+
+            <dialog id="editMangaModal" class="bg-transparent p-0 rounded-xl shadow-2xl backdrop:bg-black/80 w-[95%] max-w-2xl m-auto">
+                <div class="flex flex-col bg-[#1e1e1e] text-white border border-gray-700 rounded-xl overflow-hidden max-h-[90vh]">
+                    <div class="p-4 border-b border-white/10 bg-[#2e2839] flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-lg">Edit Manga Info</h3>
+                        <button onclick="this.closest('dialog').close()" class="text-gray-400 hover:text-white"><span class="material-symbols-outlined">close</span></button>
+                    </div>
+                    <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
+                        <form id="editMangaForm" class="flex flex-col gap-5">
+                            <input type="hidden" name="id" th:value="${manga.id}">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4"> <div>
+                                    <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Title</label>
+                                    <input type="text" name="title" id="editTitle" class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Status</label>
+                                    <select name="status" id="editStatus" class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none">
+                                        <option value="ONGOING">ONGOING</option>
+                                        <option value="COMPLETED">COMPLETED</option>
+                                        <option value="HIATUS">HIATUS</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Description</label>
+                                <textarea name="description" id="editDesc" rows="3" class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none"></textarea>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-2 block uppercase font-bold">Tags</label>
+                                <div class="border border-white/10 rounded-lg p-3 bg-black/20 max-h-32 overflow-y-auto flex flex-wrap gap-2 custom-scrollbar" id="tagEditContainer">
+                                    <span class="text-gray-500 text-xs">Loading tags...</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-2 block uppercase font-bold">Update Cover</label>
+                                <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-2">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="coverOption" value="file" checked onchange="toggleCoverOption('file')" class="text-primary focus:ring-0 bg-gray-700 border-gray-600">
+                                        <span class="text-sm">Upload File</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="coverOption" value="select" onchange="toggleCoverOption('select')" class="text-primary focus:ring-0 bg-gray-700 border-gray-600">
+                                        <span class="text-sm">Select from Chapter</span>
+                                    </label>
+                                </div>
+                                <div id="coverUploadBox">
+                                    <input type="file" name="coverFile" accept="image/*" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/20 file:text-primary hover:file:bg-primary/30">
+                                </div>
+                                <div id="coverSelectBox" class="hidden h-40 overflow-y-auto border border-white/10 rounded bg-black/30 p-2 grid grid-cols-3 sm:grid-cols-4 gap-2 custom-scrollbar">
+                                    <p class="text-gray-500 text-xs col-span-4 text-center py-4">Loading chapter images...</p>
+                                </div>
+                                <input type="hidden" name="coverPageId" id="selectedCoverPageId">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="p-4 border-t border-white/10 bg-[#1e1e1e] flex justify-end gap-3 shrink-0">
+                        <button onclick="this.closest('dialog').close()" class="px-4 py-2 text-gray-400 hover:text-white text-sm">Cancel</button>
+                        <button onclick="submitEditManga()" id="btnSaveManga" class="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded font-bold text-sm">Save Changes</button>
+                    </div>
+                </div>
+            </dialog>
+
+            <dialog id="deleteChapterModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-[90%] max-w-sm m-auto">
+                <h3 class="font-bold text-lg text-white mb-2">Delete Chapter?</h3>
+                <p class="text-gray-400 text-sm mb-4">Are you sure you want to delete <strong id="delChapName" class="text-white"></strong>?</p>
+                <label class="flex items-start gap-3 p-3 rounded bg-white/5 mb-6 cursor-pointer">
+                    <input type="checkbox" id="checkDelChapPhysical" checked class="mt-1 rounded bg-gray-700 border-gray-600 text-red-600">
+                    <span class="text-sm text-gray-300">Also delete files from Disk</span>
+                </label>
+                <div class="flex justify-end gap-3">
+                    <button onclick="this.closest('dialog').close()" class="px-4 py-2 text-gray-400 hover:text-white text-sm">Cancel</button>
+                    <button onclick="confirmDeleteChapter()" id="btnConfirmDelChap" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-bold text-sm">Delete</button>
+                </div>
+            </dialog>
+
+            <div id="chapterContextMenu" class="hidden fixed z-[60] w-48 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl overflow-hidden p-1">
+                <button onclick="openEditChapterModal()" class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white flex items-center gap-2 transition-colors rounded mb-1">
+                    <span class="material-symbols-outlined text-[16px]">edit_note</span> Edit Chapter
+                </button>
+                <div class="h-px bg-white/10 my-1"></div>
+                <button onclick="openDeleteChapterModal()" class="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-white/10 hover:text-red-300 flex items-center gap-2 transition-colors rounded">
+                    <span class="material-symbols-outlined text-[16px]">delete</span> Delete Chapter
+                </button>
+            </div>
         </section>
 
         <script th:inline="javascript">
-            async function confirmDelete() {
-                // Lấy ID từ Thymeleaf variable
-                const mangaId = /*[[${manga.id}]]*/ '';
+            const mangaId = /*[[${manga.id}]]*/ '';
+            const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+            // --- 1. MANGA DELETE ---
+            async function confirmDeleteManga() {
                 const deletePhysical = document.getElementById('checkDeletePhysical').checked;
+                if (deletePhysical && !confirm("Warning: Files will be lost permanently!"))
+                    return;
 
-                if (deletePhysical) {
-                    if (!confirm("ARE YOU SURE? All files on disk will be wiped out!"))
-                        return;
-                }
+                const formData = new FormData();
+                formData.append('id', mangaId);
+                formData.append('deletePhysical', deletePhysical);
 
-                const btn = document.getElementById('btnConfirmDelete');
-                btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Deleting...';
+                await fetch('/manga/delete', {method: 'POST', headers: {[csrfHeader]: csrfToken}, body: formData});
+                window.location.href = "/manga";
+            }
+
+            // --- 2. ADD CHAPTER ---
+            async function submitAddChapter(e) {
+                e.preventDefault();
+                const btn = document.getElementById('btnAddChapter');
+                const form = e.target;
+                const formData = new FormData(form);
+
                 btn.disabled = true;
+                btn.innerHTML = 'Uploading...';
+
+                try {
+                    const res = await fetch(`/manga/${mangaId}/chapter/add`, {
+                        method: 'POST',
+                        headers: {[csrfHeader]: csrfToken},
+                        body: formData
+                    });
+                    if (res.ok)
+                        window.location.reload();
+                    else
+                        alert("Error: " + await res.text());
+                } catch (err) {
+                    alert("Network Error");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Upload';
+                }
+            }
+
+            // --- 3. CHAPTER CONTEXT MENU & DELETE ---
+            let selectedChapId = null;
+            let selectedChapName = null;
+            const chapMenu = document.getElementById('chapterContextMenu');
+
+            function showChapterContextMenu(e, el) {
+                e.preventDefault();
+                e.stopPropagation();
+                selectedChapId = el.getAttribute('data-id');
+                selectedChapName = el.getAttribute('data-name');
+
+                chapMenu.style.left = `${e.clientX}px`;
+                chapMenu.style.top = `${e.clientY}px`;
+                chapMenu.classList.remove('hidden');
+            }
+
+            function hideChapterContextMenu() {
+                chapMenu.classList.add('hidden');
+            }
+
+            function openDeleteChapterModal() {
+                hideChapterContextMenu();
+                document.getElementById('delChapName').innerText = selectedChapName;
+                document.getElementById('deleteChapterModal').showModal();
+            }
+
+            async function confirmDeleteChapter() {
+                const delPhysical = document.getElementById('checkDelChapPhysical').checked;
+                const btn = document.getElementById('btnConfirmDelChap');
+                btn.disabled = true;
+
+                const formData = new FormData();
+                formData.append('id', selectedChapId);
+                formData.append('deletePhysical', delPhysical);
+
+                const res = await fetch('/manga/chapter/delete', {method: 'POST', headers: {[csrfHeader]: csrfToken}, body: formData});
+                if (res.ok)
+                    window.location.reload();
+                else {
+                    alert("Failed");
+                    btn.disabled = false;
+                }
+            }
+
+            // --- 4. EDIT MANGA & TAGS & COVER ---
+            function toggleCoverOption(val) {
+                if (val === 'file') {
+                    document.getElementById('coverUploadBox').classList.remove('hidden');
+                    document.getElementById('coverSelectBox').classList.add('hidden');
+                } else {
+                    document.getElementById('coverUploadBox').classList.add('hidden');
+                    document.getElementById('coverSelectBox').classList.remove('hidden');
+                }
+            }
+
+            function selectCoverImage(pageId, el) {
+                document.querySelectorAll('.cover-option').forEach(d => d.classList.remove('ring-2', 'ring-primary'));
+                el.classList.add('ring-2', 'ring-primary');
+                document.getElementById('selectedCoverPageId').value = pageId;
+            }
+
+            function openEditModal() {
+                document.getElementById('editMangaModal').showModal();
+
+                // Load data
+                fetch(`/manga/${mangaId}/edit-data`).then(r => r.json()).then(data => {
+                    // Fill Info
+                    document.getElementById('editTitle').value = data.manga.title;
+                    document.getElementById('editDesc').value = data.manga.description;
+                    document.getElementById('editStatus').value = data.manga.status;
+
+                    // Fill Tags (Checkbox list)
+                    const tagContainer = document.getElementById('tagEditContainer');
+                    const currentTagIds = data.currentTags || []; // Lấy list ID hiện tại
+
+                    tagContainer.innerHTML = data.allTags.map(tag => {
+                        // Kiểm tra xem tag này có trong list hiện tại không
+                        const isChecked = currentTagIds.includes(tag.id) ? 'checked' : '';
+
+                        return `
+                            <label class="flex items-center gap-2 cursor-pointer bg-white/5 px-2 py-1 rounded hover:bg-white/10 border border-white/5 has-[:checked]:border-primary/50">
+                                <input type="checkbox" name="tagIds" value="${tag.id}" ${isChecked} class="rounded bg-gray-700 border-gray-600 text-primary focus:ring-0">
+                                <span class="text-xs text-white">${tag.name}</span>
+                            </label>
+                        `;
+                    }).join('');
+
+                    // Fill Cover Selector
+                    const coverContainer = document.getElementById('coverSelectBox');
+                    if (data.covers.length === 0) {
+                        coverContainer.innerHTML = '<p class="col-span-4 text-xs text-center">No chapters available.</p>';
+                    } else {
+                        coverContainer.innerHTML = data.covers.map(c => `
+                            <div class="cover-option aspect-[2/3] bg-gray-800 rounded overflow-hidden cursor-pointer relative group" 
+                                 onclick="selectCoverImage('${c.pageId}', this)">
+                                <img src="/manga/image/${c.pageId}" class="w-full h-full object-cover">
+                                <div class="absolute bottom-0 inset-x-0 bg-black/60 text-[10px] text-white p-1 truncate">${c.chapterName}</div>
+                            </div>
+                        `).join('');
+                    }
+                });
+            }
+
+            function toggleGridMode(checkbox) {
+                const gridItems = document.querySelectorAll('#pageSortableGrid > div');
+                const images = document.querySelectorAll('#pageSortableGrid img');
+
+                if (checkbox.checked) {
+                    // -> Chuyển sang Vuông (Square)
+                    gridItems.forEach(el => el.classList.add('aspect-square'));
+                    images.forEach(img => {
+                        img.classList.remove('h-auto');
+                        img.classList.add('h-full', 'object-cover');
+                    });
+                } else {
+                    // -> Chuyển sang Tỉ lệ thật (Real/Auto)
+                    gridItems.forEach(el => el.classList.remove('aspect-square'));
+                    images.forEach(img => {
+                        img.classList.remove('h-full', 'object-cover');
+                        img.classList.add('h-auto');
+                    });
+                }
+            }
+
+            async function submitEditManga() {
+                const btn = document.getElementById('btnSaveManga');
+                btn.innerHTML = 'Saving...';
+                btn.disabled = true;
+
+                const form = document.getElementById('editMangaForm');
+                const formData = new FormData(form);
+
+                try {
+                    const res = await fetch('/manga/update', {
+                        method: 'POST',
+                        headers: {[csrfHeader]: csrfToken},
+                        body: formData
+                    });
+                    if (res.ok)
+                        window.location.reload();
+                    else
+                        alert("Error: " + await res.text());
+                } catch (e) {
+                    alert(e);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Save Changes';
+                }
+            }
+
+            // --- LOGIC PREVIEW ---
+            const previewPopup = document.getElementById('chapterPreviewPopup');
+            const previewImg = document.getElementById('previewImage');
+            const previewLoading = document.getElementById('previewLoading');
+
+            function showPreview(el) {
+                // Không hiện preview nếu là màn hình nhỏ (Mobile/Tablet dọc)
+                if (window.innerWidth < 768)
+                    return;
+
+                const pageId = el.getAttribute('data-preview-id');
+                if (!pageId)
+                    return;
+
+                previewLoading.style.display = 'flex';
+                previewImg.style.display = 'none';
+                previewImg.src = `/manga/image/${pageId}`;
+                previewImg.onload = () => {
+                    previewLoading.style.display = 'none';
+                    previewImg.style.display = 'block';
+                };
+                previewPopup.classList.remove('hidden');
+            }
+
+            function movePreview(e) {
+                if (window.innerWidth < 768 || previewPopup.classList.contains('hidden'))
+                    return;
+
+                const offset = 15;
+                let top = e.clientY + offset;
+                let left = e.clientX + offset;
+
+                if (top + previewPopup.offsetHeight > window.innerHeight)
+                    top = e.clientY - previewPopup.offsetHeight - offset;
+                if (left + previewPopup.offsetWidth > window.innerWidth)
+                    left = e.clientX - previewPopup.offsetWidth - offset;
+
+                previewPopup.style.top = `${top}px`;
+                previewPopup.style.left = `${left}px`;
+            }
+
+            function hidePreview() {
+                previewPopup.classList.add('hidden');
+                previewImg.src = '';
+            }
+
+            function handleRightClick(e, el) {
+                // 1. Ẩn Preview ngay lập tức
+                hidePreview();
+
+                // 2. Gọi hàm hiện menu xóa cũ
+                showChapterContextMenu(e, el);
+            }
+
+            // --- 5. EDIT CHAPTER LOGIC ---
+            let sortableInstance = null;
+
+            async function openEditChapterModal() {
+                hideChapterContextMenu();
+                const modal = document.getElementById('editChapterModal');
+                const grid = document.getElementById('pageSortableGrid');
+                const nameInput = document.getElementById('editChapName');
+
+                grid.innerHTML = '<div class="col-span-full text-center py-10 text-gray-500">Loading pages...</div>';
+                modal.showModal();
+
+                try {
+                    // Gọi API lấy chi tiết
+                    const res = await fetch(`/manga/chapter/${selectedChapId}/details`);
+                    const data = await res.json();
+
+                    nameInput.value = data.name;
+
+                    // Render Grid
+                    renderPageGrid(data.pages);
+
+                } catch (e) {
+                    alert("Error loading chapter details");
+                    modal.close();
+                }
+            }
+
+            function renderPageGrid(pages) {
+                const grid = document.getElementById('pageSortableGrid');
+                grid.innerHTML = '';
+
+                // Kiểm tra checkbox
+                const isSquare = document.getElementById('toggleGridAspect').checked;
+
+                // LOGIC CLASS:
+                // 1. Square Mode: Ép khung vuông (aspect-square), ảnh phủ kín (h-full object-cover).
+                // 2. Real Mode: Không ép khung (bỏ aspect), ảnh cao tự nhiên (h-auto), grid tự giãn.
+                const containerAspect = isSquare ? 'aspect-square' : '';
+                const imgClass = isSquare ? 'w-full h-full object-cover' : 'w-full h-auto block';
+
+                pages.forEach((page, index) => {
+                    const el = document.createElement('div');
+
+                    // Thêm 'z-0 hover:z-10' để khi di chuột, ảnh sẽ nổi lên trên (tránh bị che bởi ảnh khác nếu có lẹm)
+                    // Xóa 'transition-all' để tránh lỗi render khi cuộn
+                    el.className = `relative group ${containerAspect} bg-gray-800 rounded overflow-hidden border border-white/10 cursor-move z-0 hover:z-10`;
+                    el.setAttribute('data-id', page.id);
+
+                    el.innerHTML = `
+                        <img src="${page.url}" class="${imgClass} pointer-events-none select-none bg-[#121212]">
+                        
+                        <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                             <button onclick="deletePage('${page.id}', this)" class="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg transform active:scale-95 transition-transform" title="Delete Page">
+                                <span class="material-symbols-outlined text-[16px]">delete</span>
+                             </button>
+                        </div>
+                        
+                        <div class="page-num-badge absolute top-1 left-1 bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-md font-mono min-w-[20px] text-center z-20">
+                           ${index + 1}
+                        </div>
+                    `;
+                    grid.appendChild(el);
+                });
+
+                if (sortableInstance)
+                    sortableInstance.destroy();
+                sortableInstance = new Sortable(grid, {
+                    animation: 150,
+                    ghostClass: 'opacity-50',
+                    onEnd: function (evt) {
+                        updateVisualOrder();
+                        saveNewOrder();
+                    }
+                });
+            }
+
+            function updateVisualOrder() {
+                const grid = document.getElementById('pageSortableGrid');
+                // Duyệt qua tất cả các thẻ con trong grid theo thứ tự hiện tại trên DOM
+                const items = grid.children;
+                for (let i = 0; i < items.length; i++) {
+                    const badge = items[i].querySelector('.page-num-badge');
+                    if (badge) {
+                        badge.innerText = i + 1; // Gán lại số (1, 2, 3...)
+                    }
+                }
+            }
+
+            // --- API ACTIONS ---
+
+            async function saveChapterName() {
+                const newName = document.getElementById('editChapName').value;
+                const formData = new FormData();
+                formData.append('id', selectedChapId);
+                formData.append('name', newName);
+
+                try {
+                    const res = await fetch('/manga/chapter/update-info', {
+                        method: 'POST',
+                        headers: {[csrfHeader]: csrfToken},
+                        body: formData
+                    });
+                    if (res.ok)
+                        alert("Name updated! (Reload to see changes)");
+                    else
+                        alert("Failed to update name");
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            async function saveNewOrder() {
+                // Lấy thứ tự ID từ DOM
+                const grid = document.getElementById('pageSortableGrid');
+                const pageIds = Array.from(grid.children).map(el => el.getAttribute('data-id'));
+
+                try {
+                    await fetch('/manga/chapter/reorder-pages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            [csrfHeader]: csrfToken
+                        },
+                        body: JSON.stringify({pageIds: pageIds})
+                    });
+                    // Không cần alert để trải nghiệm mượt mà, chỉ console log
+                    console.log("Order saved");
+                } catch (e) {
+                    alert("Failed to save order");
+                }
+            }
+
+            async function deletePage(pageId, btnEl) {
+                // Ngăn chặn click lan ra ngoài (để ko bị xung đột Drag)
+                event.stopPropagation();
+
+                const deletePhysical = document.getElementById('globalDeletePhysical').checked;
+                if (!confirm("Delete this page?"))
+                    return;
+
+                const card = btnEl.closest('div.group'); // Lấy thẻ cha
 
                 try {
                     const formData = new FormData();
-                    formData.append('id', mangaId);
+                    formData.append('id', pageId);
                     formData.append('deletePhysical', deletePhysical);
 
-                    // Lấy CSRF Token từ layout
-                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
-                    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
-
-                    const res = await fetch('/manga/delete', {
+                    const res = await fetch('/manga/page/delete', {
                         method: 'POST',
-                        headers: {
-                            [csrfHeader]: csrfToken
-                        },
+                        headers: {[csrfHeader]: csrfToken},
                         body: formData
                     });
 
                     if (res.ok) {
-                        alert("Manga deleted successfully!");
-                        window.location.href = "/manga"; // Quay về trang danh sách
+                        card.remove(); // Xóa khỏi giao diện ngay
+                        updateVisualOrder();
                     } else {
-                        const txt = await res.text();
-                        alert("Delete failed: " + txt);
-                        btn.disabled = false;
-                        btn.innerHTML = 'Confirm Delete';
+                        alert("Error deleting page");
                     }
                 } catch (e) {
-                    alert("Network error: " + e);
-                    btn.disabled = false;
+                    alert("Network error");
                 }
+            }
+
+            async function uploadMorePages(input) {
+                if (input.files.length === 0)
+                    return;
+
+                const formData = new FormData();
+                for (let file of input.files) {
+                    formData.append('files', file);
+                }
+
+                // Hiển thị loading tạm
+                const grid = document.getElementById('pageSortableGrid');
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = "col-span-full text-center text-primary font-bold py-2";
+                loadingDiv.innerText = "Uploading images...";
+                grid.prepend(loadingDiv);
+
+                try {
+                    const res = await fetch(`/manga/chapter/${selectedChapId}/add-images`, {
+                        method: 'POST',
+                        headers: {[csrfHeader]: csrfToken},
+                        body: formData
+                    });
+
+                    if (res.ok) {
+                        // Reload lại modal để thấy ảnh mới
+                        openEditChapterModal();
+                    } else {
+                        alert("Upload failed");
+                        loadingDiv.remove();
+                    }
+                } catch (e) {
+                    alert("Error");
+                    loadingDiv.remove();
+                }
+
+                input.value = ''; // Reset input
             }
         </script>
     </body>

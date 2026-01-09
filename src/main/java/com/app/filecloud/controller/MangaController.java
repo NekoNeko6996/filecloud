@@ -2,6 +2,7 @@ package com.app.filecloud.controller;
 
 import com.app.filecloud.entity.*;
 import com.app.filecloud.repository.*;
+import java.io.File;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,7 @@ import java.util.zip.ZipInputStream;
 import java.io.InputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/manga")
@@ -35,6 +37,7 @@ public class MangaController {
     private final MangaChapterRepository chapterRepository;
     private final MangaPageRepository pageRepository;
     private final MangaAuthorRepository authorRepository;
+    private final TagRepository tagRepository;
 
     @Value("${app.storage.root:uploads}")
     private String rootUploadDir;
@@ -280,8 +283,17 @@ public class MangaController {
             return extractPageNumber(c1.getChapterName()) - extractPageNumber(c2.getChapterName());
         });
 
+        Map<String, String> previewMap = new HashMap<>();
+        for (MangaChapter chap : chapters) {
+            // Lấy trang đầu tiên (page_order nhỏ nhất)
+            // Lưu ý: Để tối ưu hiệu năng nếu dữ liệu lớn, sau này nên dùng Custom Query
+            pageRepository.findFirstByChapterIdOrderByPageOrderAsc(chap.getId())
+                    .ifPresent(page -> previewMap.put(chap.getId(), page.getId()));
+        }
+
         model.addAttribute("manga", manga);
         model.addAttribute("chapters", chapters);
+        model.addAttribute("previewMap", previewMap);
         return "manga/detail";
     }
 
@@ -368,5 +380,298 @@ public class MangaController {
                 .sorted(Comparator.reverseOrder()) // Xóa file con trước, folder sau
                 .map(Path::toFile)
                 .forEach(java.io.File::delete);
+    }
+
+    // --- 1. API THÊM CHƯƠNG (UPLOAD ZIP) ---
+    @PostMapping("/{id}/chapter/add")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> addChapter(
+            @PathVariable String id,
+            @RequestParam("name") String chapterName,
+            @RequestParam("file") MultipartFile zipFile) {
+        try {
+            MangaSeries manga = mangaRepository.findById(id).orElseThrow();
+
+            // Check trùng tên chương trong truyện này
+            if (chapterRepository.findByMangaIdAndChapterName(id, chapterName) != null) {
+                return ResponseEntity.badRequest().body("Chapter name already exists!");
+            }
+
+            // Tạo Chapter
+            MangaChapter chapter = MangaChapter.builder()
+                    .manga(manga)
+                    .chapterName(chapterName)
+                    .folderPath("")
+                    .build();
+            chapter = chapterRepository.save(chapter);
+
+            // Tạo đường dẫn vật lý
+            String relativePath = Paths.get("manga", "content", manga.getId(), chapter.getId()).toString();
+            Path absolutePath = Paths.get(rootUploadDir, relativePath);
+            Files.createDirectories(absolutePath);
+
+            chapter.setFolderPath(relativePath);
+            chapterRepository.save(chapter);
+
+            // Xử lý ZIP (Chỉ lấy ảnh, không quan tâm folder con)
+            try (ZipInputStream zis = new ZipInputStream(zipFile.getInputStream())) {
+                ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.isDirectory()) {
+                        continue;
+                    }
+
+                    String fileName = new File(entry.getName()).getName(); // Lấy tên file gốc, bỏ qua folder trong zip
+                    if (!isImageFile(fileName)) {
+                        continue;
+                    }
+
+                    saveImage(zis, manga, chapterName, fileName, entry.getSize(), new HashMap<>()); // Tận dụng hàm saveImage cũ
+                }
+            }
+
+            return ResponseEntity.ok("Chapter added successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    // --- 2. API XÓA CHƯƠNG ---
+    @PostMapping("/chapter/delete")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> deleteChapter(@RequestParam("id") String id,
+            @RequestParam(defaultValue = "true") boolean deletePhysical) {
+        try {
+            MangaChapter chapter = chapterRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Chapter not found"));
+
+            if (deletePhysical) {
+                // Xóa thư mục vật lý của chapter: {root}/{manga}/{chapID}
+                Path chapterDir = Paths.get(rootUploadDir, chapter.getFolderPath());
+                deleteFolderRecursively(chapterDir);
+            }
+            chapterRepository.delete(chapter);
+            return ResponseEntity.ok("Chapter deleted");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    // --- 3. API LẤY DỮ LIỆU EDIT (Info + Tags + Cover Candidates) ---
+    @GetMapping("/{id}/edit-data")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getEditData(@PathVariable String id) {
+        try {
+            MangaSeries manga = mangaRepository.findById(id).orElseThrow();
+            List<Tag> allTags = tagRepository.findAll();
+
+            // Lấy danh sách ảnh đại diện (trang 1 của mỗi chương) để chọn làm bìa
+            List<MangaChapter> chapters = chapterRepository.findByMangaIdOrderByChapterNameAsc(id);
+            List<Map<String, String>> potentialCovers = new ArrayList<>();
+
+            for (MangaChapter c : chapters) {
+                // Lấy trang đầu tiên của chap
+                List<MangaPage> pages = pageRepository.findByChapterIdOrderByPageOrderAsc(c.getId());
+                if (!pages.isEmpty()) {
+                    Map<String, String> item = new HashMap<>();
+                    item.put("chapterName", c.getChapterName());
+                    item.put("pageId", pages.get(0).getId()); // Dùng ID trang để load ảnh
+                    potentialCovers.add(item);
+                }
+            }
+
+            List<Integer> currentTagIds = manga.getTags().stream()
+                    .map(Tag::getId)
+                    .collect(Collectors.toList());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("currentTags", currentTagIds);
+            response.put("manga", manga);
+            response.put("allTags", allTags);
+            // Giả sử MangaSeries có field 'tags' (@ManyToMany), nếu chưa có bạn cần thêm vào Entity
+            // response.put("currentTags", manga.getTags().stream().map(Tag::getId).collect(Collectors.toList())); 
+            response.put("covers", potentialCovers);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    // --- 4. API CẬP NHẬT MANGA (Info, Tags, Cover) ---
+    @PostMapping("/update")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> updateManga(
+            @RequestParam("id") String id,
+            @RequestParam("title") String title,
+            @RequestParam("description") String description,
+            @RequestParam("status") MangaSeries.Status status,
+            @RequestParam(value = "tagIds", required = false) List<Integer> tagIds,
+            @RequestParam(value = "coverFile", required = false) MultipartFile coverFile,
+            @RequestParam(value = "coverPageId", required = false) String coverPageId) {
+        try {
+            MangaSeries manga = mangaRepository.findById(id).orElseThrow();
+            manga.setTitle(title);
+            manga.setDescription(description);
+            manga.setStatus(status);
+
+            if (tagIds != null) {
+                // Tìm các Tag entity dựa trên ID gửi lên
+                List<Tag> selectedTags = tagRepository.findAllById(tagIds);
+                manga.setTags(new HashSet<>(selectedTags));
+            } else {
+                // Nếu không chọn tag nào -> Xóa hết
+                manga.setTags(new HashSet<>());
+            }
+
+            // Xử lý Cover: Ưu tiên File Upload -> Sau đó đến Chọn từ Chapter
+            if (coverFile != null && !coverFile.isEmpty()) {
+                String coverName = System.currentTimeMillis() + "_" + coverFile.getOriginalFilename();
+                Path coverDir = Paths.get(rootUploadDir, "manga", "covers");
+                if (!Files.exists(coverDir)) {
+                    Files.createDirectories(coverDir);
+                }
+                coverFile.transferTo(coverDir.resolve(coverName));
+                manga.setCoverPath("/manga/covers/" + coverName);
+            } else if (coverPageId != null && !coverPageId.isEmpty()) {
+                // User chọn 1 trang làm bìa -> Copy trang đó ra folder covers
+                MangaPage page = pageRepository.findById(coverPageId).orElseThrow();
+                Path sourceImg = Paths.get(rootUploadDir, page.getChapter().getFolderPath(), page.getFileName());
+
+                String newCoverName = "cover_" + manga.getId() + "_" + System.currentTimeMillis() + ".jpg";
+                Path destImg = Paths.get(rootUploadDir, "manga", "covers", newCoverName);
+
+                Files.copy(sourceImg, destImg, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                manga.setCoverPath("/manga/covers/" + newCoverName);
+            }
+
+            mangaRepository.save(manga);
+            return ResponseEntity.ok("Updated successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/chapter/{id}/details")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getChapterDetails(@PathVariable String id) {
+        try {
+            MangaChapter chapter = chapterRepository.findById(id).orElseThrow();
+            List<MangaPage> pages = pageRepository.findByChapterIdOrderByPageOrderAsc(id);
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("id", chapter.getId());
+            res.put("name", chapter.getChapterName());
+            // Chỉ lấy các trường cần thiết của Page để json nhẹ
+            res.put("pages", pages.stream().map(p -> Map.of(
+                    "id", p.getId(),
+                    "fileName", p.getFileName(),
+                    "url", "/manga/image/" + p.getId()
+            )).collect(Collectors.toList()));
+
+            return ResponseEntity.ok(res);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    // B. Cập nhật tên Chapter
+    @PostMapping("/chapter/update-info")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> updateChapterInfo(@RequestParam("id") String id, @RequestParam("name") String name) {
+        try {
+            MangaChapter chapter = chapterRepository.findById(id).orElseThrow();
+            chapter.setChapterName(name);
+            chapterRepository.save(chapter);
+            return ResponseEntity.ok("Updated");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
+
+    // C. Sắp xếp lại thứ tự trang (Nhận vào danh sách ID trang đã sắp xếp)
+    @PostMapping("/chapter/reorder-pages")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> reorderPages(@RequestBody Map<String, List<String>> payload) {
+        try {
+            List<String> pageIds = payload.get("pageIds");
+            for (int i = 0; i < pageIds.size(); i++) {
+                String pageId = pageIds.get(i);
+                // Update page_order = index mới
+                // Lưu ý: Để tối ưu, nên dùng executeUpdate HQL thay vì find + save từng cái
+                pageRepository.updatePageOrder(pageId, i);
+            }
+            return ResponseEntity.ok("Reordered");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
+    // *LƯU Ý: Cần thêm method updatePageOrder vào MangaPageRepository (xem bên dưới)
+
+    // D. Xóa 1 trang ảnh
+    @PostMapping("/page/delete")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> deletePage(@RequestParam("id") String id, @RequestParam(defaultValue = "true") boolean deletePhysical) {
+        try {
+            MangaPage page = pageRepository.findById(id).orElseThrow();
+            if (deletePhysical) {
+                Path file = Paths.get(rootUploadDir, page.getChapter().getFolderPath(), page.getFileName());
+                Files.deleteIfExists(file);
+            }
+            pageRepository.delete(page);
+            return ResponseEntity.ok("Deleted");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
+
+    // E. Thêm ảnh vào Chapter (Upload thêm)
+    @PostMapping("/chapter/{id}/add-images")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> addImagesToChapter(@PathVariable String id, @RequestParam("files") MultipartFile[] files) {
+        try {
+            MangaChapter chapter = chapterRepository.findById(id).orElseThrow();
+            MangaSeries manga = chapter.getManga();
+
+            // Tìm pageOrder lớn nhất hiện tại để cộng dồn
+            // Integer maxOrder = pageRepository.findMaxPageOrderByChapterId(id); 
+            // int startOrder = (maxOrder == null) ? 0 : maxOrder + 1;
+            // Để đơn giản, ta lấy list size
+            int startOrder = pageRepository.findByChapterIdOrderByPageOrderAsc(id).size();
+
+            // Cache map rỗng vì ta đang add vào chapter đã xác định
+            Map<String, MangaChapter> cache = new HashMap<>();
+            cache.put(chapter.getChapterName(), chapter);
+
+            for (MultipartFile file : files) {
+                // Tái sử dụng logic saveImage, nhưng cần sửa lại saveImage chút để nhận pageOrder tùy chỉnh
+                // Hoặc viết logic lưu thẳng ở đây cho nhanh:
+                String fileName = file.getOriginalFilename();
+                Path destFile = Paths.get(rootUploadDir, chapter.getFolderPath(), fileName);
+                Files.copy(file.getInputStream(), destFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+                MangaPage page = MangaPage.builder()
+                        .chapter(chapter)
+                        .fileName(fileName)
+                        .size(file.getSize())
+                        .pageOrder(startOrder++) // Tự tăng order
+                        .build();
+                pageRepository.save(page);
+            }
+            return ResponseEntity.ok("Added");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
     }
 }
