@@ -81,6 +81,7 @@
                                onmouseenter="showPreview(this)"
                                onmousemove="movePreview(event)"
                                onmouseleave="hidePreview()"
+                               target="_blank"
                                oncontextmenu="handleRightClick(event, this.parentElement.querySelector('.btn-more-options'))"
                                class="flex items-center justify-between p-4 pr-12 rounded-lg cursor-pointer h-full">
 
@@ -184,23 +185,33 @@
             </dialog>
 
             <dialog id="addChapterModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-[90%] max-w-md m-auto">
-                <form onsubmit="submitAddChapter(event)" class="flex flex-col gap-4">
-                    <h3 class="font-bold text-lg text-white mb-2">Upload New Chapter</h3>
-                    <div>
-                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Chapter Name</label>
-                        <input type="text" name="name" required placeholder="e.g. Chapter 10" class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none">
+                <form onsubmit="submitBulkChapters(event)" class="flex flex-col gap-4">
+                    <h3 class="font-bold text-lg text-white mb-2">Upload Chapters (Bulk)</h3>
+
+                    <div class="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-xs text-blue-200">
+                        <span class="font-bold">Note:</span> Chapter names will be automatically created based on the ZIP filenames.
+                        <br>Example: <code>Chapter 10.zip</code> -> <strong>Chapter 10</strong>
                     </div>
+
                     <div>
-                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">ZIP File</label>
-                        <div class="border-2 border-dashed border-white/20 rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer relative bg-white/5">
-                            <input type="file" name="file" accept=".zip" required class="absolute inset-0 opacity-0 cursor-pointer" onchange="this.nextElementSibling.innerText = this.files[0].name">
-                            <span class="text-sm text-gray-400 pointer-events-none truncate px-2">Click to select ZIP file</span>
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Select ZIP Files</label>
+                        <div class="border-2 border-dashed border-white/20 rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer relative bg-white/5 group">
+                            <input type="file" name="files" accept=".zip" multiple required 
+                                   class="absolute inset-0 opacity-0 cursor-pointer z-10" 
+                                   onchange="updateFileCount(this)">
+
+                            <div class="pointer-events-none">
+                                <span class="material-symbols-outlined text-3xl text-gray-500 group-hover:text-primary mb-2 transition-colors">folder_zip</span>
+                                <p id="fileCountText" class="text-sm text-gray-300 font-bold">Click to select files</p>
+                                <p class="text-[10px] text-gray-500 mt-1">Supports multiple .zip files</p>
+                            </div>
                         </div>
                     </div>
-                    <div class="flex justify-end gap-3 mt-2">
+
+                    <div class="flex justify-end gap-3 mt-4">
                         <button type="button" onclick="this.closest('dialog').close()" class="px-4 py-2 text-gray-400 hover:text-white text-sm">Cancel</button>
-                        <button type="submit" id="btnAddChapter" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded font-bold text-sm flex items-center gap-2">
-                            <span class="material-symbols-outlined text-sm">upload</span> Upload
+                        <button type="submit" id="btnAddBulk" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded font-bold text-sm flex items-center gap-2">
+                            <span class="material-symbols-outlined text-sm">upload_file</span> Upload All
                         </button>
                     </div>
                 </form>
@@ -338,6 +349,57 @@
                 }
             }
 
+            // --- 2. BULK ADD CHAPTERS ---
+
+            // Hàm hiển thị số file đã chọn
+            function updateFileCount(input) {
+                const textEl = document.getElementById('fileCountText');
+                if (input.files && input.files.length > 0) {
+                    textEl.innerText = `${input.files.length} file(s) selected`;
+                    textEl.classList.add('text-primary');
+                } else {
+                    textEl.innerText = 'Click to select files';
+                    textEl.classList.remove('text-primary');
+                }
+            }
+
+            async function submitBulkChapters(e) {
+                e.preventDefault();
+                const btn = document.getElementById('btnAddBulk');
+                const form = e.target;
+                const formData = new FormData(form);
+
+                // Validation sơ bộ
+                const fileInput = form.querySelector('input[type="file"]');
+                if (fileInput.files.length === 0)
+                    return;
+
+                btn.disabled = true;
+                btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-sm">sync</span> Processing ${fileInput.files.length} files...`;
+
+                try {
+                    // Gọi API Bulk mới
+                    const res = await fetch(`/manga/${mangaId}/chapters/bulk-add`, {
+                        method: 'POST',
+                        headers: {[csrfHeader]: csrfToken},
+                        body: formData
+                    });
+
+                    const text = await res.text();
+
+                    if (res.ok) {
+                        window.location.reload();
+                    } else {
+                        alert("Error: " + text);
+                    }
+                } catch (err) {
+                    alert("Network Error: " + err);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Upload All';
+                }
+            }
+
             // --- 3. CHAPTER CONTEXT MENU & DELETE ---
             let selectedChapId = null;
             let selectedChapName = null;
@@ -404,6 +466,7 @@
 
                 // Load data
                 fetch(`/manga/${mangaId}/edit-data`).then(r => r.json()).then(data => {
+                    
                     // Fill Info
                     document.getElementById('editTitle').value = data.manga.title;
                     document.getElementById('editDesc').value = data.manga.description;

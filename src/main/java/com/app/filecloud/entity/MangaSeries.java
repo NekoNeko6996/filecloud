@@ -40,6 +40,7 @@ public class MangaSeries {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    @Builder.Default
     @OneToMany(mappedBy = "manga", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<MangaChapter> chapters = new ArrayList<>();
     
@@ -51,6 +52,7 @@ public class MangaSeries {
     )
     private Set<MangaAuthor> authors;
 
+    @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "manga_tags",

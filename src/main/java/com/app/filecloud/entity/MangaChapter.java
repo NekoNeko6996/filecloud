@@ -1,5 +1,6 @@
 package com.app.filecloud.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ public class MangaChapter {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manga_id")
+    @JsonIgnore
     private MangaSeries manga;
 
     @Column(name = "chapter_name")

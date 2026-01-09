@@ -600,6 +600,92 @@ public class MangaController {
         }
     }
 
+    @PostMapping("/{id}/chapters/bulk-add")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> addBulkChapters(
+            @PathVariable String id,
+            @RequestParam("files") MultipartFile[] files) {
+
+        StringBuilder resultMsg = new StringBuilder();
+        int successCount = 0;
+
+        try {
+            MangaSeries manga = mangaRepository.findById(id).orElseThrow();
+
+            for (MultipartFile zipFile : files) {
+                // Tự động lấy tên Chapter từ tên file (Bỏ đuôi .zip)
+                String originalName = zipFile.getOriginalFilename();
+                if (originalName == null || !originalName.toLowerCase().endsWith(".zip")) {
+                    resultMsg.append("Skipped non-zip: ").append(originalName).append("\n");
+                    continue;
+                }
+
+                String chapterName = originalName.substring(0, originalName.lastIndexOf('.'));
+
+                // Check trùng tên
+                if (chapterRepository.findByMangaIdAndChapterName(id, chapterName) != null) {
+                    resultMsg.append("Skipped exists: ").append(chapterName).append("\n");
+                    continue;
+                }
+
+                // Gọi hàm xử lý (Tách logic ra hàm riêng bên dưới)
+                processChapterZipUpload(manga, chapterName, zipFile);
+                successCount++;
+            }
+
+            return ResponseEntity.ok("Uploaded " + successCount + " chapters.\n" + resultMsg.toString());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    // --- HELPER: Hàm xử lý logic tạo Chapter và giải nén ZIP ---
+    private void processChapterZipUpload(MangaSeries manga, String chapterName, MultipartFile zipFile) throws Exception {
+        // 1. Tạo Chapter trong DB
+        MangaChapter chapter = MangaChapter.builder()
+                .manga(manga)
+                .chapterName(chapterName)
+                .folderPath("")
+                .build();
+        chapter = chapterRepository.save(chapter);
+
+        // 2. Tạo đường dẫn vật lý
+        String relativePath = Paths.get("manga", "content", manga.getId(), chapter.getId()).toString();
+        Path absolutePath = Paths.get(rootUploadDir, relativePath);
+        if (!Files.exists(absolutePath)) {
+            Files.createDirectories(absolutePath);
+        }
+
+        chapter.setFolderPath(relativePath);
+        chapterRepository.save(chapter);
+
+        // 3. Giải nén và lưu ảnh
+        // (Tận dụng lại logic cũ, đảm bảo hàm saveImage có quyền truy cập)
+        try (ZipInputStream zis = new ZipInputStream(zipFile.getInputStream())) {
+            ZipEntry entry;
+            // Cache giả để hàm saveImage hoạt động
+            Map<String, MangaChapter> singleCache = new HashMap<>();
+            singleCache.put(chapterName, chapter);
+
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    continue;
+                }
+
+                String fileName = new File(entry.getName()).getName();
+                if (!isImageFile(fileName)) {
+                    continue;
+                }
+
+                // Gọi hàm saveImage có sẵn của bạn
+                saveImage(zis, manga, chapterName, fileName, entry.getSize(), singleCache);
+            }
+        }
+    }
+
     // --- 2. API XÓA CHƯƠNG ---
     @PostMapping("/chapter/delete")
     @ResponseBody
