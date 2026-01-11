@@ -1,112 +1,497 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{fragments/layout :: layout('Add Manga', 'manga', ~{::section}, ~{::script})}">
-    <body>
-        <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark p-8">
-            <h2 class="text-2xl font-bold text-white mb-6">Add New Manga Series</h2>
-
-            <form id="uploadMangaForm" class="max-w-2xl bg-[#1e1e1e] p-6 rounded-xl border border-white/10 flex flex-col gap-6">
-
-                <div class="p-6 border-2 border-dashed border-white/20 rounded-xl bg-white/5 text-center hover:border-primary/50 transition-colors cursor-pointer relative">
-                    <input type="file" id="folderInput" name="files" accept=".zip,image/*" multiple class="absolute inset-0 opacity-0 cursor-pointer" required>
-
-                    <span class="material-symbols-outlined text-4xl text-gray-400 mb-2">folder_zip</span>
-                    <p class="text-white font-bold">Select Manga (.ZIP) or Folder</p>
-                    <p class="text-xs text-gray-500 mt-1">
-                        Recommended: Compress your manga folder into a 
-                        <span class="text-primary font-bold">.ZIP file</span> to avoid upload limits.
-                    </p>
-                    <p id="selectedFolderInfo" class="text-primary text-sm mt-2 font-mono"></p>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Title</label>
-                        <input type="text" name="title" required class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none">
-                    </div>
-                    <div>
-                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Author</label>
-                        <input type="text" name="author" required class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Description</label>
-                    <textarea name="description" rows="3" class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-white focus:border-primary outline-none"></textarea>
-                </div>
-
-                <div class="flex gap-4">
-                    <div class="flex-1">
-                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">Cover Image</label>
-                        <input type="file" name="cover" accept="image/*" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/20 file:text-primary hover:file:bg-primary/30">
-                    </div>
-                </div>
-
-                <button type="submit" id="btnSubmit" class="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-lg font-bold shadow-lg mt-2 flex items-center justify-center gap-2">
-                    <span class="material-symbols-outlined">cloud_upload</span> Upload & Process
-                </button>
-            </form>
-        </section>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8">
+        <title>Create New Manga</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
         <script>
-            document.getElementById('folderInput').addEventListener('change', function (e) {
-                const files = e.target.files;
-                if (files.length > 0) {
-                    const firstFile = files[0];
-                    document.getElementById('selectedFolderInfo').innerText =
-                            files.length === 1 ? `Selected: ${firstFile.name}` : `${files.length} files selected`;
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        colors: {
+                            primary: '#8a63d2',
+                            'primary-dark': '#724ebf',
+                            background: '#121212',
+                            surface: '#1e1e2e',
+                            'surface-hover': '#27273a'
+                        },
+                        fontFamily: {sans: ['Inter', 'sans-serif']}
+                    }
+                }
+            }
+        </script>
+        <style>
+            .scrollbar-thin::-webkit-scrollbar {
+                width: 6px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb {
+                background-color: #4b5563;
+                border-radius: 20px;
+            }
+            input[type="file"]::file-selector-button {
+                display: none;
+            }
+        </style>
+    </head>
+    <body class="bg-background text-gray-200 font-sans min-h-screen">
 
-                    // Nếu là zip, lấy tên file làm Title (bỏ đuôi .zip)
-                    if (firstFile.name.toLowerCase().endsWith('.zip')) {
-                        const name = firstFile.name.substring(0, firstFile.name.lastIndexOf('.'));
-                        document.querySelector('input[name="title"]').value = name;
+        <div class="container mx-auto px-4 py-8 max-w-6xl">
+            <div class="flex items-center mb-8">
+                <a href="/manga" class="flex items-center text-gray-400 hover:text-white transition-colors mr-4">
+                    <span class="material-symbols-outlined text-3xl">arrow_back</span>
+                </a>
+                <h1 class="text-3xl font-bold text-white flex items-center gap-3">Create New Manga</h1>
+            </div>
+
+            <form id="createMangaForm" class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" id="csrfToken"/>
+
+                <div class="lg:col-span-8 space-y-6">
+                    <div class="bg-surface p-6 rounded-xl border border-white/10 shadow-lg">
+                        <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                            <span class="material-symbols-outlined">info</span> Basic Information
+                        </h2>
+                        <div class="space-y-5">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Manga Title <span class="text-red-500">*</span></label>
+                                <input type="text" id="title" name="title" required
+                                       class="w-full bg-background/50 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder-gray-500"
+                                       placeholder="e.g., One Piece">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                                <textarea id="description" name="description" rows="4"
+                                          class="w-full bg-background/50 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder-gray-500 resize-y"
+                                          placeholder="Synopsis of the manga..."></textarea>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Status</label>
+                                    <div class="relative">
+                                        <select id="status" name="status"
+                                                class="w-full bg-background/50 border border-white/20 text-white rounded-lg px-4 py-3 appearance-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                                            <option value="ONGOING">Ongoing</option>
+                                            <option value="COMPLETED">Completed</option>
+                                            <option value="HIATUS">Hiatus</option>
+                                        </select>
+                                        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">expand_more</span>
+                                    </div>
+                                </div>
+
+                                <div class="relative" id="authorSearchContainer">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Author</label>
+                                    <div class="relative">
+                                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">search</span>
+                                        <input type="text" id="authorSearch" 
+                                               class="w-full pl-10 bg-background/50 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder-gray-500"
+                                               placeholder="Search author..." autocomplete="off">
+                                        <input type="hidden" id="selectedAuthorId" name="authorId">
+                                    </div>
+                                    <div id="authorSearchResults" class="hidden absolute z-10 w-full bg-surface border border-white/20 rounded-lg mt-1 max-h-60 overflow-y-auto scrollbar-thin shadow-xl"></div>
+                                    <div id="selectedAuthorDisplay" class="hidden mt-2 flex items-center justify-between bg-primary/20 text-primary px-3 py-2 rounded-lg border border-primary/30">
+                                        <span id="selectedAuthorName" class="font-medium"></span>
+                                        <button type="button" id="btnClearAuthor" class="text-gray-400 hover:text-white focus:outline-none">
+                                            <span class="material-symbols-outlined text-lg">close</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-surface p-6 rounded-xl border border-white/10 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined">label</span> Tags/Genres
+                            </h2>
+                            <div class="relative w-48 sm:w-64">
+                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-sm">search</span>
+                                <input type="text" id="tagSearchInput" 
+                                       class="w-full bg-background/50 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary/50 outline-none transition-all placeholder-gray-600"
+                                       placeholder="Filter tags...">
+                            </div>
+                        </div>
+
+                        <div id="tagGrid" class="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto scrollbar-thin p-1">
+                            <label th:each="tag : ${allTags}" 
+                                   class="tag-item flex items-center space-x-3 p-3 rounded-lg border border-white/10 bg-background/30 hover:bg-surface-hover cursor-pointer transition-all group select-none">
+                                <input type="checkbox" name="tagIds" th:value="${tag.id}"
+                                       class="w-5 h-5 rounded border-gray-500 text-primary focus:ring-primary bg-background/50 shrink-0">
+                                <span class="tag-name text-sm text-gray-300 group-hover:text-white transition-colors truncate" th:text="${tag.name}">Tag Name</span>
+                            </label>
+                        </div>
+                        <p id="noTagsFoundMsg" class="hidden text-center text-sm text-gray-500 mt-4">No tags found.</p>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-4 space-y-6">
+                    <div class="bg-surface p-6 rounded-xl border border-white/10 shadow-lg top-8">
+                        <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                            <span class="material-symbols-outlined">image</span> Cover Image
+                        </h2>
+
+                        <div class="aspect-[2/3] w-full bg-background/50 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center overflow-hidden mb-4 relative group">
+                            <img id="coverPreview" src="#" alt="Cover Preview" class="hidden w-full h-full object-cover">
+                            <div id="coverPlaceholder" class="text-center p-4">
+                                <span class="material-symbols-outlined text-5xl text-gray-600 mb-2 group-hover:text-primary transition-colors">cloud_upload</span>
+                                <p class="text-sm text-gray-500 group-hover:text-gray-300">Click to upload cover</p>
+                                <p class="text-xs text-gray-600 mt-1">(JPG, PNG, WebP)</p>
+                            </div>
+                            <input type="file" id="coverFile" name="coverFile" accept="image/*"
+                                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                        </div>
+                        <button type="button" id="btnRemoveCover" class="hidden w-full py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-colors flex items-center justify-center gap-1">
+                            <span class="material-symbols-outlined text-lg">delete</span> Remove Cover
+                        </button>
+                    </div>
+
+                    <div class="bg-surface p-6 rounded-xl border border-white/10 shadow-lg">
+                        <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                            <span class="material-symbols-outlined">folder_zip</span> Upload Chapters
+                        </h2>
+                        <p class="text-sm text-gray-500 mb-4">Select .zip files. Each ZIP will be treated as a chapter.</p>
+
+                        <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-primary/50 rounded-lg cursor-pointer bg-primary/5 hover:bg-primary/10 transition-all group">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <span class="material-symbols-outlined text-4xl text-primary mb-2 group-hover:scale-110 transition-transform">upload_file</span>
+                                <p class="text-sm text-gray-300">Click to select ZIP files</p>
+                            </div>
+                            <input type="file" id="chapterFilesInput" multiple accept=".zip,.cbz" class="hidden" />
+                        </label>
+                    </div>
+                </div>
+
+                <div id="chapterInspectionSection" class="hidden lg:col-span-12 bg-surface p-6 rounded-xl border border-white/10 shadow-lg mt-6">
+                    <h2 class="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                        <span class="material-symbols-outlined">rate_review</span> Chapter Inspection & Sorting
+                    </h2>
+                    <p class="text-sm text-gray-500 mb-6 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-lg">drag_indicator</span>
+                        Drag and drop to reorder. Click chapter names to edit.
+                    </p>
+
+                    <div id="loadingZipIndicator" class="hidden text-center py-8 text-gray-400 flex flex-col items-center">
+                        <span class="material-symbols-outlined text-4xl animate-spin mb-2 text-primary">sync</span>
+                        Analyzing ZIP files... Please wait.
+                    </div>
+
+                    <div id="draftChapterList" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                </div>
+
+                <div class="lg:col-span-12 flex justify-end mt-4 pt-6 border-t border-white/10">
+                    <button type="submit" id="btnSubmit" 
+                            class="px-8 py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-lg shadow-lg shadow-primary/30 flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg">
+                        <span class="material-symbols-outlined text-2xl">rocket_launch</span>
+                        Create Manga
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <script th:inline="javascript">
+            const csrfToken = document.getElementById('csrfToken').value;
+            const csrfHeader = 'X-CSRF-TOKEN';
+
+            // --- 1. TAG SEARCH LOGIC (FIX MỚI) ---
+            const tagSearchInput = document.getElementById('tagSearchInput');
+            const tagItems = document.querySelectorAll('.tag-item');
+            const noTagsMsg = document.getElementById('noTagsFoundMsg');
+
+            tagSearchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase().trim();
+                let visibleCount = 0;
+
+                tagItems.forEach(item => {
+                    const name = item.querySelector('.tag-name').textContent.toLowerCase();
+                    if (name.includes(term)) {
+                        item.classList.remove('hidden');
+                        visibleCount++;
+                    } else {
+                        item.classList.add('hidden');
                     }
-                    // Nếu là folder upload (webkitRelativePath có giá trị)
-                    else if (firstFile.webkitRelativePath) {
-                        const rootFolder = firstFile.webkitRelativePath.split('/')[0];
-                        document.querySelector('input[name="title"]').value = rootFolder;
+                });
+
+                if (visibleCount === 0)
+                    noTagsMsg.classList.remove('hidden');
+                else
+                    noTagsMsg.classList.add('hidden');
+            });
+
+            // --- 2. COVER IMAGE ---
+            const coverInput = document.getElementById('coverFile');
+            const coverPreview = document.getElementById('coverPreview');
+            const coverPlaceholder = document.getElementById('coverPlaceholder');
+            const btnRemoveCover = document.getElementById('btnRemoveCover');
+
+            coverInput.addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        coverPreview.src = e.target.result;
+                        coverPreview.classList.remove('hidden');
+                        coverPlaceholder.classList.add('hidden');
+                        btnRemoveCover.classList.remove('hidden');
                     }
+                    reader.readAsDataURL(file);
                 }
             });
 
-            document.getElementById('uploadMangaForm').addEventListener('submit', async function (e) {
-                e.preventDefault();
-                const btn = document.getElementById('btnSubmit');
-                const originalText = btn.innerHTML;
+            btnRemoveCover.addEventListener('click', function () {
+                coverInput.value = '';
+                coverPreview.src = '#';
+                coverPreview.classList.add('hidden');
+                coverPlaceholder.classList.remove('hidden');
+                btnRemoveCover.classList.add('hidden');
+            });
 
-                btn.disabled = true;
-                btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Processing...';
+            // --- 3. AUTHOR SEARCH ---
+            const authorSearchInput = document.getElementById('authorSearch');
+            const authorSearchResults = document.getElementById('authorSearchResults');
+            const selectedAuthorIdInput = document.getElementById('selectedAuthorId');
+            const selectedAuthorDisplay = document.getElementById('selectedAuthorDisplay');
+            const selectedAuthorName = document.getElementById('selectedAuthorName');
+            const btnClearAuthor = document.getElementById('btnClearAuthor');
+            const authorSearchContainer = document.getElementById('authorSearchContainer');
+            let debounceTimer;
 
-                const formData = new FormData(this);
+            authorSearchInput.addEventListener('input', function (e) {
+                clearTimeout(debounceTimer);
+                const query = e.target.value.trim();
+                if (query.length < 2) {
+                    authorSearchResults.classList.add('hidden');
+                    return;
+                }
+                debounceTimer = setTimeout(() => {
+                    fetch(`/manga/api/authors/search?query=${encodeURIComponent(query)}`)
+                            .then(res => res.json())
+                            .then(authors => {
+                                authorSearchResults.innerHTML = '';
+                                if (authors.length > 0) {
+                                    authors.forEach(author => {
+                                        const div = document.createElement('div');
+                                        div.className = 'p-3 hover:bg-primary/20 cursor-pointer transition-colors text-sm text-gray-200';
+                                        div.textContent = author.name;
+                                        div.addEventListener('click', () => selectAuthor(author));
+                                        authorSearchResults.appendChild(div);
+                                    });
+                                    authorSearchResults.classList.remove('hidden');
+                                } else {
+                                    authorSearchResults.innerHTML = '<div class="p-3 text-sm text-gray-500">No authors found.</div>';
+                                    authorSearchResults.classList.remove('hidden');
+                                }
+                            })
+                            .catch(err => console.error('Author search error:', err));
+                }, 300);
+            });
 
-                // --- LẤY CSRF TOKEN TỪ LAYOUT ---
-                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
-                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+            function selectAuthor(author) {
+                selectedAuthorIdInput.value = author.id;
+                selectedAuthorName.textContent = author.name;
+                selectedAuthorDisplay.classList.remove('hidden');
+                authorSearchInput.value = '';
+                authorSearchResults.classList.add('hidden');
+                authorSearchContainer.querySelector('.relative').classList.add('hidden');
+            }
+
+            btnClearAuthor.addEventListener('click', function () {
+                selectedAuthorIdInput.value = '';
+                selectedAuthorDisplay.classList.add('hidden');
+                authorSearchContainer.querySelector('.relative').classList.remove('hidden');
+            });
+
+            document.addEventListener('click', function (e) {
+                if (!authorSearchContainer.contains(e.target)) {
+                    authorSearchResults.classList.add('hidden');
+                }
+            });
+
+            // --- 4. ZIP INSPECTION & SORTING (FIXED) ---
+            const chapterFilesInput = document.getElementById('chapterFilesInput');
+            const chapterInspectionSection = document.getElementById('chapterInspectionSection');
+            const draftChapterList = document.getElementById('draftChapterList');
+            const loadingZipIndicator = document.getElementById('loadingZipIndicator');
+            let draftChaptersData = [];
+            let chapterSortableInstance;
+
+            chapterFilesInput.addEventListener('change', async function (e) {
+                const files = Array.from(e.target.files);
+                if (files.length === 0)
+                    return;
+
+                draftChaptersData = [];
+                draftChapterList.innerHTML = '';
+                chapterInspectionSection.classList.remove('hidden');
+                loadingZipIndicator.classList.remove('hidden');
 
                 try {
-                    const res = await fetch('/manga/upload', {
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const defaultName = file.name.replace(/\.(zip|cbz)$/i, '');
+                        let previewImageUrl = null;
+                        try {
+                            const zip = new JSZip();
+                            const zipContents = await zip.loadAsync(file);
+                            const imageFile = Object.values(zipContents.files).find(entry => {
+                                return !entry.dir && /\.(jpg|jpeg|png|webp)$/i.test(entry.name);
+                            });
+                            if (imageFile) {
+                                const blob = await imageFile.async('blob');
+                                previewImageUrl = URL.createObjectURL(blob);
+                            }
+                        } catch (zipErr) {
+                            console.warn("Could not read ZIP:", file.name);
+                        }
+                        draftChaptersData.push({
+                            originalFile: file,
+                            fileName: file.name,
+                            tempId: 'chap_' + Date.now() + '_' + i,
+                            previewUrl: previewImageUrl,
+                            currentName: defaultName
+                        });
+                    }
+                    renderDraftList();
+                } catch (error) {
+                    console.error("Error processing ZIP:", error);
+                    alert("Error processing files.");
+                } finally {
+                    loadingZipIndicator.classList.add('hidden');
+                }
+            });
+
+            function renderDraftList() {
+                draftChapterList.innerHTML = draftChaptersData.map((chap, index) => `
+                    <div class="draft-chapter-item bg-background/50 border border-white/10 rounded-lg p-3 flex items-center gap-3 group hover:border-primary/50 transition-all relative" data-temp-id="${chap.tempId}">
+
+                        <div class="cursor-grab text-gray-500 hover:text-primary p-1 shrink-0">
+                            <span class="material-symbols-outlined">drag_indicator</span>
+                        </div>
+
+                        <div class="w-16 h-20 bg-gray-800 rounded overflow-hidden shrink-0 border border-white/10 flex items-center justify-center relative">
+                            ${chap.previewUrl
+                                        ? `<img src="${chap.previewUrl}" class="w-full h-full object-cover" alt="Preview">`
+                                        : `<span class="material-symbols-outlined text-gray-600">folder_zip</span>`
+                                        }
+                        </div>
+
+                        <div class="flex-grow min-w-0 relative">
+                            <label class="block text-[10px] text-gray-500 uppercase font-bold mb-0.5 ml-1">Chapter Name</label>
+                            <div class="relative group/input">
+                                <input type="text" value="${chap.currentName}" 
+                                       class="w-full bg-black/20 hover:bg-black/40 focus:bg-black/50 border border-white/10 focus:border-primary rounded px-3 py-1.5 text-sm text-white transition-all outline-none pr-8"
+                                       placeholder="Enter name..."
+                                       onchange="updateChapterName('${chap.tempId}', this.value)">
+
+                                <span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none group-focus-within/input:text-primary">edit</span>
+                            </div>
+                            <p class="text-xs text-gray-600 truncate mt-1 ml-1 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[10px]">attach_file</span> ${chap.fileName}
+                            </p>
+                        </div>
+
+                        <div class="chapter-index-badge absolute top-2 right-2 text-xs font-mono text-gray-500 bg-white/5 border border-white/5 px-1.5 rounded">#${index + 1}</div>
+                    </div>
+                `).join('');
+
+                if (chapterSortableInstance)
+                    chapterSortableInstance.destroy();
+                chapterSortableInstance = new Sortable(draftChapterList, {
+                    animation: 150,
+                    handle: '.cursor-grab',
+                    ghostClass: 'opacity-50',
+                    onEnd: function () {
+                        // Cập nhật lại số thứ tự #1, #2...
+                        document.querySelectorAll('.chapter-index-badge').forEach((el, idx) => {
+                            el.innerText = '#' + (idx + 1);
+                        });
+                    }
+                });
+            }
+
+            window.updateChapterName = function (tempId, newName) {
+                const chap = draftChaptersData.find(c => c.tempId === tempId);
+                if (chap)
+                    chap.currentName = newName.trim();
+            }
+
+            // --- 5. SUBMIT ---
+            const form = document.getElementById('createMangaForm');
+            const btnSubmit = document.getElementById('btnSubmit');
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                if (!document.getElementById('title').value.trim()) {
+                    alert("Title is required!");
+                    return;
+                }
+                btnSubmit.disabled = true;
+                btnSubmit.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Processing...';
+
+                try {
+                    const formData = new FormData();
+                    formData.append('title', document.getElementById('title').value);
+                    formData.append('description', document.getElementById('description').value);
+                    formData.append('status', document.getElementById('status').value);
+                    formData.append('authorId', selectedAuthorIdInput.value);
+
+                    document.querySelectorAll('input[name="tagIds"]:checked').forEach(cb => {
+                        formData.append('tagIds', cb.value);
+                    });
+
+                    const coverFile = document.getElementById('coverFile').files[0];
+                    if (coverFile)
+                        formData.append('coverFile', coverFile);
+
+                    if (draftChaptersData.length > 0) {
+                        // Lấy thứ tự từ DOM sau khi đã kéo thả
+                        const domItems = Array.from(draftChapterList.children);
+                        let metadataList = [];
+
+                        domItems.forEach((item, index) => {
+                            const tempId = item.getAttribute('data-temp-id');
+                            const chapData = draftChaptersData.find(c => c.tempId === tempId);
+                            if (chapData) {
+                                formData.append('chapterFiles', chapData.originalFile);
+                                metadataList.push({
+                                    fileName: chapData.fileName,
+                                    newChapterName: chapData.currentName || chapData.fileName.replace(/\.(zip|cbz)$/i, ''),
+                                    order: index
+                                });
+                            }
+                        });
+                        formData.append('chapterMetadataJson', JSON.stringify(metadataList));
+                    }
+
+                    const response = await fetch('/manga/upload', {
                         method: 'POST',
-                        headers: {
-                            // Thêm header bảo mật
-                            [csrfHeader]: csrfToken
-                        },
+                        headers: {[csrfHeader]: csrfToken},
                         body: formData
                     });
 
-                    const text = await res.text();
-
-                    if (res.ok) {
-                        alert(text);
-                        window.location.href = "/manga";
+                    if (response.ok) {
+                        window.location.href = '/manga';
                     } else {
-                        // Nếu server trả về lỗi (4xx, 5xx)
-                        alert("Upload failed: " + text);
+                        const errorText = await response.text();
+                        alert('Upload failed: ' + errorText);
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerHTML = '<span class="material-symbols-outlined text-2xl">rocket_launch</span> Create Manga';
                     }
-                } catch (err) {
-                    alert("Network error: " + err);
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
+                } catch (error) {
+                    console.error('Submission error:', error);
+                    alert('An error occurred.');
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = '<span class="material-symbols-outlined text-2xl">rocket_launch</span> Create Manga';
                 }
             });
         </script>

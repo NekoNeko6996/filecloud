@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import com.app.filecloud.dto.MangaUploadDTO;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,11 +26,14 @@ import org.springframework.http.ResponseEntity;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.io.InputStream;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.coobird.thumbnailator.Thumbnails;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Controller
 @RequestMapping("/manga")
@@ -41,6 +45,7 @@ public class MangaController {
     private final MangaPageRepository pageRepository;
     private final MangaAuthorRepository authorRepository;
     private final TagRepository tagRepository;
+    private final MangaAuthorRepository mangaAuthorRepository;
 
     @Value("${app.storage.root:uploads}")
     private String rootUploadDir;
@@ -118,6 +123,7 @@ public class MangaController {
 
     @GetMapping("/create")
     public String createMangaPage(Model model) {
+        model.addAttribute("allTags", tagRepository.findAll());
         return "manga/create";
     }
 
@@ -125,67 +131,148 @@ public class MangaController {
     @PostMapping("/upload")
     @ResponseBody
     @Transactional
-    public String uploadManga(
-            @RequestParam("files") MultipartFile[] files,
-            @RequestParam("title") String title,
-            @RequestParam("author") String authorName,
-            @RequestParam("description") String description,
-            @RequestParam(value = "cover", required = false) MultipartFile cover) {
-
+    public ResponseEntity<String> uploadManga(@ModelAttribute MangaUploadDTO dto) {
         try {
-            // 1. Xử lý Author
-            MangaAuthor author = authorRepository.findByName(authorName)
-                    .orElseGet(() -> authorRepository.save(MangaAuthor.builder().name(authorName).build()));
-
-            // 2. Xử lý Manga Series
+            // --- 1. TẠO MANGA SERIES (Logic cũ) ---
             MangaSeries manga = new MangaSeries();
-            manga.setTitle(title);
-            manga.setDescription(description);
-            manga.setStatus(MangaSeries.Status.ONGOING);
-            manga.setAuthors(Set.of(author));
+            manga.setTitle(dto.getTitle());
+            manga.setDescription(dto.getDescription());
+            manga.setStatus(dto.getStatus());
             manga.setReleaseYear(String.valueOf(java.time.Year.now().getValue()));
 
-            // Lưu Cover (Dùng đường dẫn tương đối /manga/covers/...)
-            if (cover != null && !cover.isEmpty()) {
-                String coverName = System.currentTimeMillis() + "_" + cover.getOriginalFilename();
-                // Path vật lý: {root}/manga/covers/
+            // Xử lý Author
+            if (dto.getAuthorId() != null && !dto.getAuthorId().isEmpty()) {
+                try {
+                    Integer authId = Integer.valueOf(dto.getAuthorId());
+                    authorRepository.findById(authId).ifPresent(author -> manga.setAuthors(Set.of(author)));
+                } catch (NumberFormatException e) {
+                    /* Ignore */ }
+            }
+
+            // Xử lý Tags
+            if (dto.getTagIds() != null && !dto.getTagIds().isEmpty()) {
+                List<Integer> tagIds = dto.getTagIds().stream().map(Integer::valueOf).collect(Collectors.toList());
+                List<Tag> selectedTags = tagRepository.findAllById(tagIds);
+                manga.setTags(new HashSet<>(selectedTags));
+            }
+
+            // Xử lý Cover Image
+            if (dto.getCoverFile() != null && !dto.getCoverFile().isEmpty()) {
+                String coverName = System.currentTimeMillis() + "_" + dto.getCoverFile().getOriginalFilename();
                 Path coverDir = Paths.get(rootUploadDir, "manga", "covers");
                 if (!Files.exists(coverDir)) {
                     Files.createDirectories(coverDir);
                 }
 
-                // 1. Lưu ảnh gốc
                 Path destFile = coverDir.resolve(coverName);
-                cover.transferTo(destFile);
-                manga.setCoverPath("/manga/covers/" + coverName);
+                dto.getCoverFile().transferTo(destFile);
 
-                // 2. Tạo Thumbnail cho Cover (MỚI)
+                // Tạo Thumb
                 try {
                     Path thumbDir = coverDir.resolve(".thumbs");
                     if (!Files.exists(thumbDir)) {
                         Files.createDirectories(thumbDir);
                     }
-
-                    // Tạo thumb 400px
                     createThumbnail(destFile.toFile(), thumbDir.resolve(coverName).toFile(), 400);
                 } catch (Exception e) {
-                    System.err.println("Failed to create cover thumbnail: " + e.getMessage());
+                }
+
+                manga.setCoverPath("/manga/covers/" + coverName);
+            }
+
+            MangaSeries savedManga = mangaRepository.save(manga);
+
+            // --- 2. XỬ LÝ CHAPTERS (PHẦN QUAN TRỌNG) ---
+            if (dto.getChapterFiles() != null && !dto.getChapterFiles().isEmpty() && dto.getChapterMetadataJson() != null) {
+
+                // [KHỞI TẠO BIẾN CÒN THIẾU]
+                ObjectMapper mapper = new ObjectMapper(); // <-- Khai báo mapper
+
+                // Tạo Map để tìm file nhanh: <TênFile, FileObject>
+                Map<String, MultipartFile> fileMap = dto.getChapterFiles().stream() // <-- Khai báo fileMap
+                        .collect(Collectors.toMap(MultipartFile::getOriginalFilename, Function.identity()));
+
+                // Dùng JsonNode để đọc dữ liệu (Cách này không bị lỗi version thư viện)
+                JsonNode rootNode = mapper.readTree(dto.getChapterMetadataJson());
+
+                if (rootNode.isArray()) {
+                    for (JsonNode node : rootNode) {
+                        // Lấy dữ liệu an toàn từ JSON
+                        String fileName = node.path("fileName").asText();
+                        String newChapterName = node.path("newChapterName").asText();
+                        int order = node.path("order").asInt(0);
+
+                        // Tìm file zip tương ứng trong Map
+                        MultipartFile zipFile = fileMap.get(fileName);
+
+                        if (zipFile != null) {
+                            processUploadedChapter(savedManga, zipFile, newChapterName, order);
+                        }
+                    }
                 }
             }
-            manga = mangaRepository.save(manga);
 
-            // 3. Xử lý File (ZIP hoặc Folder)
-            if (files.length == 1 && files[0].getOriginalFilename() != null && files[0].getOriginalFilename().toLowerCase().endsWith(".zip")) {
-                processZipFile(files[0], manga);
-                return "Upload ZIP success!";
-            }
-
-            processFolderUpload(files, manga);
-            return "Upload Folder success!";
+            return ResponseEntity.ok("Manga created successfully!");
 
         } catch (Exception e) {
             e.printStackTrace();
-            return "Error: " + e.getMessage();
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Hàm xử lý giải nén và lưu 1 chapter cụ thể
+     */
+    private void processUploadedChapter(MangaSeries manga, MultipartFile zipFile, String customChapterName, Integer order) throws Exception {
+        // 1. Tạo Chapter Entity
+        // Nếu không có tên custom, fallback về tên file gốc (bỏ đuôi zip)
+        String finalName = (customChapterName != null && !customChapterName.isEmpty())
+                ? customChapterName
+                : zipFile.getOriginalFilename().replace(".zip", "");
+
+        MangaChapter chapter = MangaChapter.builder()
+                .manga(manga)
+                .chapterName(finalName)
+                .chapterOrder(order) // Lưu thứ tự sắp xếp
+                .folderPath("") // Sẽ cập nhật sau khi có ID
+                .build();
+
+        chapter = chapterRepository.save(chapter);
+
+        // 2. Tạo đường dẫn vật lý: uploads/manga/content/{mangaID}/{chapterID}/
+        String relativePath = Paths.get("manga", "content", manga.getId(), chapter.getId()).toString();
+        Path absolutePath = Paths.get(rootUploadDir, relativePath);
+        if (!Files.exists(absolutePath)) {
+            Files.createDirectories(absolutePath);
+        }
+
+        // Cập nhật folder path vào DB
+        chapter.setFolderPath(relativePath);
+        chapterRepository.save(chapter);
+
+        // 3. Giải nén ZIP và lưu các trang ảnh (MangaPage)
+        try (ZipInputStream zis = new ZipInputStream(zipFile.getInputStream())) {
+            ZipEntry entry;
+
+            // Tạo cache giả để tái sử dụng hàm saveImage hiện có
+            // Hàm saveImage của bạn yêu cầu Map<String, MangaChapter> để tìm chapter
+            Map<String, MangaChapter> singleChapterCache = new HashMap<>();
+            singleChapterCache.put(finalName, chapter);
+
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    continue;
+                }
+
+                String fileName = new File(entry.getName()).getName(); // Lấy tên file, bỏ qua folder cha trong zip
+                if (!isImageFile(fileName)) {
+                    continue;
+                }
+
+                // Tái sử dụng hàm saveImage có sẵn trong Controller của bạn
+                // Lưu ý: Hàm saveImage của bạn tự trích xuất pageOrder từ tên file (vd: 01.jpg -> 1)
+                saveImage(zis, manga, finalName, fileName, entry.getSize(), singleChapterCache);
+            }
         }
     }
 
@@ -307,6 +394,20 @@ public class MangaController {
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @GetMapping("/api/authors/search")
+    @ResponseBody
+    public ResponseEntity<List<MangaAuthor>> searchAuthors(@RequestParam("query") String query) {
+        // Giả sử bạn có method này trong AuthorRepository:
+        // List<MangaAuthor> findByNameContainingIgnoreCase(String name);
+        // Ở đây tôi demo tạm bằng cách find all rồi filter (không tối ưu cho production)
+        List<MangaAuthor> allAuthors = authorRepository.findAll();
+        List<MangaAuthor> filtered = allAuthors.stream()
+                .filter(a -> a.getName().toLowerCase().contains(query.toLowerCase()))
+                .limit(10) // Giới hạn 10 kết quả
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(filtered);
     }
 
     // --- API ĐỌC ẢNH (Quan trọng: Ghép đường dẫn tương đối với Root) ---
