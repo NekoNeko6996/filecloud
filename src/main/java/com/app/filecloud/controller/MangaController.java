@@ -1,5 +1,6 @@
 package com.app.filecloud.controller;
 
+import com.app.filecloud.dto.MangaUpdateDTO;
 import com.app.filecloud.entity.*;
 import com.app.filecloud.repository.*;
 import java.io.File;
@@ -750,54 +751,51 @@ public class MangaController {
         }
     }
 
-    // --- 4. API CẬP NHẬT MANGA (Info, Tags, Cover) ---
+    // --- 4. API CẬP NHẬT MANGA (SỬ DỤNG DTO) ---
     @PostMapping("/update")
     @ResponseBody
     @Transactional
-    public ResponseEntity<String> updateManga(
-            @RequestParam("id") String id,
-            @RequestParam("title") String title,
-            @RequestParam("description") String description,
-            @RequestParam("status") MangaSeries.Status status,
-            @RequestParam(value = "tagIds", required = false) List<Integer> tagIds,
-            @RequestParam(value = "coverFile", required = false) MultipartFile coverFile,
-            @RequestParam(value = "coverPageId", required = false) String coverPageId) {
+    public ResponseEntity<String> updateManga(@ModelAttribute MangaUpdateDTO dto) {
         try {
-            MangaSeries manga = mangaRepository.findById(id).orElseThrow();
-            manga.setTitle(title);
-            manga.setDescription(description);
-            manga.setStatus(status);
+            // 1. Tìm Manga
+            MangaSeries manga = mangaRepository.findById(dto.getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Manga not found"));
 
-            if (tagIds != null) {
-                // Tìm các Tag entity dựa trên ID gửi lên
-                List<Tag> selectedTags = tagRepository.findAllById(tagIds);
+            // 2. Cập nhật thông tin cơ bản
+            manga.setTitle(dto.getTitle());
+            manga.setDescription(dto.getDescription());
+            manga.setStatus(dto.getStatus());
+
+            // 3. Xử lý Tags (Chỉ xử lý list ID được gửi lên)
+            if (dto.getTagIds() != null && !dto.getTagIds().isEmpty()) {
+                // JPA sẽ tự lọc ra các Tag có ID nằm trong list này
+                List<Tag> selectedTags = tagRepository.findAllById(dto.getTagIds());
                 manga.setTags(new HashSet<>(selectedTags));
             } else {
-                // Nếu không chọn tag nào -> Xóa hết
+                // Nếu list rỗng (người dùng bỏ tick hết) -> Xóa hết tag
                 manga.setTags(new HashSet<>());
             }
 
-            // Xử lý Cover: Ưu tiên File Upload -> Sau đó đến Chọn từ Chapter
-            if (coverFile != null && !coverFile.isEmpty()) {
-                String coverName = System.currentTimeMillis() + "_" + coverFile.getOriginalFilename();
+            // 4. Xử lý Cover
+            // Option 1: Upload File mới
+            if ("file".equals(dto.getCoverOption()) && dto.getCoverFile() != null && !dto.getCoverFile().isEmpty()) {
+                String coverName = System.currentTimeMillis() + "_" + dto.getCoverFile().getOriginalFilename();
 
                 Path coverDir = Paths.get(rootUploadDir, "manga", "covers");
                 if (!Files.exists(coverDir)) {
                     Files.createDirectories(coverDir);
                 }
 
-                // --- SỬA Ở ĐÂY: Khai báo biến destFile rõ ràng ---
                 Path destFile = coverDir.resolve(coverName);
-                coverFile.transferTo(destFile); // Lưu ảnh gốc bằng biến này
+                dto.getCoverFile().transferTo(destFile);
 
-                // --- ĐOẠN TẠO THUMBNAIL (Sử dụng destFile vừa khai báo) ---
+                // Tạo Thumbnail
                 try {
                     Path thumbDir = coverDir.resolve(".thumbs");
                     if (!Files.exists(thumbDir)) {
                         Files.createDirectories(thumbDir);
                     }
 
-                    // Thư viện Thumbnails cần biết file gốc nằm ở đâu (destFile)
                     Thumbnails.of(destFile.toFile())
                             .size(400, 600)
                             .outputQuality(0.8)
@@ -805,52 +803,44 @@ public class MangaController {
                 } catch (Exception e) {
                     System.err.println("Cover thumb error: " + e.getMessage());
                 }
-                // -------------------------------------
 
                 manga.setCoverPath("/manga/covers/" + coverName);
-            } else if (coverPageId != null && !coverPageId.isEmpty()) {
-                // User chọn 1 trang làm bìa -> Copy trang đó ra folder covers
-                MangaPage page = pageRepository.findById(coverPageId).orElseThrow();
+            } // Option 2: Chọn từ Chapter
+            else if ("select".equals(dto.getCoverOption()) && dto.getCoverPageId() != null && !dto.getCoverPageId().isEmpty()) {
+                MangaPage page = pageRepository.findById(dto.getCoverPageId()).orElseThrow();
 
-                // 1. Xác định file nguồn (Ảnh trong chapter)
                 Path sourceImg = Paths.get(rootUploadDir, page.getChapter().getFolderPath(), page.getFileName());
-
-                // 2. Chuẩn bị đường dẫn đích (Folder covers)
                 String newCoverName = "cover_" + manga.getId() + "_" + System.currentTimeMillis() + ".jpg";
+
                 Path coverDir = Paths.get(rootUploadDir, "manga", "covers");
                 if (!Files.exists(coverDir)) {
                     Files.createDirectories(coverDir);
                 }
 
                 Path destImg = coverDir.resolve(newCoverName);
-
-                // 3. Copy ảnh gốc sang folder covers
                 Files.copy(sourceImg, destImg, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
-                // --- 4. TẠO THUMBNAIL CHO COVER MỚI (Bổ sung phần này) ---
+                // Tạo Thumbnail cho ảnh chọn từ chapter
                 try {
                     Path thumbDir = coverDir.resolve(".thumbs");
                     if (!Files.exists(thumbDir)) {
                         Files.createDirectories(thumbDir);
                     }
 
-                    // Tạo thumb từ file vừa copy sang (destImg)
                     Thumbnails.of(destImg.toFile())
-                            .size(400, 600) // Kích thước chuẩn cho cover thumb
+                            .size(400, 600)
                             .outputQuality(0.8)
                             .toFile(thumbDir.resolve(newCoverName).toFile());
-
                 } catch (Exception e) {
-                    System.err.println("Error creating thumb for selected cover: " + e.getMessage());
+                    System.err.println("Error creating thumb: " + e.getMessage());
                 }
-                // ---------------------------------------------------------
 
-                // 5. Lưu đường dẫn vào DB
                 manga.setCoverPath("/manga/covers/" + newCoverName);
             }
 
             mangaRepository.save(manga);
             return ResponseEntity.ok("Updated successfully");
+
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
