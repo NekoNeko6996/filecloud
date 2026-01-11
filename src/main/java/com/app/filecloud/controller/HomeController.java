@@ -2,9 +2,11 @@ package com.app.filecloud.controller;
 
 import com.app.filecloud.entity.ContentSubject;
 import com.app.filecloud.entity.FileNode;
+import com.app.filecloud.entity.MangaSeries;
 import com.app.filecloud.entity.StorageVolume;
 import com.app.filecloud.repository.ContentSubjectRepository;
 import com.app.filecloud.repository.FileNodeRepository;
+import com.app.filecloud.repository.MangaSeriesRepository;
 import com.app.filecloud.repository.StorageVolumeRepository;
 import com.app.filecloud.repository.SubjectFolderMappingRepository;
 import java.util.HashMap;
@@ -29,6 +31,7 @@ public class HomeController {
     private final FileNodeRepository fileNodeRepository;
     private final SubjectFolderMappingRepository mappingRepository;
     private final StorageVolumeRepository volumeRepository;
+    private final MangaSeriesRepository mangaRepository;
 
     @GetMapping("/")
     public String dashboard(Model model) {
@@ -41,10 +44,16 @@ public class HomeController {
                 PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"))
         );
         
+        // 3. [NEW] Lấy Manga mới cập nhật (Sắp xếp theo updatedAt giảm dần)
+        List<MangaSeries> recentManga = mangaRepository.findAll(
+                PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "updatedAt"))
+        ).getContent();
+        
         List<StorageVolume> activeVolumes = volumeRepository.findVolumesInUse();
         model.addAttribute("activeVolumes", activeVolumes);
         model.addAttribute("recentSubjects", recentSubjects);
         model.addAttribute("recentFiles", recentMedia);
+        model.addAttribute("recentManga", recentManga);
 
         return "dashboard";
     }

@@ -335,12 +335,23 @@ public class MangaController {
 
     private void createThumbnail(File source, File dest, int targetWidth) {
         try {
+            // Thử tạo thumbnail
             Thumbnails.of(source)
-                    .size(targetWidth, targetWidth) // Kích thước tối đa (nó tự giữ tỷ lệ)
-                    .outputQuality(0.8) // Nén ảnh giảm dung lượng (80% chất lượng)
+                    .size(targetWidth, targetWidth)
+                    .outputQuality(0.8)
                     .toFile(dest);
-        } catch (IOException e) {
-            System.err.println("Thumbnail error: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Thumbnail error (" + source.getName() + "): " + e.getMessage());
+
+            // FALLBACK: Nếu lỗi (do ảnh hỏng hoặc format lạ), copy luôn ảnh gốc làm thumb
+            // (Chấp nhận nặng một chút nhưng giao diện không bị lỗi)
+            try {
+                if (!source.equals(dest)) { // Tránh copy đè nếu đường dẫn trùng
+                    Files.copy(source.toPath(), dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+            } catch (IOException copyEx) {
+                System.err.println("Fallback copy failed: " + copyEx.getMessage());
+            }
         }
     }
 

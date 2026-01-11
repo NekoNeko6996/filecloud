@@ -22,7 +22,6 @@
             </header>
 
             <div class="flex-1 overflow-y-auto p-8 scroll-smooth space-y-10">
-
                 <div class="relative">
                     <div class="flex items-center justify-between mb-4 px-1">
                         <h3 class="text-white text-xl font-bold flex items-center gap-2">Recently Updated</h3>
@@ -129,6 +128,69 @@
                     </div>
                 </div>
 
+                <div class="relative">
+                    <div class="flex items-center justify-between mb-4 px-1">
+                        <h3 class="text-white text-xl font-bold flex items-center gap-2">Latest Manga</h3>
+                        <a href="/manga" class="text-xs text-gray-400 hover:text-white transition-colors">View All</a>
+                    </div>
+
+                    <div class="relative group">
+                        <button onclick="scrollCarousel('mangaCarousel', -1)" 
+                                class="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-30 w-12 h-full items-center justify-center text-white translate-x-0 bg-gradient-to-r from-black/50 to-transparent rounded-l-xl">
+                            <span class="material-symbols-outlined text-3xl">chevron_left</span>
+                        </button>
+
+                        <div id="mangaCarousel" class="flex overflow-x-auto gap-4 sm:gap-5 px-1 no-scrollbar snap-x snap-mandatory scroll-smooth">
+
+                            <div th:each="manga : ${recentManga}" 
+                                 onclick="window.location.href = this.getAttribute('data-url')"
+                                 th:data-url="@{/manga/{id}(id=${manga.id})}"
+                                 class="snap-start shrink-0 w-[160px] sm:w-[200px] h-[260px] sm:h-[320px] relative rounded-xl overflow-hidden cursor-pointer group/card border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20 bg-[#2e2839]">
+
+                                <img th:if="${manga.coverPath != null}" 
+                                     loading="lazy"
+                                     th:src="@{/manga/cover/{id}/thumb(id=${manga.id})}" 
+                                     class="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110 filter brightness-90 group-hover/card:brightness-100">
+
+                                <div th:unless="${manga.coverPath != null}" class="w-full h-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center flex-col gap-2">
+                                    <span class="material-symbols-outlined text-4xl text-white/20">auto_stories</span>
+                                </div>
+
+                                <div class="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide text-white border border-white/10 backdrop-blur-md shadow-sm"
+                                     th:classappend="${manga.status.name() == 'ONGOING' ? 'bg-green-500/80' : (manga.status.name() == 'COMPLETED' ? 'bg-blue-500/80' : 'bg-gray-500/80')}">
+                                    <span th:text="${manga.status}">STATUS</span>
+                                </div>
+
+                                <div class="absolute inset-0 bg-gradient-to-t from-[#171022] via-transparent to-transparent opacity-90"></div>
+
+                                <div class="absolute bottom-0 left-0 w-full p-4">
+                                    <p class="text-primary text-[10px] font-bold uppercase truncate mb-1" 
+                                       th:if="${not #lists.isEmpty(manga.authors)}" 
+                                       th:text="${manga.authors[0].name}">Author</p>
+
+                                    <h4 class="text-base sm:text-lg font-bold text-white leading-tight mb-1 line-clamp-2 drop-shadow-md" th:text="${manga.title}">Title</h4>
+
+                                    <div class="flex items-center justify-between text-gray-400 text-[10px] sm:text-xs mt-2">
+                                        <span class="flex items-center gap-1 bg-white/10 px-1.5 py-0.5 rounded">
+                                            <span class="material-symbols-outlined text-[12px]">layers</span>
+                                            <span th:text="${manga.chapters.size()}">0</span>
+                                        </span>
+                                        <span th:text="${#temporals.format(manga.updatedAt, 'dd MMM')}">Date</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div th:if="${recentManga.isEmpty()}" class="w-full h-40 flex items-center justify-center text-gray-500 border border-dashed border-white/10 rounded-xl">
+                                No manga library created yet.
+                            </div>
+                        </div>
+
+                        <button onclick="scrollCarousel('mangaCarousel', 1)" 
+                                class="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 z-30 w-12 h-full items-center justify-center text-white translate-x-0 bg-gradient-to-l from-black/50 to-transparent rounded-r-xl">
+                            <span class="material-symbols-outlined text-3xl">chevron_right</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-full sm:w-80 flex flex-col border-l border-white/10 overflow-y-auto no-scrollbar z-50 bg-[#171022] shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
