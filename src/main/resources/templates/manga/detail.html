@@ -66,14 +66,25 @@
                             <span class="material-symbols-outlined">list</span> Chapters
                             <span class="text-sm text-gray-500 font-normal ml-2" th:text="'(' + ${chapters.size()} + ')'"></span>
                         </h3>
-                        <button onclick="document.getElementById('addChapterModal').showModal()" class="flex items-center gap-2 px-3 py-1.5 rounded bg-primary hover:bg-primary-dark text-white text-sm font-bold shadow-lg shadow-primary/20 transition-colors">
-                            <span class="material-symbols-outlined text-[18px]">add</span> <span class="hidden sm:inline">Add Chapter</span>
-                        </button>
+                        <div class="flex gap-2">
+                            <button id="btnToggleSort" onclick="toggleSortMode()" class="flex items-center gap-2 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white text-sm font-bold border border-white/10 transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">swap_vert</span> <span class="hidden sm:inline">Sort</span>
+                            </button>
+
+                            <button id="btnSaveOrder" onclick="saveChapterOrder()" class="hidden flex items-center gap-2 px-3 py-1.5 rounded bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-lg shadow-green-600/20 transition-colors animate-pulse">
+                                <span class="material-symbols-outlined text-[18px]">save</span> Save Order
+                            </button>
+
+                            <button onclick="document.getElementById('addChapterModal').showModal()" class="flex items-center gap-2 px-3 py-1.5 rounded bg-primary hover:bg-primary-dark text-white text-sm font-bold shadow-lg shadow-primary/20 transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">add</span> <span class="hidden sm:inline">Add</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 relative"> 
+                    <div id="chapterListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3 relative"> 
                         <div th:each="chap : ${chapters}" 
-                             class="relative group bg-[#2e2839] rounded-lg border border-white/5 hover:bg-[#362f42] hover:border-primary/50 transition-all">
+                             class="relative group bg-[#2e2839] rounded-lg border border-white/5 hover:bg-[#362f42] hover:border-primary/50 transition-all"
+                             th:data-id="${chap.id}">
 
                             <a th:href="@{/manga/read/{id}(id=${chap.id})}"
                                th:data-id="${chap.id}"
@@ -569,6 +580,7 @@
 
             function showPreview(el) {
                 // Không hiện preview nếu là màn hình nhỏ (Mobile/Tablet dọc)
+                if (isSorting) return;
                 if (window.innerWidth < 768)
                     return;
 
@@ -587,6 +599,7 @@
             }
 
             function movePreview(e) {
+                if (isSorting) return;
                 if (window.innerWidth < 768 || previewPopup.classList.contains('hidden'))
                     return;
 
@@ -818,6 +831,107 @@
                 }
 
                 input.value = ''; // Reset input
+            }
+
+
+            // --- LOGIC SORT CHAPTERS ---
+            let chapterSortable = null;
+            let isSorting = false;
+
+            function toggleSortMode() {
+                isSorting = !isSorting;
+                const listContainer = document.getElementById('chapterListContainer');
+                const btnSort = document.getElementById('btnToggleSort');
+                const btnSave = document.getElementById('btnSaveOrder');
+
+                if (isSorting) {
+                    hidePreview();
+                    // BẬT CHẾ ĐỘ SORT
+                    btnSort.classList.add('bg-primary', 'text-white', 'border-primary');
+                    btnSort.classList.remove('bg-white/5', 'text-gray-300');
+                    btnSave.classList.remove('hidden');
+
+                    // Khởi tạo SortableJS
+                    chapterSortable = new Sortable(listContainer, {
+                        animation: 150,
+                        ghostClass: 'opacity-50', // Class cho item đang được kéo
+                        handle: '.chapter-item', // Kéo thả vào bất cứ đâu trên item
+                        onStart: function () {
+                            // Tắt click link khi đang kéo (để tránh nhảy trang)
+                            document.querySelectorAll('.chapter-item a').forEach(a => a.style.pointerEvents = 'none');
+                        },
+                        onEnd: function () {
+                            document.querySelectorAll('.chapter-item a').forEach(a => a.style.pointerEvents = 'auto');
+                        }
+                    });
+
+                    // Thêm hiệu ứng visual cho list để user biết được phép kéo
+                    listContainer.classList.add('ring-2', 'ring-primary/20', 'rounded-lg', 'p-1');
+
+                } else {
+                    // TẮT CHẾ ĐỘ SORT (Hủy mà không save)
+                    turnOffSortMode();
+                    // Reload để trả về vị trí cũ (nếu chưa save)
+                    window.location.reload();
+                }
+            }
+
+            function turnOffSortMode() {
+                const listContainer = document.getElementById('chapterListContainer');
+                const btnSort = document.getElementById('btnToggleSort');
+                const btnSave = document.getElementById('btnSaveOrder');
+
+                isSorting = false;
+
+                // Reset nút
+                btnSort.classList.remove('bg-primary', 'text-white', 'border-primary');
+                btnSort.classList.add('bg-white/5', 'text-gray-300');
+                btnSave.classList.add('hidden');
+
+                // Hủy Sortable
+                if (chapterSortable) {
+                    chapterSortable.destroy();
+                    chapterSortable = null;
+                }
+
+                // Xóa hiệu ứng visual
+                listContainer.classList.remove('ring-2', 'ring-primary/20', 'rounded-lg', 'p-1');
+                document.querySelectorAll('.chapter-item a').forEach(a => a.style.pointerEvents = 'auto');
+            }
+
+            async function saveChapterOrder() {
+                const listContainer = document.getElementById('chapterListContainer');
+                // Lấy danh sách ID theo thứ tự DOM hiện tại
+                // Lưu ý: data-id nằm ở thẻ div cha (.chapter-item)
+                const chapterIds = Array.from(listContainer.children).map(el => el.getAttribute('data-id'));
+
+                const btnSave = document.getElementById('btnSaveOrder');
+                btnSave.innerText = 'Saving...';
+                btnSave.disabled = true;
+
+                try {
+                    const res = await fetch('/manga/chapters/reorder', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            [csrfHeader]: csrfToken
+                        },
+                        body: JSON.stringify(chapterIds)
+                    });
+
+                    if (res.ok) {
+                        turnOffSortMode();
+                        // Không cần reload nếu không muốn, nhưng reload để đảm bảo server sync đúng
+                        window.location.reload();
+                    } else {
+                        alert("Failed to save order");
+                    }
+                } catch (e) {
+                    alert("Network error");
+                } finally {
+                    btnSave.innerText = 'Save Order';
+                    btnSave.disabled = false;
+                }
             }
 
             document.addEventListener("DOMContentLoaded", () => {

@@ -430,6 +430,13 @@ public class MangaController {
         // Sắp xếp lại chapter theo logic số học (Chap 1, Chap 2, Chap 10...) thay vì String (1, 10, 2)
         // Đây là xử lý java đơn giản, sau này có thể tối ưu DB
         chapters.sort((c1, c2) -> {
+            int order1 = c1.getChapterOrder() != null ? c1.getChapterOrder() : 0;
+            int order2 = c2.getChapterOrder() != null ? c2.getChapterOrder() : 0;
+
+            if (order1 != order2) {
+                return Integer.compare(order1, order2); // Sort theo thứ tự custom
+            }
+            // Fallback: Sort theo tên (logic cũ)
             return extractPageNumber(c1.getChapterName()) - extractPageNumber(c2.getChapterName());
         });
 
@@ -445,6 +452,27 @@ public class MangaController {
         model.addAttribute("chapters", chapters);
         model.addAttribute("previewMap", previewMap);
         return "manga/detail";
+    }
+
+    // --- [NEW] API LƯU THỨ TỰ CHAPTER ---
+    @PostMapping("/chapters/reorder")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> reorderChapters(@RequestBody List<String> chapterIds) {
+        try {
+            // Duyệt danh sách ID gửi lên (đã được sắp xếp ở frontend)
+            // Gán index 0, 1, 2... vào DB
+            for (int i = 0; i < chapterIds.size(); i++) {
+                String chapId = chapterIds.get(i);
+                // Dùng custom query update cho nhanh, đỡ phải findById từng cái
+                // Bạn cần thêm method này vào Repository (xem bước 3 bên dưới)
+                chapterRepository.updateChapterOrder(chapId, i);
+            }
+            return ResponseEntity.ok("Order saved");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
     }
 
     // 5. Màn hình Đọc (Xem ảnh trong chapter)

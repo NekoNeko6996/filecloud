@@ -25,6 +25,9 @@ public class MangaChapter {
 
     @Column(name = "chapter_name")
     private String chapterName;
+    
+    @Column(name = "chapter_order")
+    private Integer chapterOrder;
 
     // Lưu đường dẫn TƯƠNG ĐỐI so với rootUploadDir
     // VD: /manga/content/{manga_id}/{chapter_id}/
@@ -38,5 +41,8 @@ public class MangaChapter {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        if (chapterOrder == null) {
+            chapterOrder = 0; // Mặc định
+        }
     }
 }
