@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('System Configuration', 'config', ~{::section}, ~{::script})}">
+    <body>
+
+        <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
+            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white transition-colors">
+                        <span class="material-symbols-outlined text-2xl">menu</span>
+                    </button>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">settings</span> System Configuration
+                    </h2>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
+                <div class="max-w-4xl mx-auto space-y-8">
+
+                    <div th:if="${success}" class="p-4 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 flex items-center gap-3">
+                        <span class="material-symbols-outlined">check_circle</span>
+                        <span th:text="${success}">Success message</span>
+                    </div>
+                    <div th:if="${error}" class="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center gap-3">
+                        <span class="material-symbols-outlined">error</span>
+                        <span th:text="${error}">Error message</span>
+                    </div>
+
+                    <div class="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl">
+                        <div class="flex items-start justify-between mb-6">
+                            <div>
+                                <h3 class="text-lg font-bold text-white mb-1">Movie Module Settings</h3>
+                                <p class="text-sm text-gray-400">Configure where your movie files are physically stored.</p>
+                            </div>
+                            <span class="px-3 py-1 rounded-full text-xs font-bold border"
+                                  th:classappend="${pathStatus == 'ACTIVE' ? 'bg-green-500/10 border-green-500/30 text-green-400' : 
+                                  (pathStatus == 'NOT_CONFIGURED' ? 'bg-gray-500/10 border-gray-500/30 text-gray-400' : 'bg-red-500/10 border-red-500/30 text-red-400')}"
+                                  th:text="${pathStatus}">STATUS</span>
+                        </div>
+
+                        <form action="/admin/config/save-movie-path" method="post" class="space-y-4">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                            <div>
+                                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Physical Main Path</label>
+                                <div class="relative group">
+                                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-primary transition-colors">folder_open</span>
+                                    <input type="text" name="path" 
+                                           th:value="${moviePath}"
+                                           placeholder="E:\data\movie_data" 
+                                           class="w-full bg-[#171022] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all font-mono text-sm">
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2 flex items-start gap-1">
+                                    <span class="material-symbols-outlined text-[14px] shrink-0 mt-0.5">info</span>
+                                    <span>
+                                        System will automatically detect the <strong>Storage Volume</strong> containing this path. 
+                                        Even if the drive letter changes (e.g., E: → F:), the system will maintain the connection using the Drive's UUID.
+                                    </span>
+                                </p>
+                            </div>
+
+                            <div class="flex justify-end pt-2">
+                                <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-primary/20">
+                                    <span class="material-symbols-outlined text-[20px]">save</span> Save Configuration
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <script>
+            // Add custom scripts here if needed
+        </script>
+    </body>
+</html>

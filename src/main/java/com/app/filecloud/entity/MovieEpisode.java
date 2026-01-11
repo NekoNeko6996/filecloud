@@ -30,6 +30,9 @@ public class MovieEpisode {
 
     @Column(name = "file_path", nullable = false, length = 500)
     private String filePath;
+    
+    @Column(name = "thumbnail_path", length = 500)
+    private String thumbnailPath;
 
     @Column(name = "file_size")
     private Long fileSize;

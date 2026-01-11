@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Movies Library', 'movies', ~{::section}, ~{::script})}">
+    <body>
+        <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
+            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white"><span class="material-symbols-outlined text-2xl">menu</span></button>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">movie</span> Movies Library
+                    </h2>
+                </div>
+                <a href="/movies/add" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm shadow-lg shadow-primary/20 transition-all">
+                    <span class="material-symbols-outlined text-[18px]">add</span> Add Movie
+                </a>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-6">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    <a th:each="movie : ${movies}" th:href="@{/movies/{id}(id=${movie.id})}"
+                       class="group relative aspect-[2/3] bg-[#2e2839] rounded-xl overflow-hidden border border-white/5 hover:border-primary/50 transition-all shadow-lg shadow-primary/20">
+
+                        <img th:src="@{/movies/image/{id}(id=${movie.id}, thumb=true)}" 
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                             onerror="this.src='https://placehold.co/300x450/1e1e1e/FFF?text=No+Cover'">
+
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-100 transition-opacity flex flex-col justify-end p-3">
+                            <h3 class="text-white font-bold text-sm leading-tight line-clamp-2" th:text="${movie.title}">Movie Title</h3>
+                            <p class="text-gray-400 text-xs mt-1" th:text="${movie.releaseYear}">2024</p>
+                        </div>
+
+                        <div class="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded border border-white/10 group-hover:hidden"
+                             th:text="${movie.releaseYear}">2023</div>
+                    </a>
+                </div>
+
+                <div th:if="${movies.isEmpty()}" class="flex flex-col items-center justify-center h-64 text-gray-500">
+                    <span class="material-symbols-outlined text-6xl mb-2 opacity-50">videocam_off</span>
+                    <p>No movies found. Add your first one!</p>
+                </div>
+            </div>
+        </section>
+        <script></script>
+    </body>
+</html>

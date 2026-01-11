@@ -13,6 +13,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Movie {
 
     @Id
@@ -36,6 +37,9 @@ public class Movie {
 
     @Column(name = "cover_image_url", length = 500)
     private String coverImageUrl;
+    
+    @Column(name = "thumbnail_path", length = 500)  
+    private String thumbnailPath;
 
     private Float rating;
 
