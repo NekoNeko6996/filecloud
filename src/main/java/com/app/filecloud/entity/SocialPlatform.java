@@ -24,4 +24,7 @@ public class SocialPlatform {
     
     @Column(name = "is_active")
     private boolean isAcvite;
+    
+    @Transient
+    private long usageCount;
 }

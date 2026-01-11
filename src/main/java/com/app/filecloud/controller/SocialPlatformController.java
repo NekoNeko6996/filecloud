@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Sort;
 
 @Controller
 @RequestMapping("/admin/platforms")
@@ -26,11 +27,38 @@ public class SocialPlatformController {
     private final SubjectSocialLinkRepository linkRepository;
     private final MediaService mediaService;
 
+    // ... imports (thêm Sort, ArrayList...)
     @GetMapping
-    public String platformsPage(Model model) {
-        List<SocialPlatform> platforms = platformRepository.findAll();
+    public String platformsPage(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false, defaultValue = "name_asc") String sort,
+            Model model) {
+
+        // 1. Xác định chiều Sắp xếp
+        Sort sortOption = switch (sort) {
+            case "name_desc" ->
+                Sort.by(Sort.Direction.DESC, "name");
+            default ->
+                Sort.by(Sort.Direction.ASC, "name");
+        };
+
+        // 2. Lấy dữ liệu (Có tìm kiếm hoặc không)
+        List<SocialPlatform> platforms;
+        if (keyword != null && !keyword.isBlank()) {
+            platforms = platformRepository.findByNameContainingIgnoreCase(keyword, sortOption);
+        } else {
+            platforms = platformRepository.findAll(sortOption);
+        }
+        
+        platforms.forEach(p -> {
+            p.setUsageCount(linkRepository.countByPlatformId(p.getId()));
+        });
+
         model.addAttribute("platforms", platforms);
-        return "admin/platforms"; // Lưu file html tại: templates/admin/platforms.html
+        model.addAttribute("keyword", keyword);
+        model.addAttribute("currentSort", sort); // Để giữ trạng thái dropdown
+
+        return "admin/platforms";
     }
 
     // API lấy chi tiết để hiện ở Side Panel

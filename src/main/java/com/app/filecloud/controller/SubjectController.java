@@ -154,12 +154,25 @@ public class SubjectController {
     }
 
     @GetMapping("/{id}")
-    public String subjectProfile(@PathVariable Integer id, Model model) {
+    public String subjectProfile(
+            @PathVariable Integer id,
+            @RequestParam(required = false, defaultValue = "newest") String sort,
+            Model model) {
         ContentSubject subject = subjectRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Subject not found"));
 
         // Lấy danh sách Files
         List<FileNode> files = fileNodeRepository.findBySubjectId(id);
+        
+        switch (sort) {
+            case "name_asc" -> files.sort(Comparator.comparing(FileNode::getName, String.CASE_INSENSITIVE_ORDER));
+            case "name_desc" -> files.sort(Comparator.comparing(FileNode::getName, String.CASE_INSENSITIVE_ORDER).reversed());
+            case "size_desc" -> files.sort(Comparator.comparing(FileNode::getSize).reversed());
+            case "size_asc" -> files.sort(Comparator.comparing(FileNode::getSize));
+            case "oldest" -> files.sort(Comparator.comparing(FileNode::getCreatedAt));
+            case "newest" -> files.sort(Comparator.comparing(FileNode::getCreatedAt).reversed());
+            default -> files.sort(Comparator.comparing(FileNode::getCreatedAt).reversed());
+        }
 
         // --- XỬ LÝ TAGS ---
         List<String> fileIds = files.stream().map(FileNode::getId).toList();
@@ -219,6 +232,8 @@ public class SubjectController {
         // Mappings (Dùng bản safe đã convert)
         model.addAttribute("mappings", safeMappings);
 
+        model.addAttribute("selectedSort", sort);
+        
         return "subject-profile";
     }
 

@@ -4,317 +4,229 @@
     <body>
 
         <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
-            <header class="glass-header h-16 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10 sticky top-0 gap-2 sm:gap-4">
-                <div class="flex items-center gap-3 sm:gap-4">
+            <header class="glass-header h-16 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10 sticky top-0 gap-3">
+                <div class="flex items-center gap-3 flex-1">
                     <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white transition-colors p-1">
                         <span class="material-symbols-outlined text-2xl">menu</span>
                     </button>
-                    <h2 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2">Social Platforms</h2>
+                    <h2 class="hidden sm:block text-lg font-bold text-white whitespace-nowrap">Social Platforms</h2>
+
+                    <div class="relative group w-full max-w-xs ml-2">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[18px]">search</span>
+                        <input type="text" id="searchInput" 
+                               th:value="${keyword}"
+                               onkeydown="if (event.key === 'Enter')
+                                           doSearch()"
+                               placeholder="Search platforms..." 
+                               class="w-full bg-[#1e1926] border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-sm text-white focus:ring-1 focus:ring-primary outline-none transition-all">
+                    </div>
                 </div>
-                
-                <button onclick="openCreateModal()" class="bg-primary hover:bg-primary-dark text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg shadow-primary/20">
-                    <span class="material-symbols-outlined text-[18px]">add</span> 
-                    <span class="hidden sm:inline">Add Platform</span>
-                </button>
+
+                <div class="flex items-center gap-3">
+                    <div class="relative hidden sm:block">
+                        <select onchange="doSort(this.value)" 
+                                class="appearance-none bg-[#2e2839] border border-white/10 text-gray-300 text-xs font-bold rounded-lg pl-3 pr-8 py-2 hover:border-primary/50 focus:outline-none cursor-pointer">
+                            <option value="name_asc" th:selected="${currentSort == 'name_asc'}">A-Z</option>
+                            <option value="name_desc" th:selected="${currentSort == 'name_desc'}">Z-A</option>
+                        </select>
+                        <span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 text-[16px] pointer-events-none">sort</span>
+                    </div>
+
+                    <button onclick="openCreateModal()" class="bg-primary hover:bg-primary-dark text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg shadow-primary/20 whitespace-nowrap">
+                        <span class="material-symbols-outlined text-[18px]">add</span> 
+                        <span class="hidden sm:inline">Add New</span>
+                    </button>
+                </div>
             </header>
 
-            <div class="flex-1 overflow-y-auto p-4 sm:p-8 scroll-smooth" onclick="closeContextMenu()">
-
-                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
+            <div class="flex-1 overflow-y-auto p-4 sm:p-8 scroll-smooth">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <div th:each="p : ${platforms}" 
-                         class="group relative bg-[#2e2839] border border-white/5 rounded-xl p-6 flex flex-col items-center gap-3 cursor-pointer hover:border-primary/50 hover:bg-[#362f42] transition-all shadow-lg hover:shadow-primary/10"
-                         th:data-id="${p.id}"
-                         th:data-name="${p.name}"
-                         th:data-baseurl="${p.baseUrl}"
-                         th:data-icon="${p.iconUrl}"
-                         oncontextmenu="openContextMenu(event, this)">
+                         class="bg-[#2e2839] border border-white/5 rounded-xl p-4 hover:border-primary/50 transition-all cursor-pointer group relative btn-open-detail"
+                         th:onclick="'openDetailPanel(' + ${p.id} + ')'">
 
-                        <div class="w-16 h-16 rounded-full bg-black/30 p-2 border border-white/10 shadow-inner group-hover:scale-110 transition-transform duration-300">
-                            <img th:if="${p.iconUrl != null and p.iconUrl != ''}" th:src="${p.iconUrl}" class="w-full h-full object-contain rounded-full">
-                            <div th:unless="${p.iconUrl != null and p.iconUrl != ''}" class="w-full h-full flex items-center justify-center text-gray-500 font-bold text-xl">
-                                <span th:text="${#strings.substring(p.name,0,1)}">A</span>
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="w-12 h-12 rounded-lg bg-black/30 p-2 flex items-center justify-center border border-white/5">
+                                <img th:if="${p.iconUrl != null}" th:src="${p.iconUrl}" class="w-full h-full object-contain">
+                                <span th:unless="${p.iconUrl != null}" class="text-xl font-bold text-gray-500" th:text="${#strings.substring(p.name,0,1)}">X</span>
+                            </div>
+                            <span th:if="${p.isAcvite}" class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>
+                            <span th:unless="${p.isAcvite}" class="w-2 h-2 rounded-full bg-red-500"></span>
+                        </div>
+
+                        <h3 class="text-white font-bold text-lg truncate" th:text="${p.name}">Twitter</h3>
+                        <p class="text-gray-500 text-xs truncate font-mono mt-1" th:text="${p.baseUrl}">https://twitter.com</p>
+
+                        <div class="mt-3 flex items-center gap-1.5 text-[11px] text-gray-400 bg-black/20 w-fit px-2 py-1 rounded-md border border-white/5">
+                            <span class="material-symbols-outlined text-[14px]">group</span>
+                            <span th:text="${p.usageCount} + ' subjects'">0 subjects</span>
+                        </div>
+                    </div>
+
+                    <div th:if="${platforms.isEmpty()}" class="col-span-full flex flex-col items-center justify-center py-20 text-gray-500 border-2 border-dashed border-white/10 rounded-xl">
+                        <span class="material-symbols-outlined text-4xl mb-2">search_off</span>
+                        <p>No platforms found.</p>
+                    </div>
+                </div>
+            </div>
+
+            <aside id="platformDetailPanel" class="fixed right-0 top-0 h-screen w-full sm:w-96 bg-[#171022] border-l border-white/10 shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+                <div class="p-6 border-b border-white/10 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-white">Platform Details</h3>
+                    <button onclick="closeDetailPanel()" class="text-gray-400 hover:text-white"><span class="material-symbols-outlined">close</span></button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-6">
+                    <form id="platformForm" action="/admin/platforms/save" method="post" enctype="multipart/form-data" class="flex flex-col gap-5">
+                        <input type="hidden" name="id" id="detailId">
+
+                        <div class="flex justify-center mb-2">
+                            <div class="w-20 h-20 rounded-xl bg-black/30 border border-white/10 flex items-center justify-center overflow-hidden relative group">
+                                <img id="detailIconPreview" src="" class="w-full h-full object-contain p-2">
+                                <div class="absolute inset-0 bg-black/60 hidden group-hover:flex items-center justify-center text-xs text-white">Icon</div>
                             </div>
                         </div>
 
-                        <div class="text-center w-full">
-                            <h3 class="text-white font-bold truncate" th:text="${p.name}">Name</h3>
-                            <p class="text-[#a79cba] text-xs truncate font-mono mt-1 px-2 py-0.5 bg-black/20 rounded" th:text="${p.baseUrl}">url</p>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Platform Name</label>
+                            <input type="text" name="name" id="detailName" required
+                                   class="w-full bg-[#2e2839] border border-white/10 rounded-lg px-4 py-2 text-white focus:border-primary outline-none">
                         </div>
-                    </div>
-                </div>
 
-                <div th:if="${platforms.isEmpty()}" class="flex flex-col items-center justify-center h-64 text-gray-500">
-                    <span class="material-symbols-outlined text-5xl mb-2">dns</span>
-                    <p>No platforms configured.</p>
-                </div>
-            </div>
-
-            <div id="contextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl overflow-hidden p-2">
-                <button onclick="viewDetails()" class="w-full text-left px-4 py-2.5 text-sm rounded text-gray-200 hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
-                    <span class="material-symbols-outlined text-[18px]">info</span> Details
-                </button>
-                <button onclick="editPlatform()" class="w-full text-left px-4 py-2.5 text-sm rounded text-gray-200 hover:bg-primary hover:text-white flex items-center gap-2 transition-colors">
-                    <span class="material-symbols-outlined text-[18px]">edit</span> Edit
-                </button>   
-                <div class="h-px bg-white/10 my-1 mx-2"></div>
-                <button onclick="deletePlatform()" class="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2 transition-colors">
-                    <span class="material-symbols-outlined text-[18px]">delete</span> Delete
-                </button>
-            </div>
-
-            <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-full sm:w-96 flex flex-col border-l border-white/10 bg-[#171022] shadow-2xl translate-x-full transition-transform duration-300 ease-in-out z-40">
-                <div class="p-6 flex flex-col h-full">
-                    <div class="flex items-center justify-between mb-6 shrink-0">
-                        <h3 class="text-white font-bold text-lg flex items-center gap-2">
-                            <span class="material-symbols-outlined text-primary">hub</span> Platform Details
-                        </h3>
-                        <button onclick="closeDetails()" class="text-[#a79cba] hover:text-white transition-colors"><span class="material-symbols-outlined">close</span></button>
-                    </div>
-
-                    <div class="flex flex-col items-center mb-6 shrink-0">
-                        <img id="detailIcon" src="" class="w-24 h-24 rounded-full border-4 border-[#2e2839] shadow-xl bg-black mb-3 object-contain">
-                        <h2 id="detailName" class="text-2xl font-bold text-white">Name</h2>
-                        <a id="detailBaseUrl" href="#" target="_blank" class="text-primary text-sm hover:underline font-mono mt-1">url</a>
-                    </div>
-
-                    <div class="h-px bg-white/10 w-full mb-4 shrink-0"></div>
-
-                    <div class="flex-1 overflow-hidden flex flex-col">
-                        <h4 class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Linked Subjects (<span id="countSubjects">0</span>)</h4>
-                        <div class="flex-1 overflow-y-auto space-y-2 pr-2" id="linkedSubjectsList">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Base URL</label>
+                            <input type="text" name="baseUrl" id="detailBaseUrl" required
+                                   class="w-full bg-[#2e2839] border border-white/10 rounded-lg px-4 py-2 text-white focus:border-primary outline-none font-mono text-sm">
                         </div>
-                    </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Icon Source</label>
+                            <div class="flex gap-4 mb-3">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="iconType" value="url" checked onchange="toggleIconInput('url')" class="text-primary bg-gray-700 border-gray-600">
+                                    <span class="text-sm text-gray-300">URL</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="iconType" value="file" onchange="toggleIconInput('file')" class="text-primary bg-gray-700 border-gray-600">
+                                    <span class="text-sm text-gray-300">Upload</span>
+                                </label>
+                            </div>
+
+                            <input type="text" name="iconUrl" id="inputIconUrl" placeholder="https://example.com/icon.png"
+                                   oninput="updatePreviewFromUrl(this.value)"
+                                   class="w-full bg-[#2e2839] border border-white/10 rounded-lg px-4 py-2 text-white focus:border-primary outline-none text-sm">
+
+                            <input type="file" name="iconFile" id="inputIconFile" accept="image/*"
+                                   onchange="updatePreviewFromFile(this)"
+                                   class="hidden w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/20 file:text-primary hover:file:bg-primary/30">
+                        </div>
+
+                        <div class="pt-4 mt-auto flex gap-3">
+                            <button type="button" onclick="deletePlatform()" id="btnDelete" class="flex-1 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white py-2 rounded-lg font-bold transition-colors">Delete</button>
+                            <button type="submit" class="flex-[2] bg-primary hover:bg-primary-dark text-white py-2 rounded-lg font-bold shadow-lg shadow-primary/20">Save Changes</button>
+                        </div>
+                    </form>
                 </div>
             </aside>
 
-            <dialog id="platformModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-md">
-                <form th:action="@{/admin/platforms/save}" method="post" enctype="multipart/form-data" class="flex flex-col gap-4">
-                    <div class="flex justify-between items-center mb-2">
-                        <h3 class="font-bold text-xl" id="modalTitle">Add Platform</h3>
-                        <button type="button" onclick="this.closest('dialog').close()" class="text-gray-400 hover:text-white">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
-                    </div>
-
-                    <input type="hidden" name="id" id="inputId">
-
-                    <div>
-                        <label class="text-xs text-gray-400 mb-2 block uppercase font-bold tracking-wide">Icon</label>
-                        <div class="flex gap-4 items-start">
-                            <div class="shrink-0 w-16 h-16 rounded-full border-2 border-white/20 overflow-hidden bg-black/50 p-1">
-                                <img id="iconPreview" src="https://ui-avatars.com/api/?name=P&background=random" class="w-full h-full object-contain rounded-full">
-                            </div>
-                            <div class="flex-1">
-                                <div class="flex gap-4 mb-2 text-sm border-b border-white/10 pb-1">
-                                    <label class="cursor-pointer font-bold text-primary hover:text-primary-light">
-                                        <input type="radio" name="iconType" value="url" checked onchange="toggleIconInput('url')" class="hidden peer">
-                                        <span class="peer-checked:underline">Paste Link</span>
-                                    </label>
-                                    <label class="cursor-pointer font-bold text-gray-400 hover:text-white">
-                                        <input type="radio" name="iconType" value="file" onchange="toggleIconInput('file')" class="hidden peer">
-                                        <span class="peer-checked:text-primary peer-checked:underline">Upload File</span>
-                                    </label>
-                                </div>
-                                <div id="inputUrlGroup">
-                                    <input type="text" name="iconUrl" id="inputIconUrl" placeholder="https://..."
-                                           oninput="updatePreviewFromUrl(this.value)"
-                                           class="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary">
-                                </div>
-                                <div id="inputFileGroup" class="hidden">
-                                    <input type="file" name="iconFile" id="inputIconFile" accept="image/*"
-                                           onchange="updatePreviewFromFile(this)"
-                                           class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/20 file:text-primary hover:file:bg-primary/30">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold tracking-wide">Name</label>
-                        <input type="text" name="name" id="inputName" required placeholder="e.g. Twitter"
-                               class="w-full bg-black/30 border border-white/10 rounded px-4 py-2 text-white focus:outline-none focus:border-primary">
-                    </div>
-
-                    <div>
-                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold tracking-wide">Base URL</label>
-                        <input type="text" name="baseUrl" id="inputBaseUrl" required placeholder="e.g. https://twitter.com/"
-                               class="w-full bg-black/30 border border-white/10 rounded px-4 py-2 text-white focus:outline-none focus:border-primary font-mono text-sm">
-                    </div>
-
-                    <div class="flex gap-3 justify-end mt-4 pt-4 border-t border-white/5">
-                        <button type="button" onclick="this.closest('dialog').close()" class="px-4 py-2 text-sm text-gray-400 hover:text-white font-medium">Cancel</button>
-                        <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-primary/20">Save</button>
-                    </div>
-                </form>
-            </dialog>
-
-            <form id="deleteForm" th:action="@{/admin/platforms/delete}" method="post" class="hidden">
+            <form id="deleteForm" action="/admin/platforms/delete" method="post" class="hidden">
                 <input type="hidden" name="id" id="deleteId">
             </form>
 
         </section>
 
-        <script>
-            // --- CONTEXT MENU ---
-            const contextMenu = document.getElementById('contextMenu');
-            let activeItem = null; // Store data of clicked item
-
-            function openContextMenu(e, el) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                // Lưu data từ thẻ div vào biến activeItem
-                activeItem = {
-                    id: el.getAttribute('data-id'),
-                    name: el.getAttribute('data-name'),
-                    baseUrl: el.getAttribute('data-baseurl'),
-                    icon: el.getAttribute('data-icon')
-                };
-
-                let x = e.clientX;
-                let y = e.clientY;
-                if (window.innerWidth - x < 200)
-                    x -= 200;
-                if (window.innerHeight - y < 150)
-                    y -= 150;
-
-                contextMenu.style.left = `${x}px`;
-                contextMenu.style.top = `${y}px`;
-                contextMenu.classList.remove('hidden');
+        <script th:inline="javascript">
+            // --- 1. SEARCH & SORT LOGIC ---
+            function doSearch() {
+                const keyword = document.getElementById('searchInput').value;
+                const sort = /*[[${currentSort}]]*/ 'name_asc';
+                window.location.href = `?keyword=${encodeURIComponent(keyword)}&sort=${sort}`;
             }
 
-            function closeContextMenu() {
-                contextMenu.classList.add('hidden');
+            function doSort(sortValue) {
+                const keyword = /*[[${keyword}]]*/ '';
+                let url = `?sort=${sortValue}`;
+                if (keyword)
+                    url += `&keyword=${encodeURIComponent(keyword)}`;
+                window.location.href = url;
             }
 
-            // --- DETAILS SIDE PANEL ---
-            const detailsPanel = document.getElementById('detailsPanel');
+            // --- 2. DETAIL PANEL LOGIC (FIX: Click outside to close) ---
+            const panel = document.getElementById('platformDetailPanel');
 
-            function closeDetails() {
-                detailsPanel.classList.remove('translate-x-0');
-                detailsPanel.classList.add('translate-x-full');
+            function openCreateModal() {
+                // Reset form for create
+                document.getElementById('detailId').value = '';
+                document.getElementById('detailName').value = '';
+                document.getElementById('detailBaseUrl').value = '';
+                document.getElementById('inputIconUrl').value = '';
+                document.getElementById('detailIconPreview').src = 'https://ui-avatars.com/api/?name=New&background=random';
+                document.getElementById('btnDelete').style.display = 'none'; // Hide delete button for new
+
+                panel.classList.remove('translate-x-full');
             }
 
-            function viewDetails() {
-                closeContextMenu();
-                if (!activeItem)
-                    return;
-
-                detailsPanel.classList.remove('translate-x-full');
-                detailsPanel.classList.add('translate-x-0');
-
-                // Set basic info immediately
-                document.getElementById('detailName').innerText = activeItem.name;
-                document.getElementById('detailBaseUrl').innerText = activeItem.baseUrl;
-                document.getElementById('detailBaseUrl').href = activeItem.baseUrl;
-                document.getElementById('detailIcon').src = activeItem.icon || `https://ui-avatars.com/api/?name=${activeItem.name}&background=random`;
-                document.getElementById('linkedSubjectsList').innerHTML = '<p class="text-gray-500 text-sm animate-pulse">Loading linked subjects...</p>';
-
-                // Fetch linked subjects
-                fetch(`/admin/platforms/${activeItem.id}/details`)
+            function openDetailPanel(id) {
+                // Fetch details via API
+                fetch(`/admin/platforms/${id}/details`)
                         .then(res => res.json())
                         .then(data => {
-                            const list = document.getElementById('linkedSubjectsList');
-                            document.getElementById('countSubjects').innerText = data.linkedSubjects.length;
+                            document.getElementById('detailId').value = data.id;
+                            document.getElementById('detailName').value = data.name;
+                            document.getElementById('detailBaseUrl').value = data.baseUrl;
+                            document.getElementById('inputIconUrl').value = data.iconUrl || '';
+                            document.getElementById('detailIconPreview').src = data.iconUrl || `https://ui-avatars.com/api/?name=${data.name}&background=random`;
+                            document.getElementById('btnDelete').style.display = 'block'; // Show delete button
 
-                            if (data.linkedSubjects.length === 0) {
-                                list.innerHTML = '<p class="text-gray-500 text-sm italic">No subjects linked.</p>';
-                                return;
-                            }
-
-                            list.innerHTML = data.linkedSubjects.map(sub => `
-                            <a href="/subjects/${sub.subjectId}" class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5 hover:border-primary/30 group transition-colors">
-                                <span class="text-white text-sm font-medium">${sub.subjectName}</span>
-                                <span class="text-xs text-gray-500 font-mono group-hover:text-primary truncate max-w-[120px]">${sub.profilePath}</span>
-                            </a>
-                        `).join('');
-                        })
-                        .catch(err => {
-                            console.error(err);
-                            document.getElementById('linkedSubjectsList').innerHTML = '<p class="text-red-400 text-sm">Error loading data.</p>';
+                            panel.classList.remove('translate-x-full');
                         });
             }
 
-            // --- CREATE / EDIT MODAL ---
-            function openCreateModal() {
-                document.getElementById('modalTitle').innerText = 'Add Platform';
-                document.getElementById('inputId').value = '';
-                document.getElementById('inputName').value = '';
-                document.getElementById('inputBaseUrl').value = '';
-                document.getElementById('inputIconUrl').value = '';
-                document.getElementById('iconPreview').src = 'https://ui-avatars.com/api/?name=New&background=random';
-
-                // Reset radio
-                document.querySelector('input[name="iconType"][value="url"]').click();
-
-                document.getElementById('platformModal').showModal();
+            function closeDetailPanel() {
+                panel.classList.add('translate-x-full');
             }
 
-            function editPlatform() {
-                closeContextMenu();
-                if (!activeItem)
-                    return;
-
-                document.getElementById('modalTitle').innerText = 'Edit Platform';
-                document.getElementById('inputId').value = activeItem.id;
-                document.getElementById('inputName').value = activeItem.name;
-                document.getElementById('inputBaseUrl').value = activeItem.baseUrl;
-
-                // Nếu có iconUrl, điền vào ô input URL và hiển thị preview
-                document.getElementById('inputIconUrl').value = activeItem.icon || '';
-                updatePreviewFromUrl(activeItem.icon || '');
-
-                // Reset radio về URL mode mặc định để user thấy link cũ
-                document.querySelector('input[name="iconType"][value="url"]').click();
-
-                document.getElementById('platformModal').showModal();
-            }
-
-            // --- DELETE ---
             function deletePlatform() {
-                closeContextMenu();
-                if (!activeItem)
-                    return;
-                if (confirm(`Are you sure you want to delete ${activeItem.name}? This will remove links from all subjects using it.`)) {
-                    document.getElementById('deleteId').value = activeItem.id;
+                if (confirm('Are you sure? This will delete all social links associated with this platform!')) {
+                    document.getElementById('deleteId').value = document.getElementById('detailId').value;
                     document.getElementById('deleteForm').submit();
                 }
             }
 
-            // --- ICON PREVIEW LOGIC (Copied & Simplified) ---
+            // --- 3. CLICK OUTSIDE LISTENER ---
+            document.addEventListener('click', (e) => {
+                const isPanelOpen = !panel.classList.contains('translate-x-full');
+                // Nếu panel đang mở
+                if (isPanelOpen) {
+                    // Nếu click KHÔNG nằm trong Panel VÀ KHÔNG nằm trong nút mở (thẻ có class .btn-open-detail hoặc nút Add)
+                    if (!panel.contains(e.target) && !e.target.closest('.btn-open-detail') && !e.target.closest('button[onclick="openCreateModal()"]')) {
+                        closeDetailPanel();
+                    }
+                }
+            });
+
+            // --- 4. ICON TOGGLE LOGIC ---
             function toggleIconInput(type) {
-                const urlGroup = document.getElementById('inputUrlGroup');
-                const fileGroup = document.getElementById('inputFileGroup');
                 const urlInput = document.getElementById('inputIconUrl');
                 const fileInput = document.getElementById('inputIconFile');
-
                 if (type === 'url') {
-                    urlGroup.classList.remove('hidden');
-                    fileGroup.classList.add('hidden');
-                    fileInput.value = '';
-                    updatePreviewFromUrl(urlInput.value);
+                    urlInput.classList.remove('hidden');
+                    fileInput.classList.add('hidden');
                 } else {
-                    urlGroup.classList.add('hidden');
-                    fileGroup.classList.remove('hidden');
+                    urlInput.classList.add('hidden');
+                    fileInput.classList.remove('hidden');
                 }
             }
 
             function updatePreviewFromUrl(url) {
-                const preview = document.getElementById('iconPreview');
-                if (url && url.trim() !== '') {
-                    preview.src = url;
-                } else {
-                    preview.src = 'https://ui-avatars.com/api/?name=P&background=random';
-                }
+                if (url)
+                    document.getElementById('detailIconPreview').src = url;
             }
 
             function updatePreviewFromFile(input) {
-                const preview = document.getElementById('iconPreview');
                 if (input.files && input.files[0]) {
                     const reader = new FileReader();
-                    reader.onload = function (e) {
-                        preview.src = e.target.result;
-                    }
+                    reader.onload = (e) => document.getElementById('detailIconPreview').src = e.target.result;
                     reader.readAsDataURL(input.files[0]);
                 }
             }

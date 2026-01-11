@@ -11,4 +11,6 @@ public interface SubjectSocialLinkRepository extends JpaRepository<SubjectSocial
     
     // THÊM HÀM NÀY: Tìm các subject đang dùng platform này
     List<SubjectSocialLink> findByPlatformId(Integer platformId);
+    
+    long countByPlatformId(Integer platformId);
 }
