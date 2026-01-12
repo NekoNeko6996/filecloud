@@ -153,107 +153,129 @@
                 </div>
             </div>
 
-            <div id="uploadModal" class="fixed inset-0 z-50 hidden">
-                <div class="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeUploadModal()"></div>
+            <div id="uploadModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeUploadModal()"></div>
 
-                <div class="absolute bottom-0 md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-full md:max-w-md bg-[#1e1e1e] border-t md:border border-white/10 rounded-t-2xl md:rounded-2xl shadow-2xl p-6 transition-transform duration-300 transform translate-y-0">
-                    <div class="w-12 h-1 bg-white/10 rounded-full mx-auto mb-4 md:hidden"></div> <h3 class="text-lg md:text-xl font-bold text-white mb-4">Add New Episode</h3>
+                <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+                    <div class="flex min-h-full items-end justify-center text-center md:items-center p-0 md:p-4">
 
-                    <form th:action="@{/movies/{id}/episodes/add(id=${movie.id})}" method="post" enctype="multipart/form-data" class="space-y-4">
-                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <div class="relative transform overflow-hidden bg-[#1e1e1e] text-left shadow-2xl transition-all w-full md:max-w-md rounded-t-2xl md:rounded-2xl border-t md:border border-white/10 max-h-[90vh] flex flex-col">
 
-                        <div id="videoPreviewContainer" class="hidden aspect-video w-full bg-black rounded-lg overflow-hidden border border-white/10 mb-2 relative group">
-                            <video id="videoPreviewPlayer" controls class="w-full h-full object-contain"></video>
-                            <button type="button" onclick="clearVideoSelection()" class="absolute top-2 right-2 bg-black/60 hover:bg-red-500 text-white p-1.5 rounded-full backdrop-blur-md">
-                                <span class="material-symbols-outlined text-sm">close</span>
-                            </button>
-                        </div>
+                            <div class="p-6 overflow-y-auto">
+                                <div class="w-12 h-1 bg-white/10 rounded-full mx-auto mb-4 md:hidden"></div> <h3 class="text-lg md:text-xl font-bold text-white mb-4">Add New Episode</h3>
 
-                        <div class="flex gap-3">
-                            <div class="w-1/3">
-                                <label class="block text-[10px] md:text-xs font-bold text-gray-400 uppercase mb-1">Ep. No.</label>
-                                <input type="number" name="episodeNumber" th:value="${movie.episodes.size() + 1}" required
-                                       class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm font-mono text-center">
+                                <form th:action="@{/movies/{id}/episodes/add(id=${movie.id})}" method="post" enctype="multipart/form-data" class="space-y-4">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                                    <div id="videoPreviewContainer" class="hidden aspect-video w-full bg-black rounded-lg overflow-hidden border border-white/10 mb-2 relative group shrink-0">
+                                        <video id="videoPreviewPlayer" controls class="w-full h-full object-contain"></video>
+                                        <button type="button" onclick="clearVideoSelection()" class="absolute top-2 right-2 bg-black/60 hover:bg-red-500 text-white p-1.5 rounded-full backdrop-blur-md">
+                                            <span class="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                    </div>
+
+                                    <div class="flex gap-3">
+                                        <div class="w-1/3">
+                                            <label class="block text-[10px] md:text-xs font-bold text-gray-400 uppercase mb-1">Ep. No.</label>  
+                                            <input type="number" name="episodeNumber" th:value="${movie.episodes.size() + 1}" required
+                                                   class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
+                                        </div>
+                                        <div class="flex-1">
+                                            <label class="block text-[10px] md:text-xs font-bold text-gray-400 uppercase mb-1">Title</label>
+                                            <input type="text" id="episodeTitleInput" name="title" required placeholder="e.g. Pilot"
+                                                   class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-[10px] md:text-xs font-bold text-gray-400 uppercase mb-1">Video File</label>
+                                        <input type="file" id="episodeFileInput" name="file" accept="video/*,.mkv" required onchange="handleEpisodeFileSelect(this)"
+                                               class="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 border border-white/10 rounded-lg bg-black/30 py-1">
+                                    </div>
+
+                                    <div class="flex justify-end gap-2 pt-2">
+                                        <button type="button" onclick="closeUploadModal()" class="px-4 py-2 text-gray-400 hover:text-white text-sm font-bold">Cancel</button>
+                                        <button type="submit" id="btnUpload" onclick="this.innerHTML = 'Uploading...';this.disabled = true;this.form.submit();"
+                                                class="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-primary/20 transition-all w-full md:w-auto">
+                                            Upload
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
-                            <div class="flex-1">
-                                <label class="block text-[10px] md:text-xs font-bold text-gray-400 uppercase mb-1">Episode Title</label>
-                                <input type="text" id="episodeTitleInput" name="title" required placeholder="e.g. Pilot"
-                                       class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
-                            </div>
                         </div>
-
-                        <div>
-                            <label class="block text-[10px] md:text-xs font-bold text-gray-400 uppercase mb-1">Video File</label>
-                            <input type="file" id="episodeFileInput" name="file" accept="video/*,.mkv" required onchange="handleEpisodeFileSelect(this)"
-                                   class="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 border border-white/10 rounded-lg bg-black/30 py-1">
-                        </div>
-
-                        <div class="flex justify-end gap-2 pt-2">
-                            <button type="button" onclick="closeUploadModal()" class="px-4 py-2 text-gray-400 hover:text-white text-sm font-bold">Cancel</button>
-                            <button type="submit" id="btnUpload" onclick="this.innerHTML = 'Uploading...'; this.disabled = true; this.form.submit();"
-                                    class="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-primary/20 transition-all w-full md:w-auto">
-                                Upload
-                            </button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
             </div>
 
-            <div id="editModal" class="fixed inset-0 z-50 hidden">
-                <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeEditModal()"></div>
+            <div id="editModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeEditModal()"></div>
 
-                <div class="absolute bottom-0 md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-full md:max-w-2xl bg-[#1e1e1e] border-t md:border border-white/10 rounded-t-2xl md:rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
-                    <div class="w-12 h-1 bg-white/10 rounded-full mx-auto mb-4 md:hidden"></div>
-                    <h3 class="text-lg md:text-xl font-bold text-white mb-6">Edit Movie Details</h3>
+                <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+                    <div class="flex min-h-full items-end justify-center text-center md:items-center p-0 md:p-4">
 
-                    <form th:action="@{/movies/{id}/update(id=${movie.id})}" method="post" enctype="multipart/form-data" class="space-y-5">
-                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <div class="relative transform overflow-hidden bg-[#1e1e1e] text-left shadow-2xl transition-all w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl border-t md:border border-white/10 max-h-[90vh] flex flex-col">
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div class="md:col-span-1">
-                                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Cover Image</label>
-                                <div class="aspect-[2/3] bg-black rounded-xl overflow-hidden border border-white/10 relative group">
-                                    <img id="editCoverPreview" 
-                                         th:src="@{/movies/image/{id}(id=${movie.id})}" 
-                                         class="w-full h-full object-cover">
+                            <div class="p-6 overflow-y-auto">
+                                <div class="w-12 h-1 bg-white/10 rounded-full mx-auto mb-4 md:hidden"></div>
+                                <h3 class="text-lg md:text-xl font-bold text-white mb-6">Edit Movie Details</h3>
 
-                                    <div class="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                                        <span class="material-symbols-outlined text-3xl text-white mb-2">cloud_upload</span>
-                                        <span class="text-xs text-white">Change Cover</span>
+                                <form th:action="@{/movies/{id}/update(id=${movie.id})}" method="post" enctype="multipart/form-data" class="space-y-5">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div class="md:col-span-1">
+                                            <div class="aspect-[2/3] bg-black rounded-xl overflow-hidden border border-white/10 relative group shrink-0">
+                                                <img id="editCoverPreview" th:src="@{/movies/image/{id}(id=${movie.id})}" class="w-full h-full object-cover">
+                                                <div class="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                                    <span class="material-symbols-outlined text-3xl text-white mb-2">cloud_upload</span>
+                                                    <span class="text-xs text-white">Change Cover</span>
+                                                </div>
+                                                <input type="file" name="coverFile" accept="image/*" onchange="previewEditImage(this)" class="absolute inset-0 opacity-0 cursor-pointer">
+                                            </div>
+                                        </div>
+
+                                        <div class="md:col-span-2 space-y-4">
+                                            <div>
+                                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Title</label>
+                                                <input type="text" name="title" th:value="${movie.title}" required
+                                                       class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Release Year</label>
+                                                    <input type="number" name="releaseYear" th:value="${movie.releaseYear}"
+                                                           class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Rating (0-10)</label>
+                                                    <input type="number" name="rating" th:value="${movie.rating}" step="0.1" min="0" max="10"
+                                                           class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm text-yellow-400 font-bold">
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Studio / Production</label>
+                                                <input type="text" name="studio" th:value="${movie.studio}" placeholder="e.g. Marvel Studios"
+                                                       class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Description</label>
+                                                <textarea name="description" rows="5" th:text="${movie.description}"
+                                                          class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-primary outline-none resize-none text-sm"></textarea>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <input type="file" name="coverFile" accept="image/*" 
-                                           onchange="previewEditImage(this)"
-                                           class="absolute inset-0 opacity-0 cursor-pointer">
-                                </div>
-                                <p class="text-[10px] text-gray-500 mt-2 text-center">Tap to change cover</p>
-                            </div>
 
-                            <div class="md:col-span-2 space-y-4">
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Title</label>
-                                    <input type="text" name="title" th:value="${movie.title}" required
-                                           class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
-                                </div>
-
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Release Year</label>
-                                    <input type="number" name="releaseYear" th:value="${movie.releaseYear}"
-                                           class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
-                                </div>
-
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Description</label>
-                                    <textarea name="description" rows="5" th:text="${movie.description}"
-                                              class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-primary outline-none resize-none text-sm"></textarea>
-                                </div>
+                                    <div class="flex justify-end gap-3 pt-4 border-t border-white/5">
+                                        <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-gray-400 hover:text-white text-sm font-bold">Cancel</button>
+                                        <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg text-sm font-bold w-full md:w-auto">Save Changes</button>
+                                    </div>
+                                </form>
                             </div>
                         </div>
-
-                        <div class="flex justify-end gap-3 pt-4 border-t border-white/5">
-                            <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-gray-400 hover:text-white text-sm font-bold">Cancel</button>
-                            <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-primary/20 transition-all w-full md:w-auto">Save Changes</button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
             </div>
         </section>

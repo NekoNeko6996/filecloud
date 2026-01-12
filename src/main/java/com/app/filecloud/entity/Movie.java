@@ -41,7 +41,7 @@ public class Movie {
     @Column(name = "thumbnail_path", length = 500)  
     private String thumbnailPath;
 
-    private Float rating;
+    private Double rating;
 
     @Column(name = "tmdb_id", length = 50)
     private String tmdbId;

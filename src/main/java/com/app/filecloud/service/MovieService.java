@@ -38,7 +38,7 @@ public class MovieService {
     private final MovieRepository movieRepository;
     private final SysConfigRepository sysConfigRepository;
     private final StorageVolumeRepository volumeRepository;
-    
+
     private final FFmpeg ffmpeg;
     private final FFprobe ffprobe;
 
@@ -296,11 +296,11 @@ public class MovieService {
         // Nếu video dài: Lấy ở mốc 20% (thường là qua intro)
         return (long) ((durationSeconds * 0.20) * 1000);
     }
-    
+
     @Transactional
-    public void updateMovie(String id, String title, Integer releaseYear, String description, MultipartFile coverFile) throws IOException {
+    public void updateMovie(String id, String title, Integer releaseYear, String description, MultipartFile coverFile, String studio, Double rating) throws IOException {
         Movie movie = getMovie(id);
-        
+
         // 1. Cập nhật thông tin cơ bản
         movie.setTitle(title);
         movie.setReleaseYear(releaseYear);
@@ -309,7 +309,7 @@ public class MovieService {
         // 2. Nếu có upload ảnh bìa mới -> Xử lý thay thế
         if (coverFile != null && !coverFile.isEmpty()) {
             Path libRoot = getMovieLibraryRoot();
-            
+
             // Lấy folder hiện tại của phim (dựa trên ảnh cũ hoặc tạo mới nếu chưa có)
             Path movieDir;
             if (movie.getCoverImageUrl() != null) {
@@ -319,26 +319,33 @@ public class MovieService {
                 // Hoặc đơn giản là tạo folder mới nếu cần (ở đây giả định folder đã có)
                 String folderName = title.replaceAll("[^a-zA-Z0-9 ._-]", "") + (releaseYear != null ? " (" + releaseYear + ")" : "");
                 movieDir = libRoot.resolve(folderName);
-                if (!Files.exists(movieDir)) Files.createDirectories(movieDir);
+                if (!Files.exists(movieDir)) {
+                    Files.createDirectories(movieDir);
+                }
             }
 
             // A. Lưu ảnh gốc mới (Ghi đè cover.jpg hoặc cover.png)
             String originalFilename = coverFile.getOriginalFilename();
             String ext = originalFilename != null && originalFilename.contains(".") ? originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
             String coverName = "cover" + ext; // Luôn đặt tên chuẩn
-            
+
             Path destCover = movieDir.resolve(coverName);
             Files.copy(coverFile.getInputStream(), destCover, StandardCopyOption.REPLACE_EXISTING);
-            
+
             // Cập nhật path (thực ra path ko đổi nếu tên file ko đổi, nhưng set lại cho chắc)
             String folderName = movieDir.getFileName().toString();
             String coverRelPath = folderName + File.separator + coverName;
             movie.setCoverImageUrl(coverRelPath);
 
+            movie.setStudio(studio);
+            movie.setRating(rating);
+
             // B. Tạo lại Thumbnail
             Path thumbDir = movieDir.resolve(".thumbs");
-            if (!Files.exists(thumbDir)) Files.createDirectories(thumbDir);
-            
+            if (!Files.exists(thumbDir)) {
+                Files.createDirectories(thumbDir);
+            }
+
             String thumbName = "thumb_" + coverName;
             Path destThumb = thumbDir.resolve(thumbName);
 
@@ -347,7 +354,7 @@ public class MovieService {
                         .size(300, 450)
                         .outputQuality(0.8)
                         .toFile(destThumb.toFile());
-                
+
                 String thumbRelPath = folderName + File.separator + ".thumbs" + File.separator + thumbName;
                 movie.setThumbnailPath(thumbRelPath);
             } catch (Exception e) {

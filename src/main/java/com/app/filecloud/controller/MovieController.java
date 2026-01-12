@@ -156,9 +156,11 @@ public class MovieController {
             @RequestParam("title") String title,
             @RequestParam(value = "releaseYear", required = false) Integer releaseYear,
             @RequestParam("description") String description,
+            @RequestParam(value = "studio", required = false) String studio,
+                              @RequestParam(value = "rating", required = false) Double rating,
             @RequestParam(value = "coverFile", required = false) MultipartFile coverFile) {
         try {
-            movieService.updateMovie(id, title, releaseYear, description, coverFile);
+            movieService.updateMovie(id, title, releaseYear, description, coverFile, studio, rating);
             return "redirect:/movies/" + id;
         } catch (Exception e) {
             e.printStackTrace();
