@@ -3,61 +3,108 @@
       th:replace="~{fragments/layout :: layout('Add Movie', 'movies', ~{::section}, ~{::script})}">
     <body>
         <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
-            <div class="max-w-3xl mx-auto w-full p-8 overflow-y-auto">
-                <div class="flex items-center gap-3 mb-6">
-                    <a href="/movies" class="text-gray-400 hover:text-white"><span class="material-symbols-outlined text-3xl">arrow_back</span></a>
-                    <h1 class="text-2xl font-bold text-white">Add New Movie</h1>
+            <div class="w-full h-full p-8 overflow-y-auto">
+
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-4">
+                        <a href="/movies" class="flex items-center text-gray-400 hover:text-white transition-colors bg-white/5 p-2 rounded-full hover:bg-white/10"><span class="material-symbols-outlined text-2xl">arrow_back</span></a>
+                        <h2 class="text-3xl font-bold text-white">Add New Movie</h2>
+                    </div>
                 </div>
 
-                <form action="/movies/save" method="post" enctype="multipart/form-data" class="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl space-y-6">
+                <form action="/movies/save" method="post" enctype="multipart/form-data" class="bg-[#1e1e1e] border border-white/5 rounded-2xl shadow-xl overflow-hidden">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="md:col-span-1">
-                            <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Cover Image</label>
-                            <div class="aspect-[2/3] bg-[#171022] border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center relative overflow-hidden group hover:border-primary/50 transition-colors">
+                    <div class="flex flex-col lg:flex-row h-full">
+
+                        <div class="w-full lg:w-[400px] bg-black/20 p-8 border-b lg:border-b-0 lg:border-r border-white/5 flex flex-col items-center">
+                            <label class="block text-sm font-bold text-gray-400 uppercase mb-4 self-start">Cover Image</label>
+
+                            <div class="w-full aspect-[2/3] bg-[#171022] border-2 border-dashed border-white/10 rounded-2xl flex items-center justify-center relative overflow-hidden group hover:border-primary/50 transition-all shadow-lg">
                                 <img id="coverPreview" class="hidden w-full h-full object-cover">
-                                <div id="coverPlaceholder" class="text-center p-4">
-                                    <span class="material-symbols-outlined text-4xl text-gray-600 mb-2">cloud_upload</span>
-                                    <p class="text-xs text-gray-500">Click to upload</p>
+                                <div id="coverPlaceholder" class="text-center p-6 transition-transform group-hover:scale-105">
+                                    <div class="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-500 group-hover:text-primary transition-colors">
+                                        <span class="material-symbols-outlined text-4xl">cloud_upload</span>
+                                    </div>
+                                    <p class="text-sm text-gray-400 font-bold">Click to upload</p>
+                                    <p class="text-xs text-gray-600 mt-1">JPG, PNG, WEBP</p>
                                 </div>
                                 <input type="file" name="coverFile" accept="image/*" required 
                                        onchange="previewImage(this)"
-                                       class="absolute inset-0 opacity-0 cursor-pointer">
+                                       class="absolute inset-0 opacity-0 cursor-pointer z-10">
                             </div>
+                            <p class="text-xs text-gray-500 mt-4 text-center px-4">Recommended size: 600x900 pixels. The image will be used for thumbnails and backgrounds.</p>
                         </div>
 
-                        <div class="md:col-span-2 space-y-5">
+                        <div class="flex-1 p-8 space-y-6">
+
                             <div>
-                                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Title</label>
+                                <label class="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">Movie Title <span class="text-red-500">*</span></label>
                                 <input type="text" name="title" required placeholder="e.g. Inception"
-                                       class="w-full bg-[#171022] border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+                                       class="w-full bg-black/20 border border-white/10 rounded-xl px-5 py-3.5 text-white focus:border-primary focus:bg-black/40 outline-none text-lg font-medium transition-all placeholder-gray-600">
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">Release Year</label>
+                                    <input type="number" name="releaseYear" placeholder="2024"
+                                           class="w-full bg-black/20 border border-white/10 rounded-xl px-5 py-3.5 text-white focus:border-primary focus:bg-black/40 outline-none transition-all placeholder-gray-600">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">Rating (0-10)</label>
+                                    <input type="number" name="rating" step="0.1" min="0" max="10" placeholder="0.0"
+                                           class="w-full bg-black/20 border border-white/10 rounded-xl px-5 py-3.5 text-yellow-500 font-bold focus:border-primary focus:bg-black/40 outline-none transition-all placeholder-gray-700">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">Studios</label>
+                                    <div class="relative">
+                                        <input type="hidden" name="studios" id="hiddenStudios">
+
+                                        <input type="text" id="studioInput" autocomplete="off" placeholder="Type & Press Enter..."
+                                               class="w-full bg-black/20 border border-white/10 rounded-xl px-5 py-3.5 text-white focus:border-primary focus:bg-black/40 outline-none transition-all placeholder-gray-600">
+
+                                        <div id="studioSuggestions" class="absolute z-50 w-full bg-[#252525] border border-white/10 rounded-b-xl shadow-2xl max-h-48 overflow-y-auto hidden top-full mt-1"></div>
+                                    </div>
+                                    <div id="studioList" class="flex flex-wrap gap-2 mt-3 min-h-[30px]">No studio...</div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">Tags</label>
+                                    <div class="relative">
+                                        <input type="hidden" name="tags" id="hiddenTags">
+
+                                        <input type="text" id="tagInput" autocomplete="off" placeholder="Type & Press Enter..."
+                                               class="w-full bg-black/20 border border-white/10 rounded-xl px-5 py-3.5 text-white focus:border-primary focus:bg-black/40 outline-none transition-all placeholder-gray-600">
+
+                                        <div id="tagSuggestions" class="absolute z-50 w-full bg-[#252525] border border-white/10 rounded-b-xl shadow-2xl max-h-48 overflow-y-auto hidden top-full mt-1"></div>
+                                    </div>
+                                    <div id="tagList" class="flex flex-wrap gap-2 mt-3 min-h-[30px]">No tag selected...</div>
+                                </div>
                             </div>
 
                             <div>
-                                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Release Year</label>
-                                <input type="number" name="releaseYear" placeholder="2010"
-                                       class="w-full bg-[#171022] border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none">
+                                <label class="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">Description</label>
+                                <textarea name="description" rows="6" placeholder="Movie synopsis..."
+                                          class="w-full bg-black/20 border border-white/10 rounded-xl px-5 py-3.5 text-white focus:border-primary focus:bg-black/40 outline-none resize-none transition-all placeholder-gray-600 leading-relaxed"></textarea>
                             </div>
 
-                            <div>
-                                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Description</label>
-                                <textarea name="description" rows="5" placeholder="Movie synopsis..."
-                                          class="w-full bg-[#171022] border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none"></textarea>
+                            <div class="flex justify-end pt-6 border-t border-white/5">
+                                <a href="/movies" class="px-6 py-3 text-gray-400 hover:text-white font-bold mr-4 transition-colors">Cancel</a>
+                                <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 transition-all flex items-center gap-2 hover:scale-105 active:scale-95">
+                                    <span class="material-symbols-outlined">save</span> Save Movie
+                                </button>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="flex justify-end pt-4 border-t border-white/5">
-                        <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 transition-all flex items-center gap-2">
-                            <span class="material-symbols-outlined">save</span> Save Movie
-                        </button>
                     </div>
                 </form>
             </div>
         </section>
 
         <script>
+            // --- IMAGE PREVIEW (Giữ nguyên) ---
             function previewImage(input) {
                 if (input.files && input.files[0]) {
                     const reader = new FileReader();
@@ -69,6 +116,135 @@
                     reader.readAsDataURL(input.files[0]);
                 }
             }
+
+            // --- MULTI-SELECT TAGS & STUDIOS LOGIC ---
+            document.addEventListener('DOMContentLoaded', () => {
+                // Khởi tạo cho Studio
+                initMultiSelect('studioInput', 'hiddenStudios', 'studioList', 'studioSuggestions', '/movies/api/suggestions/studios');
+                // Khởi tạo cho Tag
+                initMultiSelect('tagInput', 'hiddenTags', 'tagList', 'tagSuggestions', '/movies/api/suggestions/tags');
+            });
+
+            function initMultiSelect(inputId, hiddenId, listId, suggestionId, apiUrl) {
+                const input = document.getElementById(inputId);
+                const hiddenInput = document.getElementById(hiddenId);
+                const listContainer = document.getElementById(listId);
+                const suggestionBox = document.getElementById(suggestionId);
+
+                let selectedItems = []; // Mảng lưu các item đã chọn
+                let allSuggestions = []; // Mảng lưu tất cả gợi ý từ API
+
+                // 1. Lấy dữ liệu gợi ý từ Server
+                fetch(apiUrl)
+                        .then(res => res.json())
+                        .then(data => {
+                            allSuggestions = data;
+                        })
+                        .catch(err => console.error(err));
+
+                // 2. Hàm render lại danh sách thẻ (Chips)
+                function renderList() {
+                    listContainer.innerHTML = '';
+                    selectedItems.forEach((item, index) => {
+                        const chip = document.createElement('div');
+                        chip.className = 'bg-primary/20 text-white border border-primary/30 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 animate-fadeIn';
+                        chip.innerHTML = `
+                            <span>${item}</span>
+                            <button type="button" class="hover:text-red-400 transition-colors focus:outline-none" data-index="${index}">
+                                <span class="material-symbols-outlined text-[16px] flex">close</span>
+                            </button>
+                        `;
+
+                        // Sự kiện xóa thẻ
+                        chip.querySelector('button').addEventListener('click', (e) => {
+                            removeItem(index);
+                        });
+
+                        listContainer.appendChild(chip);
+                    });
+
+                    // Cập nhật giá trị cho input ẩn (gửi về server)
+                    hiddenInput.value = selectedItems.join(';');
+                }
+
+                // 3. Hàm thêm item
+                function addItem(value) {
+                    const cleanValue = value.trim();
+                    if (cleanValue && !selectedItems.includes(cleanValue)) {
+                        selectedItems.push(cleanValue);
+                        renderList();
+                    }
+                    input.value = ''; // Reset ô nhập
+                    suggestionBox.classList.add('hidden');
+                    input.focus();
+                }
+
+                // 4. Hàm xóa item
+                function removeItem(index) {
+                    selectedItems.splice(index, 1);
+                    renderList();
+                }
+
+                // 5. Xử lý sự kiện nhập liệu (Hiển thị gợi ý)
+                input.addEventListener('input', function () {
+                    const val = this.value.toLowerCase().trim();
+                    suggestionBox.innerHTML = '';
+
+                    if (!val) {
+                        suggestionBox.classList.add('hidden');
+                        return;
+                    }
+
+                    // Lọc gợi ý (chưa được chọn)
+                    const matches = allSuggestions.filter(item =>
+                        item.toLowerCase().includes(val) && !selectedItems.includes(item)
+                    );
+
+                    if (matches.length > 0) {
+                        suggestionBox.classList.remove('hidden');
+                        matches.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'px-4 py-2.5 text-sm text-gray-300 hover:bg-primary/20 hover:text-white cursor-pointer transition-colors border-b border-white/5 last:border-0';
+                            div.textContent = item;
+                            div.addEventListener('click', () => addItem(item));
+                            suggestionBox.appendChild(div);
+                        });
+                    } else {
+                        suggestionBox.classList.add('hidden');
+                    }
+                });
+
+                // 6. Xử lý phím Enter
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault(); // Ngăn submit form
+                        addItem(this.value);
+                    }
+                });
+
+                // 7. Ẩn gợi ý khi click ra ngoài
+                document.addEventListener('click', function (e) {
+                    if (e.target !== input && e.target !== suggestionBox) {
+                        suggestionBox.classList.add('hidden');
+                    }
+                });
+            }
         </script>
+
+        <style>
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(5px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            .animate-fadeIn {
+                animation: fadeIn 0.2s ease-out forwards;
+            }
+        </style>
     </body>
 </html>

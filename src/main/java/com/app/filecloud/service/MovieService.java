@@ -8,6 +8,7 @@ import com.app.filecloud.entity.Studio;
 import com.app.filecloud.entity.SysConfig;
 import com.app.filecloud.entity.Tag;
 import com.app.filecloud.repository.MovieAlternativeTitleRepository;
+import com.app.filecloud.repository.MovieEpisodeRepository;
 import com.app.filecloud.repository.MovieRepository;
 import com.app.filecloud.repository.StorageVolumeRepository;
 import com.app.filecloud.repository.StudioRepository;
@@ -51,6 +52,7 @@ public class MovieService {
     private final TagRepository tagRepository;
     private final StudioRepository studioRepository;
     private final MovieAlternativeTitleRepository movieAlternativeTitleRepository;
+    private final MovieEpisodeRepository movieEpisodeRepository;
 
     private final FFmpeg ffmpeg;
     private final FFprobe ffprobe;
@@ -80,13 +82,14 @@ public class MovieService {
 
     // --- 2. TẠO MOVIE MỚI ---
     @Transactional
-    public void createMovie(String title, Integer year, String description, MultipartFile coverFile) throws IOException {
+    public void createMovie(String title, Integer year, String description,
+            Double rating, String studioInput, String tagInput, // [NEW] Thêm tham số
+            MultipartFile coverFile) throws IOException {
         Path libRoot = getMovieLibraryRoot();
 
-        // Tạo tên folder chuẩn: "Title (Year)" để tránh trùng
+        // Tạo tên folder chuẩn
         String folderName = title.replaceAll("[^a-zA-Z0-9 ._-]", "") + (year != null ? " (" + year + ")" : "");
         Path movieDir = libRoot.resolve(folderName);
-
         if (!Files.exists(movieDir)) {
             Files.createDirectories(movieDir);
         }
@@ -94,51 +97,33 @@ public class MovieService {
         String coverPathRel = null;
         String thumbPathRel = null;
 
-        // Xử lý ảnh bìa
+        // Xử lý ảnh bìa (Giữ nguyên logic cũ)
         if (coverFile != null && !coverFile.isEmpty()) {
+            // ... (Logic lưu ảnh bìa và tạo thumbnail giữ nguyên như cũ) ...
+            // Copy đoạn logic xử lý file từ code cũ vào đây
+            // Hoặc để gọn tôi chỉ ghi chú là giữ nguyên logic xử lý file
             String originalFilename = coverFile.getOriginalFilename();
-            String ext = originalFilename != null && originalFilename.contains(".")
-                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
-                    : ".jpg";
-
-            String coverName = "cover" + ext; // Đặt tên chuẩn là cover.jpg/png
-
-            // A. Lưu ảnh gốc
+            String ext = originalFilename != null && originalFilename.contains(".") ? originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
+            String coverName = "cover" + ext;
             Path destCover = movieDir.resolve(coverName);
             Files.copy(coverFile.getInputStream(), destCover, StandardCopyOption.REPLACE_EXISTING);
-
-            // Lưu đường dẫn tương đối (so với thư viện Movie)
             coverPathRel = folderName + File.separator + coverName;
 
+            // Tạo thumbnail...
             Path thumbDir = movieDir.resolve(".thumbs");
             if (!Files.exists(thumbDir)) {
                 Files.createDirectories(thumbDir);
             }
-
-            // tạo thumnail
             String thumbName = "thumb_" + coverName;
             Path destThumb = thumbDir.resolve(thumbName);
-
             try {
-                // Cố gắng tạo thumbnail nhỏ gọn
-                Thumbnails.of(destCover.toFile())
-                        .size(300, 450)
-                        .outputQuality(0.8)
-                        .toFile(destThumb.toFile());
-
+                Thumbnails.of(destCover.toFile()).size(300, 450).outputQuality(0.8).toFile(destThumb.toFile());
                 thumbPathRel = folderName + File.separator + ".thumbs" + File.separator + thumbName;
-
             } catch (Exception e) {
-                // [FIX QUAN TRỌNG] Nếu lỗi (do WebP, ảnh hỏng...), không throw lỗi mà fallback
-                System.err.println("Failed to create thumbnail for " + title + ": " + e.getMessage());
-
-                // Cách xử lý: Copy luôn ảnh gốc làm thumbnail (chấp nhận nặng chút nhưng không lỗi app)
                 try {
                     Files.copy(destCover, destThumb, StandardCopyOption.REPLACE_EXISTING);
                     thumbPathRel = folderName + File.separator + ".thumbs" + File.separator + thumbName;
-                } catch (IOException ioException) {
-                    // Nếu copy cũng lỗi thì đành để null (hiển thị ảnh mặc định ở frontend)
-                    thumbPathRel = null;
+                } catch (IOException io) {
                 }
             }
         }
@@ -148,9 +133,17 @@ public class MovieService {
                 .title(title)
                 .releaseYear(year)
                 .description(description)
+                .rating(rating) // [NEW] Lưu rating
                 .coverImageUrl(coverPathRel)
                 .thumbnailPath(thumbPathRel)
                 .build();
+
+        // Lưu lần 1 để có ID (nếu cần)
+        movie = movieRepository.save(movie);
+
+        // [NEW] Xử lý Studio & Tag (Dùng hàm helper bên dưới)
+        processStudios(movie, studioInput);
+        processTags(movie, tagInput);
 
         movieRepository.save(movie);
     }
@@ -329,49 +322,8 @@ public class MovieService {
         movie.setDescription(description);
         movie.setRating(rating);
 
-        // 1. XỬ LÝ STUDIOS
-        movie.getStudios().clear();
-        if (studioInput != null && !studioInput.trim().isEmpty()) {
-            // [MOD] Tách bằng dấu chấm phẩy (;) HOẶC dấu phẩy (,)
-            String[] names = studioInput.split("[;,]");
-            for (String name : names) {
-                String cleanName = name.trim();
-                if (!cleanName.isEmpty()) {
-                    String slug = toSlug(cleanName); // Chuyển về slug (viết thường, không dấu)
-
-                    // [MOD] Tìm theo Slug để không phân biệt hoa/thường
-                    Studio studio = studioRepository.findBySlug(slug)
-                            .orElseGet(() -> studioRepository.save(
-                            Studio.builder().name(cleanName).slug(slug).build()
-                    ));
-                    movie.getStudios().add(studio);
-                }
-            }
-        }
-
-        // 2. XỬ LÝ TAGS (Logic tạo Slug)
-        movie.getTags().clear();
-        if (tagInput != null && !tagInput.trim().isEmpty()) {
-            // [MOD] Tách bằng dấu chấm phẩy (;) HOẶC dấu phẩy (,)
-            String[] names = tagInput.split("[;,]");
-            for (String name : names) {
-                String tagName = name.trim();
-                if (!tagName.isEmpty()) {
-                    String slug = toSlug(tagName);
-
-                    // [MOD] Tìm theo Slug có sẵn
-                    Tag tag = tagRepository.findBySlug(slug)
-                            .orElseGet(() -> tagRepository.save(
-                            Tag.builder()
-                                    .name(tagName)
-                                    .slug(slug)
-                                    .colorHex("#6366f1")
-                                    .build()
-                    ));
-                    movie.getTags().add(tag);
-                }
-            }
-        }
+        processStudios(movie, studioInput);
+        processTags(movie, tagInput);
 
         // 2. Nếu có upload ảnh bìa mới -> Xử lý thay thế
         if (coverFile != null && !coverFile.isEmpty()) {
@@ -432,6 +384,43 @@ public class MovieService {
         movieRepository.save(movie);
     }
 
+    // --- HELPER METHODS (Tách ra để dùng chung) ---
+    private void processStudios(Movie movie, String input) {
+        movie.getStudios().clear();
+        if (input != null && !input.trim().isEmpty()) {
+            String[] names = input.split("[;,]");
+            for (String name : names) {
+                String cleanName = name.trim();
+                if (!cleanName.isEmpty()) {
+                    String slug = toSlug(cleanName);
+                    Studio studio = studioRepository.findBySlug(slug)
+                            .orElseGet(() -> studioRepository.save(
+                            Studio.builder().name(cleanName).slug(slug).build()
+                    ));
+                    movie.getStudios().add(studio);
+                }
+            }
+        }
+    }
+
+    private void processTags(Movie movie, String input) {
+        movie.getTags().clear();
+        if (input != null && !input.trim().isEmpty()) {
+            String[] names = input.split("[;,]");
+            for (String name : names) {
+                String tagName = name.trim();
+                if (!tagName.isEmpty()) {
+                    String slug = toSlug(tagName);
+                    Tag tag = tagRepository.findBySlug(slug)
+                            .orElseGet(() -> tagRepository.save(
+                            Tag.builder().name(tagName).slug(slug).colorHex("#6366f1").build()
+                    ));
+                    movie.getTags().add(tag);
+                }
+            }
+        }
+    }
+
     private String toSlug(String input) {
         if (input == null) {
             return "";
@@ -462,5 +451,105 @@ public class MovieService {
     public Page<Movie> searchMovies(String keyword, Integer year, String studioId, java.util.List<String> tagIds, Pageable pageable) {
         Specification<Movie> spec = com.app.filecloud.repository.spec.MovieSpecification.filterMovies(keyword, year, studioId, tagIds);
         return movieRepository.findAll(spec, pageable);
+    }
+
+    @Transactional
+    public void updateEpisode(String episodeId, String title, Integer episodeNumber, MultipartFile file) throws IOException {
+        MovieEpisode episode = movieEpisodeRepository.findById(episodeId)
+                .orElseThrow(() -> new RuntimeException("Episode not found"));
+
+        // 1. Cập nhật thông tin cơ bản
+        episode.setTitle(title);
+        episode.setEpisodeNumber(episodeNumber);
+
+        // 2. Nếu có upload video mới -> Thay thế file cũ
+        if (file != null && !file.isEmpty()) {
+            Path libRoot = getMovieLibraryRoot();
+
+            // A. Xóa file cũ (nếu tồn tại)
+            if (episode.getFilePath() != null) {
+                Path oldFile = libRoot.resolve(episode.getFilePath());
+                Files.deleteIfExists(oldFile);
+            }
+            // Xóa thumbnail cũ luôn cho sạch
+            if (episode.getThumbnailPath() != null) {
+                Path oldThumb = libRoot.resolve(episode.getThumbnailPath());
+                Files.deleteIfExists(oldThumb);
+            }
+
+            // B. Lưu file mới (Logic tương tự addEpisode)
+            // Lấy folder phim từ Movie cha
+            String coverRelPath = episode.getMovie().getCoverImageUrl();
+            Path relativeMovieDir = Paths.get(coverRelPath).getParent(); // Folder phim
+            Path absoluteMovieDir = libRoot.resolve(relativeMovieDir);
+
+            if (!Files.exists(absoluteMovieDir)) {
+                Files.createDirectories(absoluteMovieDir);
+            }
+
+            String fileName = file.getOriginalFilename();
+            Path destVideo = absoluteMovieDir.resolve(fileName);
+            // Copy file mới (REPLACE nếu trùng tên)
+            Files.copy(file.getInputStream(), destVideo, StandardCopyOption.REPLACE_EXISTING);
+
+            // C. Xử lý Metadata & Thumbnail mới
+            int duration = 0;
+            String thumbRelPath = null;
+            try {
+                FFmpegProbeResult probeResult = ffprobe.probe(destVideo.toAbsolutePath().toString());
+                duration = (int) probeResult.getFormat().duration;
+
+                // Tạo thumb mới
+                Path thumbDir = absoluteMovieDir.resolve(".thumbs");
+                if (!Files.exists(thumbDir)) {
+                    Files.createDirectories(thumbDir);
+                }
+
+                String thumbName = "ep_" + episodeNumber + "_" + System.currentTimeMillis() + ".jpg";
+                Path destThumb = thumbDir.resolve(thumbName);
+
+                generateSmartVideoThumbnail(destVideo.toAbsolutePath().toString(), destThumb.toAbsolutePath().toString(), duration);
+                thumbRelPath = relativeMovieDir.resolve(".thumbs").resolve(thumbName).toString();
+            } catch (Exception e) {
+                System.err.println("Warning processing new video media: " + e.getMessage());
+            }
+
+            // D. Cập nhật Entity
+            episode.setFilePath(relativeMovieDir.resolve(fileName).toString());
+            episode.setFileSize(file.getSize());
+            episode.setMimeType(file.getContentType());
+            episode.setDurationSeconds(duration);
+            episode.setThumbnailPath(thumbRelPath);
+        }
+
+        movieEpisodeRepository.save(episode);
+    }
+
+    // --- [NEW] XÓA TẬP PHIM ---
+    @Transactional
+    public void deleteEpisode(String episodeId, boolean deletePhysicalFile) {
+        MovieEpisode episode = movieEpisodeRepository.findById(episodeId)
+                .orElseThrow(() -> new RuntimeException("Episode not found"));
+
+        if (deletePhysicalFile) {
+            Path libRoot = getMovieLibraryRoot();
+            try {
+                // Xóa Video
+                if (episode.getFilePath() != null) {
+                    Files.deleteIfExists(libRoot.resolve(episode.getFilePath()));
+                }
+                // Xóa Thumbnail
+                if (episode.getThumbnailPath() != null) {
+                    Files.deleteIfExists(libRoot.resolve(episode.getThumbnailPath()));
+                }
+            } catch (IOException e) {
+                System.err.println("Error deleting physical files: " + e.getMessage());
+                // Vẫn tiếp tục xóa DB dù lỗi file
+            }
+        }
+
+        // Xóa khỏi danh sách của Movie cha (để Hibernate sync)
+        episode.getMovie().getEpisodes().remove(episode);
+        movieEpisodeRepository.delete(episode);
     }
 }

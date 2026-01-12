@@ -83,9 +83,13 @@ public class MovieController {
     public String saveMovie(@RequestParam("title") String title,
             @RequestParam(value = "releaseYear", required = false) Integer year,
             @RequestParam("description") String description,
+            @RequestParam(value = "rating", required = false) Double rating, // [NEW]
+            @RequestParam(value = "studios", required = false) String studios, // [NEW]
+            @RequestParam(value = "tags", required = false) String tags, // [NEW]
             @RequestParam("coverFile") MultipartFile coverFile) {
         try {
-            movieService.createMovie(title, year, description, coverFile);
+            // Gọi hàm createMovie với đầy đủ tham số
+            movieService.createMovie(title, year, description, rating, studios, tags, coverFile);
             return "redirect:/movies";
         } catch (Exception e) {
             e.printStackTrace();
@@ -237,6 +241,34 @@ public class MovieController {
     public String deleteAltTitle(@PathVariable String movieId, @PathVariable String titleId) {
         try {
             movieService.deleteAlternativeTitle(titleId);
+            return "redirect:/movies/" + movieId;
+        } catch (Exception e) {
+            return "redirect:/movies/" + movieId + "?error=" + e.getMessage();
+        }
+    }
+
+    // --- CẬP NHẬT TẬP PHIM ---
+    @PostMapping("/episodes/{id}/update")
+    public String updateEpisode(@PathVariable String id,
+            @RequestParam("title") String title,
+            @RequestParam("episodeNumber") Integer episodeNumber,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam("movieId") String movieId) { // Cần movieId để redirect về đúng trang
+        try {
+            movieService.updateEpisode(id, title, episodeNumber, file);
+            return "redirect:/movies/" + movieId;
+        } catch (Exception e) {
+            return "redirect:/movies/" + movieId + "?error=" + e.getMessage();
+        }
+    }
+
+    // --- XÓA TẬP PHIM ---
+    @PostMapping("/episodes/{id}/delete")
+    public String deleteEpisode(@PathVariable String id,
+            @RequestParam("movieId") String movieId,
+            @RequestParam(value = "deleteFile", defaultValue = "false") boolean deleteFile) {
+        try {
+            movieService.deleteEpisode(id, deleteFile);
             return "redirect:/movies/" + movieId;
         } catch (Exception e) {
             return "redirect:/movies/" + movieId + "?error=" + e.getMessage();

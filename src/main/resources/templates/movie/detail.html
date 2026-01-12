@@ -67,7 +67,7 @@
                                 </span>
                             </div>
                         </div>
-                        
+
                         <div class="flex flex-wrap justify-center md:justify-start items-center gap-3 md:gap-4 text-gray-300 text-xs md:text-base font-medium mt-2">
                             <span class="bg-white/10 backdrop-blur-md px-2 md:px-3 py-1 rounded-md border border-white/10" th:text="${movie.releaseYear}">2023</span>
 
@@ -157,10 +157,15 @@
                                 </div>
 
                                 <div class="flex flex-col md:flex-row items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2 bg-[#1e1e1e]/90 md:bg-transparent rounded-lg p-1">
-                                    <button class="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors" title="Edit">
+                                    <button type="button" 
+                                            th:onclick="openEditEpisodeModal([[${ep.id}]], [[${ep.title}]], [[${ep.episodeNumber}]])"
+                                            class="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors flex items-center" title="Edit">
                                         <span class="material-symbols-outlined text-[18px]">edit</span>
                                     </button>
-                                    <button class="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors" title="Delete">
+
+                                    <button type="button" 
+                                            th:onclick="openDeleteEpisodeModal([[${ep.id}]], [[${ep.title}]])"
+                                            class="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors flex items-center" title="Delete">
                                         <span class="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
                                 </div>
@@ -366,6 +371,79 @@
                     </div>
                 </div>
             </div>
+
+            <div id="editEpisodeModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeEditEpisodeModal()"></div>
+                <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+                    <div class="flex min-h-full items-end justify-center text-center md:items-center p-0 md:p-4">
+                        <div class="relative transform overflow-hidden bg-[#1e1e1e] text-left shadow-2xl transition-all w-full md:max-w-md rounded-t-2xl md:rounded-2xl border-t md:border border-white/10">
+
+                            <div class="p-6">
+                                <h3 class="text-lg font-bold text-white mb-4">Edit Episode</h3>
+
+                                <form id="editEpisodeForm" method="post" enctype="multipart/form-data" class="space-y-4">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="movieId" th:value="${movie.id}"/>
+
+                                    <div class="flex gap-3">
+                                        <div class="w-1/3">
+                                            <label class="block text-[10px] md:text-xs font-bold text-gray-400 uppercase mb-1">Ep. No.</label>
+                                            <input type="number" id="editEpNum" name="episodeNumber" required
+                                                   class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm text-center">
+                                        </div>
+                                        <div class="flex-1">
+                                            <label class="block text-[10px] md:text-xs font-bold text-gray-400 uppercase mb-1">Title</label>
+                                            <input type="text" id="editEpTitle" name="title" required
+                                                   class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-[10px] md:text-xs font-bold text-gray-400 uppercase mb-1">Replace Video (Optional)</label>
+                                        <input type="file" name="file" accept="video/*,.mkv"
+                                               class="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 border border-white/10 rounded-lg bg-black/30 py-1">
+                                        <p class="text-[10px] text-gray-500 mt-1">Upload new file to replace the existing one.</p>
+                                    </div>
+
+                                    <div class="flex justify-end gap-2 pt-2">
+                                        <button type="button" onclick="closeEditEpisodeModal()" class="px-4 py-2 text-gray-400 hover:text-white text-sm font-bold">Cancel</button>
+                                        <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-all">Save Changes</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="deleteEpisodeModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeDeleteEpisodeModal()"></div>
+                <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+                    <div class="flex min-h-full items-center justify-center p-4">
+                        <div class="relative transform overflow-hidden bg-[#1e1e1e] text-left shadow-2xl transition-all w-full max-w-sm rounded-2xl border border-white/10 p-6">
+
+                            <h3 class="text-lg font-bold text-white mb-2">Delete Episode?</h3>
+                            <p class="text-gray-400 text-sm mb-4">Are you sure you want to delete <span id="delEpTitle" class="text-white font-bold"></span>?</p>
+
+                            <form id="deleteEpisodeForm" method="post">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <input type="hidden" name="movieId" th:value="${movie.id}"/>
+
+                                <label class="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg mb-6 cursor-pointer hover:bg-red-500/20 transition-colors">
+                                    <input type="checkbox" name="deleteFile" checked
+                                           class="w-5 h-5 rounded border-gray-500 text-red-500 focus:ring-red-500 bg-black/40">
+                                    <span class="text-sm text-red-200">Delete physical file from disk</span>
+                                </label>
+
+                                <div class="flex justify-end gap-2">
+                                    <button type="button" onclick="closeDeleteEpisodeModal()" class="px-4 py-2 text-gray-400 hover:text-white text-sm font-bold">Cancel</button>
+                                    <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-red-500/20">Delete</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <script th:inline="javascript">
@@ -525,6 +603,39 @@
             }
             function closeAltTitleModal() {
                 document.getElementById('altTitleModal').classList.add('hidden');
+            }
+
+            // --- EDIT EPISODE LOGIC ---
+            function openEditEpisodeModal(id, title, number) {
+                // Điền dữ liệu vào form
+                document.getElementById('editEpNum').value = number;
+                document.getElementById('editEpTitle').value = title;
+
+                // Cập nhật action của form
+                const form = document.getElementById('editEpisodeForm');
+                form.action = `/movies/episodes/${id}/update`;
+
+                document.getElementById('editEpisodeModal').classList.remove('hidden');
+            }
+
+            function closeEditEpisodeModal() {
+                document.getElementById('editEpisodeModal').classList.add('hidden');
+            }
+
+            // --- DELETE EPISODE LOGIC ---
+            function openDeleteEpisodeModal(id, title) {
+                // Hiển thị tên tập phim để confirm
+                document.getElementById('delEpTitle').innerText = `"${title}"`;
+
+                // Cập nhật action form
+                const form = document.getElementById('deleteEpisodeForm');
+                form.action = `/movies/episodes/${id}/delete`;
+
+                document.getElementById('deleteEpisodeModal').classList.remove('hidden');
+            }
+
+            function closeDeleteEpisodeModal() {
+                document.getElementById('deleteEpisodeModal').classList.add('hidden');
             }
         </script>
     </body>
