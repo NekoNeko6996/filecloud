@@ -44,7 +44,8 @@
                     <a th:each="movie : ${movies}" th:href="@{/movies/{id}(id=${movie.id})}"
                        class="group relative aspect-[2/3] bg-[#2e2839] rounded-xl overflow-hidden border border-white/5 hover:border-primary/50 transition-all shadow-lg shadow-primary/5 hover:shadow-primary/20">
                         <img th:src="@{/movies/image/{id}(id=${movie.id}, thumb=true)}" 
-                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy"
+                             loading="lazy"
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 img-blur"
                              onerror="this.src='https://placehold.co/300x450/1e1e1e/FFF?text=No+Cover'">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-100 transition-opacity flex flex-col justify-end p-3">
                             <h3 class="text-white font-bold text-xs md:text-sm leading-tight line-clamp-2 mb-1 group-hover:text-primary transition-colors" th:text="${movie.title}">Title</h3>
@@ -200,8 +201,26 @@
                 document.getElementById('pageInput').value = page;
                 document.getElementById('mainFilterForm').submit();
             }
-        </script>
 
+        </script>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                // Tìm tất cả ảnh có class 'img-blur'
+                const lazyImages = document.querySelectorAll('.img-blur');
+
+                lazyImages.forEach(img => {
+                    // Nếu ảnh đã load xong từ cache -> hiện luôn
+                    if (img.complete) {
+                        img.classList.add('img-loaded');
+                    } else {
+                        // Nếu chưa -> chờ sự kiện onload
+                        img.onload = () => {
+                            img.classList.add('img-loaded');
+                        };
+                    }
+                });
+            });
+        </script>
         <style>
             /* Custom Scrollbar for Tags List */
             .custom-scrollbar::-webkit-scrollbar {
@@ -216,6 +235,23 @@
             }
             .custom-scrollbar::-webkit-scrollbar-thumb:hover {
                 background: #555;
+            }
+        </style>
+        <style>
+            /* Trạng thái ban đầu: Mờ và trong suốt */
+            .img-blur {
+                filter: blur(20px);
+                opacity: 0;
+                transform: scale(1.1); /* Zoom nhẹ để tránh viền trắng khi blur */
+                transition: filter 0.5s ease-out, opacity 0.5s ease-out, transform 0.5s ease-out;
+                will-change: filter, opacity, transform;
+            }
+
+            /* Trạng thái sau khi load xong: Rõ nét */
+            .img-loaded {
+                filter: blur(0);
+                opacity: 1;
+                transform: scale(1);
             }
         </style>
     </body>

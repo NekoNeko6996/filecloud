@@ -274,4 +274,17 @@ public class MovieController {
             return "redirect:/movies/" + movieId + "?error=" + e.getMessage();
         }
     }
+    
+    @PostMapping("/{movieId}/titles/update/{titleId}")
+    public String updateAltTitle(@PathVariable String movieId,
+                                 @PathVariable String titleId,
+                                 @RequestParam("altTitle") String altTitle,
+                                 @RequestParam(value = "languageCode", required = false) String languageCode) {
+        try {
+            movieService.updateAlternativeTitle(titleId, altTitle, languageCode);
+            return "redirect:/movies/" + movieId;
+        } catch (Exception e) {
+            return "redirect:/movies/" + movieId + "?error=" + e.getMessage();
+        }
+    }
 }

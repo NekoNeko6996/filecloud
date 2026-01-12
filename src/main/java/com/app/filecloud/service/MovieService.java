@@ -552,4 +552,16 @@ public class MovieService {
         episode.getMovie().getEpisodes().remove(episode);
         movieEpisodeRepository.delete(episode);
     }
+
+    @Transactional
+    public void updateAlternativeTitle(String titleId, String altTitle, String languageCode) {
+        // Tìm và cập nhật
+        var entity = movieAlternativeTitleRepository.findById(titleId)
+                .orElseThrow(() -> new RuntimeException("Alternative Title not found"));
+
+        entity.setAltTitle(altTitle);
+        entity.setLanguageCode(languageCode);
+
+        movieAlternativeTitleRepository.save(entity);
+    }
 }
