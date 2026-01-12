@@ -20,6 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import com.app.filecloud.repository.spec.MovieSpecification; // Import class mới tạo
+import org.springframework.data.jpa.domain.Specification;
 
 import java.io.File;
 import java.io.IOException;
@@ -439,22 +441,26 @@ public class MovieService {
         Pattern pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
         return pattern.matcher(normalized).replaceAll("").toLowerCase();
     }
-    
-    
+
     @Transactional
     public void addAlternativeTitle(String movieId, String altTitle, String languageCode) {
         Movie movie = getMovie(movieId);
-        
+
         MovieAlternativeTitle newTitle = new MovieAlternativeTitle();
         newTitle.setMovie(movie);
         newTitle.setAltTitle(altTitle);
         newTitle.setLanguageCode(languageCode);
-        
+
         movieAlternativeTitleRepository.save(newTitle);
     }
 
     @Transactional
     public void deleteAlternativeTitle(String titleId) {
         movieAlternativeTitleRepository.deleteById(titleId);
+    }
+
+    public Page<Movie> searchMovies(String keyword, Integer year, String studioId, java.util.List<String> tagIds, Pageable pageable) {
+        Specification<Movie> spec = com.app.filecloud.repository.spec.MovieSpecification.filterMovies(keyword, year, studioId, tagIds);
+        return movieRepository.findAll(spec, pageable);
     }
 }

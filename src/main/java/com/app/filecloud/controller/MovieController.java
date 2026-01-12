@@ -3,6 +3,7 @@ package com.app.filecloud.controller;
 import com.app.filecloud.entity.Movie;
 import com.app.filecloud.entity.MovieEpisode;
 import com.app.filecloud.repository.MovieEpisodeRepository;
+import com.app.filecloud.repository.MovieRepository;
 import com.app.filecloud.repository.StudioRepository;
 import com.app.filecloud.repository.TagRepository;
 import com.app.filecloud.service.MovieService;
@@ -31,14 +32,44 @@ public class MovieController {
     private final MovieEpisodeRepository movieEpisodeRepository;
     private final StudioRepository studioRepository;
     private final TagRepository tagRepository;
+    private final MovieRepository movieRepository;
 
     // --- TRANG LIST ---
     @GetMapping
-    public String listPage(Model model, @RequestParam(defaultValue = "0") int page) {
-        Page<Movie> moviePage = movieService.getAllMovies(PageRequest.of(page, 20, Sort.by("createdAt").descending()));
+    public String listPage(Model model,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String studio,
+            @RequestParam(required = false) java.util.List<String> tags, // [MOD] Nhận List
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+
+        // 1. Sort
+        String[] sortParams = sort.split(",");
+        Sort sortObj = Sort.by(Sort.Direction.fromString(sortParams[1]), sortParams[0]);
+
+        // 2. Search (truyền list tags)
+        Page<Movie> moviePage = movieService.searchMovies(keyword, year, studio, tags, PageRequest.of(page, 24, sortObj));
+
+        // 3. Model Attributes
         model.addAttribute("movies", moviePage.getContent());
         model.addAttribute("currentPage", page);
         model.addAttribute("totalPages", moviePage.getTotalPages());
+
+        // Filter params
+        model.addAttribute("keyword", keyword);
+        model.addAttribute("selectedYear", year);
+        model.addAttribute("selectedStudio", studio);
+        model.addAttribute("selectedTags", tags); // List các ID đã chọn
+        model.addAttribute("selectedSort", sort);
+
+        // Dropdown Data
+        model.addAttribute("allStudios", studioRepository.findAll(Sort.by("name")));
+        model.addAttribute("allTags", tagRepository.findAll(Sort.by("name")));
+
+        // [MOD] Dùng danh sách năm thực tế từ DB
+        model.addAttribute("allYears", movieRepository.findDistinctReleaseYears());
+
         return "movie/list";
     }
 

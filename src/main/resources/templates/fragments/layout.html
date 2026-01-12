@@ -156,6 +156,15 @@
                                   style="font-variation-settings: 'FILL' 1;">label</span>
                             <p class="text-sm font-medium">Tags</p>
                         </a>
+                        <div class="h-px bg-white/10 w-full"></div>
+                        <a th:href="@{/admin/config}" 
+                           class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group"
+                           th:classappend="${activePage == 'config'} ? 'bg-primary/20 text-white border border-primary/20' : 'text-[#a79cba] hover:text-white hover:bg-[#2e2839]/50'">
+                            <span class="material-symbols-outlined" 
+                                  th:classappend="${activePage == 'config'} ? 'text-white' : 'text-[#a79cba] group-hover:text-white'"
+                                  style="font-variation-settings: 'FILL' 1;">settings</span>
+                            <p class="text-sm font-medium">Config</p>
+                        </a>
                     </div>
 
                     <div class="flex flex-col gap-3 mt-auto mb-4">
