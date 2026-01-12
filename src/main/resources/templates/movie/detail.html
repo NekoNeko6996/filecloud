@@ -304,22 +304,35 @@
                                                 </div>
                                             </div>
 
-                                            <div class="relative">
-                                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Studios (separated by ;)</label>
-                                                <input type="text" id="studioInput" name="studios" autocomplete="off"
-                                                       th:value="${#strings.listJoin(movie.studios.![name], '; ')}"
-                                                       placeholder="Start typing studio name..."
-                                                       class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
-                                                <div id="studioSuggestions" class="absolute z-50 w-full bg-[#252525] border border-white/10 rounded-b-lg shadow-xl max-h-40 overflow-y-auto hidden"></div>
-                                            </div>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                                            <div class="relative">
-                                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Tags (separated by ;)</label>
-                                                <input type="text" id="tagInput" name="tags" autocomplete="off"
-                                                       th:value="${#strings.listJoin(movie.tags.![name], '; ')}"
-                                                       placeholder="Start typing tag..."
-                                                       class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
-                                                <div id="tagSuggestions" class="absolute z-50 w-full bg-[#252525] border border-white/10 rounded-b-lg shadow-xl max-h-40 overflow-y-auto hidden"></div>
+                                                <div>
+                                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">Studios</label>
+                                                    <div class="relative">
+                                                        <input type="hidden" name="studios" id="editHiddenStudios" 
+                                                               th:value="${#strings.listJoin(movie.studios.![name], ';')}">
+
+                                                        <input type="text" id="editStudioInput" autocomplete="off" placeholder="Type & Press Enter..."
+                                                               class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm transition-all placeholder-gray-600">
+
+                                                        <div id="editStudioSuggestions" class="absolute z-50 w-full bg-[#252525] border border-white/10 rounded-b-lg shadow-xl max-h-40 overflow-y-auto hidden top-full mt-1"></div>
+                                                    </div>
+                                                    <div id="editStudioList" class="flex flex-wrap gap-2 mt-3 min-h-[30px]"></div>
+                                                </div>
+
+                                                <div>
+                                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">Tags</label>
+                                                    <div class="relative">
+                                                        <input type="hidden" name="tags" id="editHiddenTags"
+                                                               th:value="${#strings.listJoin(movie.tags.![name], ';')}">
+
+                                                        <input type="text" id="editTagInput" autocomplete="off" placeholder="Type & Press Enter..."
+                                                               class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm transition-all placeholder-gray-600">
+
+                                                        <div id="editTagSuggestions" class="absolute z-50 w-full bg-[#252525] border border-white/10 rounded-b-lg shadow-xl max-h-40 overflow-y-auto hidden top-full mt-1"></div>
+                                                    </div>
+                                                    <div id="editTagList" class="flex flex-wrap gap-2 mt-3 min-h-[30px]"></div>
+                                                </div>
                                             </div>
 
                                             <div>
@@ -524,75 +537,130 @@
             }
 
 
-            // --- AUTOCOMPLETE LOGIC ---
+            // --- MULTI-SELECT TAGS & STUDIOS LOGIC (EDIT MODAL) ---
             document.addEventListener('DOMContentLoaded', () => {
-                // Load dữ liệu gợi ý khi trang tải xong
-                fetchSuggestions('/movies/api/suggestions/studios', 'studioInput', 'studioSuggestions');
-                fetchSuggestions('/movies/api/suggestions/tags', 'tagInput', 'tagSuggestions');
+                // Chỉ cần khởi tạo MultiSelect cho các trường trong Edit Modal
+                // 1. Khởi tạo Studio
+                initMultiSelect('editStudioInput', 'editHiddenStudios', 'editStudioList', 'editStudioSuggestions', '/movies/api/suggestions/studios');
+                // 2. Khởi tạo Tag
+                initMultiSelect('editTagInput', 'editHiddenTags', 'editTagList', 'editTagSuggestions', '/movies/api/suggestions/tags');
             });
 
-            function fetchSuggestions(apiUrl, inputId, listId) {
-                fetch(apiUrl)
-                        .then(res => res.json())
-                        .then(data => setupAutocomplete(inputId, listId, data))
-                        .catch(err => console.error('Error loading suggestions:', err));
-            }
-
-            function setupAutocomplete(inputId, listId, allItems) {
+            function initMultiSelect(inputId, hiddenId, listId, suggestionId, apiUrl) {
                 const input = document.getElementById(inputId);
-                const list = document.getElementById(listId);
+                const hiddenInput = document.getElementById(hiddenId);
+                const listContainer = document.getElementById(listId);
+                const suggestionBox = document.getElementById(suggestionId);
 
-                if (!input || !list)
+                // Kiểm tra nếu không tìm thấy element thì dừng lại (tránh lỗi null)
+                if (!input || !hiddenInput || !listContainer || !suggestionBox)
                     return;
 
+                let selectedItems = [];
+                let allSuggestions = [];
+
+                // 1. Load dữ liệu ban đầu từ hidden input (nếu có)
+                if (hiddenInput.value) {
+                    // Tách chuỗi "A;B;C" thành mảng và loại bỏ khoảng trắng
+                    selectedItems = hiddenInput.value.split(';').map(s => s.trim()).filter(s => s.length > 0);
+                    renderList();
+                }
+
+                // 2. Lấy gợi ý từ Server
+                fetch(apiUrl)
+                        .then(res => res.json())
+                        .then(data => {
+                            allSuggestions = data;
+                        })
+                        .catch(err => console.error(err));
+
+                // 3. Hàm render lại danh sách thẻ (Chips)
+                function renderList() {
+                    listContainer.innerHTML = '';
+                    selectedItems.forEach((item, index) => {
+                        const chip = document.createElement('div');
+                        // Style cho thẻ chip
+                        chip.className = 'bg-primary/20 text-white border border-primary/30 px-2 py-1 rounded text-xs font-bold flex items-center gap-2 animate-fadeIn';
+
+                        // [FIX] Sửa lại phần hiển thị icon close
+                        chip.innerHTML = `
+                            <span>${item}</span>
+                            <button type="button" class="hover:text-red-400 transition-colors focus:outline-none flex items-center" data-index="${index}">
+                                <span class="material-symbols-outlined text-[14px]">close</span>
+                            </button>
+                        `;
+
+                        // Gán sự kiện xóa thẻ
+                        chip.querySelector('button').addEventListener('click', () => removeItem(index));
+                        listContainer.appendChild(chip);
+                    });
+
+                    // Cập nhật input ẩn để gửi form (nối lại bằng dấu ;)
+                    hiddenInput.value = selectedItems.join(';');
+                }
+
+                // 4. Hàm thêm item
+                function addItem(value) {
+                    const cleanValue = value.trim();
+                    // Chỉ thêm nếu có giá trị và chưa tồn tại trong danh sách
+                    if (cleanValue && !selectedItems.includes(cleanValue)) {
+                        selectedItems.push(cleanValue);
+                        renderList();
+                    }
+                    input.value = ''; // Xóa ô nhập liệu
+                    suggestionBox.classList.add('hidden'); // Ẩn gợi ý
+                    input.focus();
+                }
+
+                // 5. Hàm xóa item
+                function removeItem(index) {
+                    selectedItems.splice(index, 1);
+                    renderList();
+                }
+
+                // 6. Sự kiện nhập liệu: Hiển thị gợi ý
                 input.addEventListener('input', function () {
-                    const val = this.value;
-                    // Lấy từ khóa cuối cùng sau dấu ;
-                    // VD: "Action; Dra" -> từ khóa là "Dra"
-                    const lastTerm = val.split(';').pop().trim();
+                    const val = this.value.toLowerCase().trim();
+                    suggestionBox.innerHTML = '';
 
-                    list.innerHTML = '';
-
-                    if (!lastTerm) {
-                        list.classList.add('hidden');
+                    if (!val) {
+                        suggestionBox.classList.add('hidden');
                         return;
                     }
 
-                    // Lọc danh sách (Case insensitive)
-                    const matches = allItems.filter(item =>
-                        item.toLowerCase().includes(lastTerm.toLowerCase())
+                    // Lọc gợi ý: Có chứa từ khóa VÀ chưa được chọn
+                    const matches = allSuggestions.filter(item =>
+                        item.toLowerCase().includes(val) && !selectedItems.includes(item)
                     );
 
                     if (matches.length > 0) {
-                        list.classList.remove('hidden');
+                        suggestionBox.classList.remove('hidden');
                         matches.forEach(item => {
                             const div = document.createElement('div');
                             div.className = 'px-3 py-2 text-sm text-gray-300 hover:bg-primary/20 hover:text-white cursor-pointer transition-colors border-b border-white/5 last:border-0';
                             div.textContent = item;
 
-                            div.addEventListener('click', function () {
-                                // Logic thay thế từ khóa đang gõ dở bằng từ đã chọn + dấu ;
-                                const terms = val.split(';');
-                                terms.pop(); // Bỏ cái đang gõ dở
-                                terms.push(' ' + item); // Thêm cái đã chọn
-
-                                // Nối lại và thêm dấu ; ở cuối để gõ tiếp
-                                input.value = terms.join(';').trim() + '; ';
-
-                                list.classList.add('hidden');
-                                input.focus();
-                            });
-                            list.appendChild(div);
+                            // Click vào gợi ý để thêm
+                            div.addEventListener('click', () => addItem(item));
+                            suggestionBox.appendChild(div);
                         });
                     } else {
-                        list.classList.add('hidden');
+                        suggestionBox.classList.add('hidden');
                     }
                 });
 
-                // Ẩn gợi ý khi click ra ngoài
+                // 7. Sự kiện nhấn Enter
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault(); // Ngăn submit form
+                        addItem(this.value);
+                    }
+                });
+
+                // 8. Ẩn gợi ý khi click ra ngoài
                 document.addEventListener('click', function (e) {
-                    if (e.target !== input && e.target !== list) {
-                        list.classList.add('hidden');
+                    if (e.target !== input && e.target !== suggestionBox) {
+                        suggestionBox.classList.add('hidden');
                     }
                 });
             }
