@@ -1,12 +1,18 @@
 package com.app.filecloud.service;
 
 import com.app.filecloud.entity.Movie;
+import com.app.filecloud.entity.MovieAlternativeTitle;
 import com.app.filecloud.entity.MovieEpisode;
 import com.app.filecloud.entity.StorageVolume;
+import com.app.filecloud.entity.Studio;
 import com.app.filecloud.entity.SysConfig;
+import com.app.filecloud.entity.Tag;
+import com.app.filecloud.repository.MovieAlternativeTitleRepository;
 import com.app.filecloud.repository.MovieRepository;
 import com.app.filecloud.repository.StorageVolumeRepository;
+import com.app.filecloud.repository.StudioRepository;
 import com.app.filecloud.repository.SysConfigRepository;
+import com.app.filecloud.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
 import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.data.domain.Page;
@@ -21,9 +27,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import net.bramp.ffmpeg.FFmpeg;
 import net.bramp.ffmpeg.FFmpegExecutor;
@@ -38,6 +46,9 @@ public class MovieService {
     private final MovieRepository movieRepository;
     private final SysConfigRepository sysConfigRepository;
     private final StorageVolumeRepository volumeRepository;
+    private final TagRepository tagRepository;
+    private final StudioRepository studioRepository;
+    private final MovieAlternativeTitleRepository movieAlternativeTitleRepository;
 
     private final FFmpeg ffmpeg;
     private final FFprobe ffprobe;
@@ -298,13 +309,67 @@ public class MovieService {
     }
 
     @Transactional
-    public void updateMovie(String id, String title, Integer releaseYear, String description, MultipartFile coverFile, String studio, Double rating) throws IOException {
+    public void updateMovie(
+            String id,
+            String title,
+            Integer releaseYear,
+            String description,
+            MultipartFile coverFile,
+            Double rating,
+            String studioInput,
+            String tagInput
+    ) throws IOException {
         Movie movie = getMovie(id);
 
         // 1. Cập nhật thông tin cơ bản
         movie.setTitle(title);
         movie.setReleaseYear(releaseYear);
         movie.setDescription(description);
+        movie.setRating(rating);
+
+        // 1. XỬ LÝ STUDIOS
+        movie.getStudios().clear();
+        if (studioInput != null && !studioInput.trim().isEmpty()) {
+            // [MOD] Tách bằng dấu chấm phẩy (;) HOẶC dấu phẩy (,)
+            String[] names = studioInput.split("[;,]");
+            for (String name : names) {
+                String cleanName = name.trim();
+                if (!cleanName.isEmpty()) {
+                    String slug = toSlug(cleanName); // Chuyển về slug (viết thường, không dấu)
+
+                    // [MOD] Tìm theo Slug để không phân biệt hoa/thường
+                    Studio studio = studioRepository.findBySlug(slug)
+                            .orElseGet(() -> studioRepository.save(
+                            Studio.builder().name(cleanName).slug(slug).build()
+                    ));
+                    movie.getStudios().add(studio);
+                }
+            }
+        }
+
+        // 2. XỬ LÝ TAGS (Logic tạo Slug)
+        movie.getTags().clear();
+        if (tagInput != null && !tagInput.trim().isEmpty()) {
+            // [MOD] Tách bằng dấu chấm phẩy (;) HOẶC dấu phẩy (,)
+            String[] names = tagInput.split("[;,]");
+            for (String name : names) {
+                String tagName = name.trim();
+                if (!tagName.isEmpty()) {
+                    String slug = toSlug(tagName);
+
+                    // [MOD] Tìm theo Slug có sẵn
+                    Tag tag = tagRepository.findBySlug(slug)
+                            .orElseGet(() -> tagRepository.save(
+                            Tag.builder()
+                                    .name(tagName)
+                                    .slug(slug)
+                                    .colorHex("#6366f1")
+                                    .build()
+                    ));
+                    movie.getTags().add(tag);
+                }
+            }
+        }
 
         // 2. Nếu có upload ảnh bìa mới -> Xử lý thay thế
         if (coverFile != null && !coverFile.isEmpty()) {
@@ -337,9 +402,6 @@ public class MovieService {
             String coverRelPath = folderName + File.separator + coverName;
             movie.setCoverImageUrl(coverRelPath);
 
-            movie.setStudio(studio);
-            movie.setRating(rating);
-
             // B. Tạo lại Thumbnail
             Path thumbDir = movieDir.resolve(".thumbs");
             if (!Files.exists(thumbDir)) {
@@ -366,5 +428,33 @@ public class MovieService {
 
         movie.setUpdatedAt(LocalDateTime.now());
         movieRepository.save(movie);
+    }
+
+    private String toSlug(String input) {
+        if (input == null) {
+            return "";
+        }
+        String nowhitespace = input.trim().replaceAll("\\s+", "-");
+        String normalized = Normalizer.normalize(nowhitespace, Normalizer.Form.NFD);
+        Pattern pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+        return pattern.matcher(normalized).replaceAll("").toLowerCase();
+    }
+    
+    
+    @Transactional
+    public void addAlternativeTitle(String movieId, String altTitle, String languageCode) {
+        Movie movie = getMovie(movieId);
+        
+        MovieAlternativeTitle newTitle = new MovieAlternativeTitle();
+        newTitle.setMovie(movie);
+        newTitle.setAltTitle(altTitle);
+        newTitle.setLanguageCode(languageCode);
+        
+        movieAlternativeTitleRepository.save(newTitle);
+    }
+
+    @Transactional
+    public void deleteAlternativeTitle(String titleId) {
+        movieAlternativeTitleRepository.deleteById(titleId);
     }
 }

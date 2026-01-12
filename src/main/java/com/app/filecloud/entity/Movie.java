@@ -5,7 +5,9 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "movies")
@@ -26,8 +28,30 @@ public class Movie {
 
     @Column(name = "original_title")
     private String originalTitle;
+    
+    @OneToMany(mappedBy = "movie", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private Set<MovieAlternativeTitle> alternativeTitles = new HashSet<>();
 
-    private String studio;
+    // [NEW] Quan hệ với bảng TAGS có sẵn
+    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+        name = "movie_tags",
+        joinColumns = @JoinColumn(name = "movie_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id") // Tag dùng Integer ID
+    )
+    @Builder.Default
+    private Set<Tag> tags = new java.util.HashSet<>();
+
+    // [NEW] Quan hệ với bảng STUDIOS mới
+    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+        name = "movie_studios",
+        joinColumns = @JoinColumn(name = "movie_id"),
+        inverseJoinColumns = @JoinColumn(name = "studio_id")
+    )
+    @Builder.Default
+    private Set<Studio> studios = new java.util.HashSet<>();
 
     @Column(name = "release_year")
     private Integer releaseYear;
@@ -57,26 +81,15 @@ public class Movie {
 
     // --- RELATIONSHIPS ---
 
-    // 1 Phim có nhiều tên khác
-    @OneToMany(mappedBy = "movie", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<MovieAlternativeTitle> alternativeTitles = new ArrayList<>();
-
     // 1 Phim có nhiều tập
     @OneToMany(mappedBy = "movie", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<MovieEpisode> episodes = new ArrayList<>();
 
     // 1 Phim có nhiều Credits (Diễn viên/Đạo diễn)
     @OneToMany(mappedBy = "movie", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<MovieCredit> credits = new ArrayList<>();
-
-    // 1 Phim có nhiều Tag (Many-to-Many với bảng Tags có sẵn)
-    @ManyToMany
-    @JoinTable(
-        name = "movie_tags",
-        joinColumns = @JoinColumn(name = "movie_id"),
-        inverseJoinColumns = @JoinColumn(name = "tag_id")
-    )
-    private List<Tag> tags = new ArrayList<>(); // Giả sử bạn đã có Entity Tag
 
     @PrePersist
     protected void onCreate() {

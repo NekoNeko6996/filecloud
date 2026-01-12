@@ -3,6 +3,8 @@ package com.app.filecloud.controller;
 import com.app.filecloud.entity.Movie;
 import com.app.filecloud.entity.MovieEpisode;
 import com.app.filecloud.repository.MovieEpisodeRepository;
+import com.app.filecloud.repository.StudioRepository;
+import com.app.filecloud.repository.TagRepository;
 import com.app.filecloud.service.MovieService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
@@ -27,6 +29,8 @@ public class MovieController {
 
     private final MovieService movieService;
     private final MovieEpisodeRepository movieEpisodeRepository;
+    private final StudioRepository studioRepository;
+    private final TagRepository tagRepository;
 
     // --- TRANG LIST ---
     @GetMapping
@@ -156,15 +160,55 @@ public class MovieController {
             @RequestParam("title") String title,
             @RequestParam(value = "releaseYear", required = false) Integer releaseYear,
             @RequestParam("description") String description,
-            @RequestParam(value = "studio", required = false) String studio,
-                              @RequestParam(value = "rating", required = false) Double rating,
+            @RequestParam(value = "studios", required = false) String studios,
+            @RequestParam(value = "tags", required = false) String tags,
+            @RequestParam(value = "rating", required = false) Double rating,
             @RequestParam(value = "coverFile", required = false) MultipartFile coverFile) {
         try {
-            movieService.updateMovie(id, title, releaseYear, description, coverFile, studio, rating);
+            // [FIX] Sửa thứ tự tham số khớp với Service: coverFile, rating, studios, tags
+            movieService.updateMovie(id, title, releaseYear, description, coverFile, rating, studios, tags);
             return "redirect:/movies/" + id;
         } catch (Exception e) {
             e.printStackTrace();
             return "redirect:/movies/" + id + "?error=" + e.getMessage();
+        }
+    }
+
+    @GetMapping("/api/suggestions/studios")
+    @ResponseBody
+    public java.util.List<String> getAllStudioNames() {
+        return studioRepository.findAll().stream()
+                .map(com.app.filecloud.entity.Studio::getName)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @GetMapping("/api/suggestions/tags")
+    @ResponseBody
+    public java.util.List<String> getAllTagNames() {
+        return tagRepository.findAll().stream()
+                .map(com.app.filecloud.entity.Tag::getName)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @PostMapping("/{id}/titles/add")
+    public String addAltTitle(@PathVariable String id,
+            @RequestParam("altTitle") String altTitle,
+            @RequestParam(value = "languageCode", required = false) String languageCode) {
+        try {
+            movieService.addAlternativeTitle(id, altTitle, languageCode);
+            return "redirect:/movies/" + id;
+        } catch (Exception e) {
+            return "redirect:/movies/" + id + "?error=" + e.getMessage();
+        }
+    }
+
+    @PostMapping("/{movieId}/titles/delete/{titleId}")
+    public String deleteAltTitle(@PathVariable String movieId, @PathVariable String titleId) {
+        try {
+            movieService.deleteAlternativeTitle(titleId);
+            return "redirect:/movies/" + movieId;
+        } catch (Exception e) {
+            return "redirect:/movies/" + movieId + "?error=" + e.getMessage();
         }
     }
 }

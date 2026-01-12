@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{fragments/layout :: layout(${movie.title}, 'movies', ~{::section}, ~{::script})}">
     <body>
-        <section class="flex-1 flex flex-col relative overflow-y-auto bg-background-dark pb-20 md:pb-0">
+        <section class="flex-1 flex flex-col relative overflow-y-auto bg-background-dark">
 
             <header class="h-14 md:h-16 flex items-center justify-between px-4 md:px-6 shrink-0 z-20 sticky top-0 gap-3 bg-gradient-to-b from-black/80 to-transparent backdrop-blur-[2px]">
                 <div class="flex items-center gap-3 md:gap-4 overflow-hidden">
@@ -29,7 +29,7 @@
                 </div>
             </header>
 
-            <div class="relative w-full min-h-[400px] md:h-[550px] overflow-visible flex items-end -mt-14 md:-mt-16 group">
+            <div class="relative w-full overflow-visible flex items-end -mt-14 md:-mt-16 group">
 
                 <div class="absolute inset-0 overflow-hidden rounded-b-[3rem]">
                     <img th:src="@{/movies/image/{id}(id=${movie.id})}" 
@@ -44,17 +44,62 @@
                     </div>
 
                     <div class="flex-1 mb-2 text-center md:text-left w-full pb-2">
-                        <h1 class="text-3xl md:text-6xl font-bold text-white mb-3 leading-tight drop-shadow-lg" th:text="${movie.title}">Title</h1>
+                        <div class="flex-1 mb-2 text-center md:text-left w-full pb-2">
 
-                        <div class="flex flex-wrap justify-center md:justify-start items-center gap-4 text-gray-200 text-sm md:text-lg font-medium">
-                            <span class="bg-white/20 backdrop-blur-md px-3 py-1 rounded-md border border-white/10" th:text="${movie.releaseYear}">2023</span>
-                            <span class="hidden md:inline text-gray-500">•</span>
-                            <span th:text="${movie.studio != null ? movie.studio : 'Unknown Studio'}" class="text-gray-300">Studio</span>
-                            <span class="hidden md:inline text-gray-500">•</span>
-                            <span class="flex items-center gap-1 text-yellow-400 font-bold bg-black/40 px-2 py-1 rounded border border-yellow-400/20">
-                                <span class="material-symbols-outlined text-[16px] md:text-[20px] fill-current">star</span>
+                            <div class="flex items-center justify-center md:justify-start gap-3 group/title">
+                                <h1 class="text-3xl md:text-6xl font-bold text-white leading-tight drop-shadow-lg break-words" 
+                                    th:text="${movie.title}">Title</h1>
+
+                                <button onclick="openAltTitleModal()" 
+                                        class="text-gray-500 hover:text-white bg-white/5 hover:bg-white/20 p-1.5 rounded-full transition-all backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover/title:opacity-100"
+                                        title="Add Alternative Title">
+                                    <span class="material-symbols-outlined text-[18px]">edit</span>
+                                </button>
+                            </div>
+
+                            <div th:if="${!movie.alternativeTitles.isEmpty()}" 
+                                 class="flex flex-wrap justify-center md:justify-start items-center gap-x-2 mt-1 mb-2 text-sm md:text-base font-medium text-gray-400/80">
+
+                                <span th:each="alt, iterStat : ${movie.alternativeTitles}" class="flex items-center">
+                                    <span th:text="${alt.altTitle}" class="hover:text-white transition-colors cursor-default">Alt Name</span>
+
+                                    <span th:if="${!iterStat.last}" class="ml-2 text-[8px] opacity-50">•</span>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex flex-wrap justify-center md:justify-start items-center gap-3 md:gap-4 text-gray-300 text-xs md:text-base font-medium mt-2">
+                            <span class="bg-white/10 backdrop-blur-md px-2 md:px-3 py-1 rounded-md border border-white/10" th:text="${movie.releaseYear}">2023</span>
+
+                            <span class="flex items-center gap-1 text-yellow-400 font-bold bg-black/40 px-2 py-0.5 rounded border border-yellow-400/20">
+                                <span class="material-symbols-outlined text-[14px] md:text-[18px] fill-current">star</span>
                                 <span th:text="${movie.rating != null ? movie.rating : 'N/A'}">8.5</span>
                             </span>
+
+                            <span th:if="${!movie.studios.isEmpty()}" class="hidden md:inline w-1 h-1 bg-gray-500 rounded-full"></span>
+
+                            <div th:if="${!movie.studios.isEmpty()}" class="flex flex-wrap gap-2 items-center">
+                                <th:block th:each="studio, iterStat : ${movie.studios}">
+                                    <span class="text-gray-300 hover:text-white hover:underline transition-colors cursor-pointer" 
+                                          th:text="${studio.name}">
+                                        Studio Name
+                                    </span>
+                                    <span th:unless="${iterStat.last}" 
+                                          class="hidden md:inline w-1 h-1 bg-gray-500 rounded-full">
+                                    </span>
+                                </th:block>
+                            </div>
+
+                            <span th:if="${movie.studios.isEmpty()}" class="text-gray-600 italic text-xs ml-2">No Studio</span>
+                        </div>
+
+                        <div class="flex flex-wrap justify-center md:justify-start gap-2 mt-3">
+                            <span th:each="tag : ${movie.tags}" 
+                                  class="text-[10px] md:text-xs font-bold text-white px-2 py-1 rounded-full border border-white/10 transition-all cursor-pointer hover:opacity-80 shadow-sm"
+                                  th:style="'background-color: ' + (${tag.colorHex} ?: '#6366f1')"
+                                  th:text="${tag.name}">Action</span>
+
+                            <span th:if="${movie.tags.isEmpty()}" class="text-gray-600 italic text-xs py-1">No Tags</span>
                         </div>
                     </div>
                 </div>
@@ -254,10 +299,22 @@
                                                 </div>
                                             </div>
 
-                                            <div>
-                                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Studio / Production</label>
-                                                <input type="text" name="studio" th:value="${movie.studio}" placeholder="e.g. Marvel Studios"
+                                            <div class="relative">
+                                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Studios (separated by ;)</label>
+                                                <input type="text" id="studioInput" name="studios" autocomplete="off"
+                                                       th:value="${#strings.listJoin(movie.studios.![name], '; ')}"
+                                                       placeholder="Start typing studio name..."
                                                        class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
+                                                <div id="studioSuggestions" class="absolute z-50 w-full bg-[#252525] border border-white/10 rounded-b-lg shadow-xl max-h-40 overflow-y-auto hidden"></div>
+                                            </div>
+
+                                            <div class="relative">
+                                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Tags (separated by ;)</label>
+                                                <input type="text" id="tagInput" name="tags" autocomplete="off"
+                                                       th:value="${#strings.listJoin(movie.tags.![name], '; ')}"
+                                                       placeholder="Start typing tag..."
+                                                       class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white focus:border-primary outline-none text-sm">
+                                                <div id="tagSuggestions" class="absolute z-50 w-full bg-[#252525] border border-white/10 rounded-b-lg shadow-xl max-h-40 overflow-y-auto hidden"></div>
                                             </div>
 
                                             <div>
@@ -274,6 +331,37 @@
                                     </div>
                                 </form>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="altTitleModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                <div class="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onclick="closeAltTitleModal()"></div>
+                <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+                    <div class="flex min-h-full items-center justify-center p-4">
+                        <div class="relative transform overflow-hidden bg-[#1e1e1e] text-left shadow-2xl transition-all w-full max-w-sm rounded-2xl border border-white/10 p-6">
+
+                            <h3 class="text-lg font-bold text-white mb-4">Add Alternative Title</h3>
+
+                            <form th:action="@{/movies/{id}/titles/add(id=${movie.id})}" method="post" class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Alternative Title</label>
+                                    <input type="text" name="altTitle" required placeholder="e.g. Tên tiếng Việt" autofocus
+                                           class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-primary outline-none text-sm">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Language Code (Optional)</label>
+                                    <input type="text" name="languageCode" placeholder="e.g. vn, en, jp"
+                                           class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-primary outline-none text-sm uppercase">
+                                </div>
+
+                                <div class="flex justify-end gap-2 pt-2">
+                                    <button type="button" onclick="closeAltTitleModal()" class="px-4 py-2 text-gray-400 hover:text-white text-sm font-bold">Cancel</button>
+                                    <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-bold transition-all">Add</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -355,6 +443,88 @@
                     }
                     reader.readAsDataURL(input.files[0]);
                 }
+            }
+
+
+            // --- AUTOCOMPLETE LOGIC ---
+            document.addEventListener('DOMContentLoaded', () => {
+                // Load dữ liệu gợi ý khi trang tải xong
+                fetchSuggestions('/movies/api/suggestions/studios', 'studioInput', 'studioSuggestions');
+                fetchSuggestions('/movies/api/suggestions/tags', 'tagInput', 'tagSuggestions');
+            });
+
+            function fetchSuggestions(apiUrl, inputId, listId) {
+                fetch(apiUrl)
+                        .then(res => res.json())
+                        .then(data => setupAutocomplete(inputId, listId, data))
+                        .catch(err => console.error('Error loading suggestions:', err));
+            }
+
+            function setupAutocomplete(inputId, listId, allItems) {
+                const input = document.getElementById(inputId);
+                const list = document.getElementById(listId);
+
+                if (!input || !list)
+                    return;
+
+                input.addEventListener('input', function () {
+                    const val = this.value;
+                    // Lấy từ khóa cuối cùng sau dấu ;
+                    // VD: "Action; Dra" -> từ khóa là "Dra"
+                    const lastTerm = val.split(';').pop().trim();
+
+                    list.innerHTML = '';
+
+                    if (!lastTerm) {
+                        list.classList.add('hidden');
+                        return;
+                    }
+
+                    // Lọc danh sách (Case insensitive)
+                    const matches = allItems.filter(item =>
+                        item.toLowerCase().includes(lastTerm.toLowerCase())
+                    );
+
+                    if (matches.length > 0) {
+                        list.classList.remove('hidden');
+                        matches.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'px-3 py-2 text-sm text-gray-300 hover:bg-primary/20 hover:text-white cursor-pointer transition-colors border-b border-white/5 last:border-0';
+                            div.textContent = item;
+
+                            div.addEventListener('click', function () {
+                                // Logic thay thế từ khóa đang gõ dở bằng từ đã chọn + dấu ;
+                                const terms = val.split(';');
+                                terms.pop(); // Bỏ cái đang gõ dở
+                                terms.push(' ' + item); // Thêm cái đã chọn
+
+                                // Nối lại và thêm dấu ; ở cuối để gõ tiếp
+                                input.value = terms.join(';').trim() + '; ';
+
+                                list.classList.add('hidden');
+                                input.focus();
+                            });
+                            list.appendChild(div);
+                        });
+                    } else {
+                        list.classList.add('hidden');
+                    }
+                });
+
+                // Ẩn gợi ý khi click ra ngoài
+                document.addEventListener('click', function (e) {
+                    if (e.target !== input && e.target !== list) {
+                        list.classList.add('hidden');
+                    }
+                });
+            }
+
+            // --- ALT TITLE MODAL ---
+            function openAltTitleModal() {
+                document.getElementById('altTitleModal').classList.remove('hidden');
+            }
+            function closeAltTitleModal() {
+                document.getElementById('altTitleModal').classList.add('hidden');
             }
         </script>
     </body>
