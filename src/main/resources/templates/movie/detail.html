@@ -154,33 +154,34 @@
                             <div th:each="ep : ${movie.episodes}" 
                                  class="group bg-[#1e1e1e] hover:bg-[#252525] border border-white/5 rounded-xl p-2 flex items-center gap-3 transition-all hover:border-primary/30 relative overflow-hidden">
 
-                                <div class="relative w-24 md:w-32 aspect-video rounded-lg bg-black overflow-hidden shrink-0 border border-white/10 group-hover:border-white/30 transition-colors">
-                                    <img th:if="${ep.thumbnailPath != null}" 
-                                         th:src="@{/movies/episodes/image/{id}(id=${ep.id})}" 
-                                         class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                                         onerror="this.style.display='none'">
+                                <a th:href="@{/movies/watch/{id}(id=${ep.id})}" class="flex items-center gap-3 flex-1 min-w-0">
+                                    <div class="relative w-24 md:w-32 aspect-video rounded-lg bg-black overflow-hidden shrink-0 border border-white/10 group-hover:border-white/30 transition-colors">
+                                        <img th:if="${ep.thumbnailPath != null}" 
+                                             th:src="@{/movies/episodes/image/{id}(id=${ep.id})}" 
+                                             class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                                             onerror="this.style.display='none'">
 
-                                    <div th:unless="${ep.thumbnailPath != null}" class="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 font-bold text-lg" 
-                                         th:text="${ep.episodeNumber}">1</div>
+                                        <div th:unless="${ep.thumbnailPath != null}" class="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500 font-bold text-lg" 
+                                             th:text="${ep.episodeNumber}">1</div>
 
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <div class="w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20">
-                                            <span class="material-symbols-outlined text-white text-[20px]">play_arrow</span>
+                                        <div class="absolute inset-0 flex items-center justify-center">
+                                            <div class="w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                                                <span class="material-symbols-outlined text-white text-[20px]">play_arrow</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div class="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                                    <h4 class="text-sm font-bold text-white truncate pr-8" th:text="${ep.title}">Episode Title</h4>
-                                    <div class="flex flex-wrap items-center gap-2 text-[10px] md:text-xs text-gray-500">
-                                        <span class="bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 font-bold" th:text="'Ep ' + ${ep.episodeNumber}">Ep 1</span>
-                                        <span class="hidden xs:inline">•</span>
-                                        <span th:text="${ep.durationSeconds != null ? (ep.durationSeconds / 60) + ' min' : '-- min'}">24 min</span>
-                                        <span>•</span>
-                                        <span th:text="${(ep.fileSize / 1024 / 1024) + ' MB'}">Size</span>
+                                    <div class="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                                        <h4 class="text-sm font-bold text-white truncate pr-8" th:text="${ep.title}">Episode Title</h4>
+                                        <div class="flex flex-wrap items-center gap-2 text-[10px] md:text-xs text-gray-500">
+                                            <span class="bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 font-bold" th:text="'Ep ' + ${ep.episodeNumber}">Ep 1</span>
+                                            <span class="hidden xs:inline">•</span>
+                                            <span th:text="${ep.durationSeconds != null ? (ep.durationSeconds / 60) + ' min' : '-- min'}">24 min</span>
+                                            <span>•</span>
+                                            <span th:text="${(ep.fileSize / 1024 / 1024) + ' MB'}">Size</span>
+                                        </div>
                                     </div>
-                                </div>
-
+                                </a>
                                 <div class="flex flex-col md:flex-row items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2 bg-[#1e1e1e]/90 md:bg-transparent rounded-lg p-1">
                                     <button type="button" 
                                             th:onclick="openEditEpisodeModal([[${ep.id}]], [[${ep.title}]], [[${ep.episodeNumber}]])"

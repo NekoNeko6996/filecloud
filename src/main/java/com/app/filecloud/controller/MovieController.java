@@ -22,6 +22,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpRange;
+import org.springframework.http.HttpStatus;
 
 @Controller
 @RequestMapping("/movies")
@@ -274,17 +277,113 @@ public class MovieController {
             return "redirect:/movies/" + movieId + "?error=" + e.getMessage();
         }
     }
-    
+
     @PostMapping("/{movieId}/titles/update/{titleId}")
     public String updateAltTitle(@PathVariable String movieId,
-                                 @PathVariable String titleId,
-                                 @RequestParam("altTitle") String altTitle,
-                                 @RequestParam(value = "languageCode", required = false) String languageCode) {
+            @PathVariable String titleId,
+            @RequestParam("altTitle") String altTitle,
+            @RequestParam(value = "languageCode", required = false) String languageCode) {
         try {
             movieService.updateAlternativeTitle(titleId, altTitle, languageCode);
             return "redirect:/movies/" + movieId;
         } catch (Exception e) {
             return "redirect:/movies/" + movieId + "?error=" + e.getMessage();
+        }
+    }
+
+    // --- 1. TRANG XEM PHIM (WATCH PAGE) ---
+    @GetMapping("/watch/{episodeId}")
+    public String watchPage(@PathVariable String episodeId, Model model) {
+        // 1. Lấy Episode hiện tại
+        MovieEpisode currentEpisode = movieEpisodeRepository.findById(episodeId)
+                .orElseThrow(() -> new RuntimeException("Episode not found"));
+
+        Movie movie = currentEpisode.getMovie();
+
+        // 2. Lấy danh sách tập phim để hiển thị ở Sidebar (Sắp xếp theo thứ tự)
+        // (Hibernate đã sort sẵn trong List nếu config đúng, hoặc ta có thể sort lại ở đây cho chắc)
+        movie.getEpisodes().sort(java.util.Comparator.comparingInt(MovieEpisode::getEpisodeNumber));
+
+        // 3. Gợi ý phim khác (Random hoặc cùng Studio) - Tạm thời lấy 4 phim random
+        Page<Movie> randomMovies = movieService.searchMovies(null, null, null, null, PageRequest.of(0, 4));
+
+        model.addAttribute("episode", currentEpisode);
+        model.addAttribute("movie", movie);
+        model.addAttribute("episodes", movie.getEpisodes()); // Playlist là các tập phim
+        model.addAttribute("recommendations", randomMovies.getContent());
+
+        return "movie/view"; // Trả về template mới
+    }
+
+    // --- 2. API STREAM VIDEO CHO EPISODE (Hỗ trợ Tua/Seek) ---
+    @GetMapping("/stream/{episodeId}")
+    public ResponseEntity<Resource> streamEpisode(@PathVariable String episodeId,
+            @RequestHeader(value = "Range", required = false) String rangeHeader) {
+        try {
+            MovieEpisode episode = movieEpisodeRepository.findById(episodeId).orElse(null);
+            if (episode == null || episode.getFilePath() == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Lấy đường dẫn gốc từ Config (Hàm getMovieLibraryRoot trong Service)
+            Path libRoot = movieService.getMovieLibraryRoot();
+            Path videoPath = libRoot.resolve(episode.getFilePath());
+
+            if (!Files.exists(videoPath)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Resource videoResource = new FileSystemResource(videoPath);
+            long fileLength = videoPath.toFile().length();
+
+            // Xử lý Range Request (Để tua video)
+            if (rangeHeader == null) {
+                return ResponseEntity.ok()
+                        .contentType(MediaTypeFactory.getMediaType(videoPath.getFileName().toString()).orElse(MediaType.APPLICATION_OCTET_STREAM))
+                        .contentLength(fileLength)
+                        .body(videoResource);
+            }
+
+            HttpRange range = HttpRange.parseRanges(rangeHeader).get(0);
+            long start = range.getRangeStart(fileLength);
+            long end = range.getRangeEnd(fileLength);
+            long contentLength = end - start + 1;
+
+            return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                    .header(HttpHeaders.CONTENT_TYPE, MediaTypeFactory.getMediaType(videoPath.getFileName().toString()).orElse(MediaType.APPLICATION_OCTET_STREAM).toString())
+                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength))
+                    .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + fileLength)
+                    .body(new FileSystemResource(videoPath) {
+                        // Override inputStream để skip đến đoạn start
+                        @Override
+                        public java.io.InputStream getInputStream() throws java.io.IOException {
+                            java.io.InputStream is = super.getInputStream();
+                            is.skip(start);
+                            return is;
+                        }
+                    });
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // Helper class detect Media Type (Copy từ MediaStreamController sang hoặc tách ra util dùng chung)
+    static class MediaTypeFactory {
+
+        public static java.util.Optional<MediaType> getMediaType(String fileName) {
+            String name = fileName.toLowerCase();
+            if (name.endsWith(".mp4")) {
+                return java.util.Optional.of(MediaType.valueOf("video/mp4"));
+            }
+            if (name.endsWith(".mkv")) {
+                return java.util.Optional.of(MediaType.valueOf("video/x-matroska"));
+            }
+            if (name.endsWith(".webm")) {
+                return java.util.Optional.of(MediaType.valueOf("video/webm"));
+            }
+            return java.util.Optional.empty();
         }
     }
 }
