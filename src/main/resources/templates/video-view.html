@@ -2,87 +2,120 @@
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{fragments/video_layout :: layout(${file.name}, ~{::div.grid-container}, ~{::#page-scripts})}">
     <body>
-        <div id="mainGrid" class="grid-container grid grid-cols-1 lg:grid-cols-4 gap-8 p-5 pl-10">
+        <div id="mainGrid" class="grid-container grid grid-cols-1 lg:grid-cols-4 gap-4 p-2 lg:gap-8 lg:p-5 lg:pl-10">
             <div id="sidebarOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] hidden transition-opacity duration-300" onclick="closeSidebar()"></div>
+
             <button id="playlistFab" onclick="openSidebar()" 
                     class="fixed bottom-6 right-6 z-[50] size-14 rounded-full bg-primary hover:bg-primary-hover text-white shadow-2xl flex items-center justify-center transition-transform hover:scale-110 hidden">
                 <span class="material-symbols-outlined text-3xl">queue_music</span>
             </button>
 
             <div id="leftCol" class="lg:col-span-3 flex flex-col gap-6 transition-all duration-500">
-                <div id="videoWrapper" class="relative w-full group select-none isolate transition-all">
+                <div id="videoWrapper" class="relative w-full group select-none isolate transition-all z-50">
                     <canvas id="ambientCanvas" 
                             class="absolute top-1/2 left-1/2 w-full h-full -z-10 transition-opacity duration-1000 opacity-0 pointer-events-none rounded-xl"
-                            style="filter: blur(60px) saturate(200%); transform: translate(-50%, -50%) scale(1.15); mix-blend-mode: screen;"
+                            style="filter: blur(45px) saturate(200%); transform: translate(-50%, -50%) scale(1.05); mix-blend-mode: screen;"
                             width="100" height="60"></canvas>
 
-                    <div id="videoContainer" class="relative w-full h-full bg-transparent rounded-xl overflow-hidden">
+                    <div id="videoContainer" class="relative w-full h-full bg-transparent rounded-xl overflow-hidden touch-manipulation">
+
                         <video id="mainPlayer" class="w-full aspect-video object-contain cursor-pointer"
                                style="-webkit-mask-image: radial-gradient(ellipse at center, black 75%, transparent 100%);">
                             <source th:src="@{/api/media/stream/{id}(id=${file.id})}" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
+
                         <div id="gradientOverlay" class="controls-layer absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
+
+                        <div id="mobileSeekLeft" class="absolute top-0 left-0 bottom-0 w-1/3 z-30 pointer-events-none flex items-center justify-center opacity-0 transition-opacity duration-200">
+                            <div class="bg-black/60 backdrop-blur-sm rounded-full w-20 h-20 flex flex-col items-center justify-center text-white/90">
+                                <span class="material-symbols-outlined text-3xl">fast_rewind</span>
+                                <span id="mobileSeekLeftText" class="text-xs font-bold font-mono mt-1">-10s</span>
+                            </div>
+                            <div class="absolute inset-0 bg-white/5 animate-pulse rounded-r-full"></div>
+                        </div>
+
+                        <div id="mobileSeekRight" class="absolute top-0 right-0 bottom-0 w-1/3 z-30 pointer-events-none flex items-center justify-center opacity-0 transition-opacity duration-200">
+                            <div class="bg-black/60 backdrop-blur-sm rounded-full w-20 h-20 flex flex-col items-center justify-center text-white/90">
+                                <span class="material-symbols-outlined text-3xl">fast_forward</span>
+                                <span id="mobileSeekRightText" class="text-xs font-bold font-mono mt-1">+10s</span>
+                            </div>
+                            <div class="absolute inset-0 bg-white/5 animate-pulse rounded-l-full"></div>
+                        </div>
+
                         <div id="seekOverlay" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none opacity-0 transition-opacity duration-200 z-30">
                             <div class="bg-black/60 backdrop-blur-md px-6 py-3 rounded-full flex items-center gap-3 border border-white/10 shadow-2xl scale-110">
                                 <span class="material-symbols-outlined text-white text-3xl" id="seekIcon">fast_forward</span>
                                 <span class="text-white font-bold text-xl font-mono" id="seekText">5s >></span>
                             </div>
                         </div>
-                        <div id="centerPlayBtn" class="controls-layer absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-20 bg-black/60 rounded-full flex items-center justify-center backdrop-blur-sm ring-1 ring-white/20 cursor-pointer hover:bg-black/80 hover:scale-110 transition-all z-20 hidden">
-                            <span class="material-symbols-outlined text-white text-[48px]">play_arrow</span>
-                        </div>
-                        <div id="settingsMenu" class="absolute bottom-20 right-4 w-72 bg-[#1e1e1e]/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl transform translate-y-4 opacity-0 invisible transition-all duration-200 z-40 overflow-hidden">
-                            <div class="p-2 space-y-1">
-                                <div class="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/5 mb-1">Settings</div>
-                                <button id="toggleAmbientBtn" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
-                                    <div class="flex items-center gap-3">
-                                        <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">light_mode</span>
-                                        <span class="text-white text-sm font-medium">Ambient Mode</span>
-                                    </div>
-                                    <div class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-600 transition-colors" id="ambientSwitchBg">
-                                        <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform" id="ambientSwitchKnob"></span>
-                                    </div>
-                                </button>
-                                <button id="toggleLoopBtn" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
-                                    <div class="flex items-center gap-3">
-                                        <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">repeat</span>
-                                        <span class="text-white text-sm font-medium">Loop Video</span>
-                                    </div>
-                                    <div class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-600 transition-colors" id="loopSwitchBg">
-                                        <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform" id="loopSwitchKnob"></span>
-                                    </div>
-                                </button>
 
-                                <button id="toggleAutoplayBtn" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
-                                    <div class="flex items-center gap-3">
-                                        <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">autoplay</span>
-                                        <span class="text-white text-sm font-medium">Autoplay</span>
-                                    </div>
-                                    <div class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-600 transition-colors" id="autoplaySwitchBg">
-                                        <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform" id="autoplaySwitchKnob"></span>
-                                    </div>
-                                </button>
-                                <div class="px-3 py-2 rounded-lg hover:bg-white/5 transition-colors">
-                                    <div class="flex items-center justify-between mb-2">
+                        <div id="centerPlayBtn" class="controls-layer absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-16 md:size-20 bg-black/60 rounded-full flex items-center justify-center backdrop-blur-sm ring-1 ring-white/20 cursor-pointer hover:bg-black/80 hover:scale-110 transition-all z-20 hidden">
+                            <span class="material-symbols-outlined text-white text-[32px] md:text-[48px]">play_arrow</span>
+                        </div>
+
+                        <div id="settingsMenu" class="controls-layer invisible opacity-0 transition-all duration-200 z-[70]
+                             fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4
+                             lg:absolute lg:inset-auto lg:bottom-20 lg:right-4 lg:bg-transparent lg:backdrop-blur-none lg:p-0 lg:block lg:w-auto lg:h-auto">
+
+                            <div class="bg-[#1e1e1e]/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden w-full max-w-sm lg:w-72 transform transition-transform scale-95 lg:scale-100"
+                                 onclick="event.stopPropagation()">
+
+                                <div class="lg:hidden flex justify-between items-center p-3 border-b border-white/5">
+                                    <span class="text-white font-bold">Settings</span>
+                                    <button onclick="closeSettings()" class="text-gray-400 hover:text-white">
+                                        <span class="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+
+                                <div class="p-2 space-y-1">
+                                    <button id="toggleAmbientBtn" class="w-full flex items-center justify-between px-3 py-3 lg:py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
                                         <div class="flex items-center gap-3">
-                                            <span class="material-symbols-outlined text-gray-300 text-[20px]">update</span>
-                                            <span class="text-white text-sm font-medium">Seek Time</span>
+                                            <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">light_mode</span>
+                                            <span class="text-white text-sm font-medium">Ambient Mode</span>
                                         </div>
-                                        <span class="text-primary text-xs font-bold bg-primary/20 px-2 py-0.5 rounded" id="seekSettingValue">5s</span>
-                                    </div>
-                                    <div class="px-1">
-                                        <input type="range" min="1" max="20" step="1" id="seekSettingSlider" 
-                                               class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-primary hover:bg-white/40 transition-colors">
-                                        <div class="flex justify-between text-[10px] text-gray-500 mt-1 font-mono">
-                                            <span>1s</span>
-                                            <span>10s</span>
-                                            <span>20s</span>
+                                        <div class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-600 transition-colors" id="ambientSwitchBg">
+                                            <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform" id="ambientSwitchKnob"></span>
+                                        </div>
+                                    </button>
+
+                                    <button id="toggleLoopBtn" class="w-full flex items-center justify-between px-3 py-3 lg:py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
+                                        <div class="flex items-center gap-3">
+                                            <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">repeat</span>
+                                            <span class="text-white text-sm font-medium">Loop Video</span>
+                                        </div>
+                                        <div class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-600 transition-colors" id="loopSwitchBg">
+                                            <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform" id="loopSwitchKnob"></span>
+                                        </div>
+                                    </button>
+
+                                    <button id="toggleAutoplayBtn" class="w-full flex items-center justify-between px-3 py-3 lg:py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/btn">
+                                        <div class="flex items-center gap-3">
+                                            <span class="material-symbols-outlined text-gray-300 group-hover/btn:text-primary text-[20px]">autoplay</span>
+                                            <span class="text-white text-sm font-medium">Autoplay</span>
+                                        </div>
+                                        <div class="relative inline-flex h-5 w-9 items-center rounded-full bg-gray-600 transition-colors" id="autoplaySwitchBg">
+                                            <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform" id="autoplaySwitchKnob"></span>
+                                        </div>
+                                    </button>
+
+                                    <div class="px-3 py-2 rounded-lg hover:bg-white/5 transition-colors">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="flex items-center gap-3">
+                                                <span class="material-symbols-outlined text-gray-300 text-[20px]">update</span>
+                                                <span class="text-white text-sm font-medium">Seek Time</span>
+                                            </div>
+                                            <span class="text-primary text-xs font-bold bg-primary/20 px-2 py-0.5 rounded" id="seekSettingValue">5s</span>
+                                        </div>
+                                        <div class="px-1 py-2">
+                                            <input type="range" min="1" max="20" step="1" id="seekSettingSlider" 
+                                                   class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-primary hover:bg-white/40 transition-colors">
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
                         <div id="bottomControls" class="controls-layer absolute bottom-0 left-0 w-full px-4 pb-4 pt-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col gap-2">
                             <div class="relative h-1.5 w-full bg-white/20 rounded-full cursor-pointer group/progress transition-all hover:h-2.5" id="progressContainer">
                                 <div id="bufferBar" class="absolute top-0 left-0 h-full bg-white/30 rounded-full w-0 transition-all duration-300"></div>
@@ -94,11 +127,11 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-4">
-                                    <button id="playBtn" class="text-white hover:text-primary transition-colors">
+                                    <button id="playBtn" class="flex items-center text-white hover:text-primary transition-colors">
                                         <span class="material-symbols-outlined text-[32px]" id="playIcon">play_arrow</span>
                                     </button>
                                     <div class="flex items-center gap-2 group/vol">
-                                        <button id="muteBtn" class="text-white hover:text-primary transition-colors">
+                                        <button id="muteBtn" class="flex items-center text-white hover:text-primary transition-colors">
                                             <span class="material-symbols-outlined text-[24px]" id="volumeIcon">volume_up</span>
                                         </button>
                                         <div class="w-0 overflow-hidden group-hover/vol:w-20 transition-all duration-300 flex items-center">
@@ -111,13 +144,13 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <button id="settingsBtn" class="text-white hover:text-primary transition-colors rotate-0 transition-transform duration-300">
+                                    <button id="settingsBtn" class="flex items-center text-white hover:text-primary transition-colors rotate-0 transition-transform duration-300">
                                         <span class="material-symbols-outlined text-[24px]">settings</span>
                                     </button>
-                                    <button id="theaterBtn" class="text-white hover:text-primary transition-colors" title="Theater Mode">
+                                    <button id="theaterBtn" class="lg:flex items-center hidden hover:text-primary transition-colors rotate-0 transition-transform duration-300" title="Theater Mode">
                                         <span class="material-symbols-outlined text-[24px]">rectangle</span>
                                     </button>
-                                    <button id="fullscreenBtn" class="text-white hover:text-primary transition-colors">
+                                    <button id="fullscreenBtn" class="flex items-center text-white hover:text-primary transition-colors">
                                         <span class="material-symbols-outlined text-[28px]">fullscreen</span>
                                     </button>
                                 </div>
@@ -126,7 +159,7 @@
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-4 mt-2">
+                <div class="flex flex-col gap-4 mt-2" id="video-title-container">
                     <h1 class="text-white text-2xl md:text-3xl lg:text-[2rem] font-bold leading-tight tracking-tight" 
                         th:text="${file.name.lastIndexOf('.') > 0 ? file.name.substring(0, file.name.lastIndexOf('.')) : file.name}">Title</h1>
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
@@ -188,7 +221,7 @@
                 </div>
             </div>
 
-            <div id="rightCol" class="lg:col-span-1 flex flex-col gap-3 relative h-fit transition-all duration-300">
+            <div id="rightCol" class="hidden lg:col-span-1 flex flex-col gap-3 relative h-fit transition-transform duration-300 z-[60]">
                 <div id="sidebarHeader" class="hidden flex items-center justify-between border-b border-white/10 mb-2">
                     <h3 class="text-white font-bold text-lg">Playlist</h3>
                     <button onclick="closeSidebar()" class="text-gray-400 hover:text-white">
@@ -257,6 +290,7 @@
                 .idle-mode .controls-layer {
                     opacity: 0 !important;
                 }
+                /* Settings Menu visibility handled by script now, no need CSS override here for idle mode as it might conflict with dialog */
                 .idle-mode #settingsMenu {
                     visibility: hidden !important;
                     opacity: 0 !important;
@@ -277,25 +311,24 @@
                     background: #555;
                 }
 
-                /* --- XỬ LÝ RIÊNG CHO CHẾ ĐỘ TOÀN MÀN HÌNH --- */
-
-                /* 1. Ẩn luôn lớp phủ tối (gradient) khi Fullscreen để màn hình trong suốt */
+                /* --- FULLSCREEN FIX --- */
+                .fullscreen-mode video {
+                    height: 100% !important;
+                    width: 100% !important;
+                    max-width: none !important;
+                    max-height: none !important;
+                    aspect-ratio: unset !important;
+                }
                 .fullscreen-mode #gradientOverlay {
                     display: none !important;
                 }
-
-                /* 2. Mặc định ẩn thanh controls dưới đáy (ghi đè logic group-hover cũ) */
                 .fullscreen-mode #bottomControls {
                     opacity: 0 !important;
-                    /* Tăng vùng đệm vô hình phía trên lên 80px để dễ bắt chuột hơn khi di xuống */
                     padding-top: 80px !important;
                     transition: opacity 0.3s ease;
                 }
-
-                /* 3. CHỈ hiện khi chuột thực sự nằm trong vùng bottomControls */
                 .fullscreen-mode #bottomControls:hover {
                     opacity: 1 !important;
-                    /* Tạo background tối cục bộ để icon trắng dễ nhìn trên nền video sáng */
                     background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
                 }
             </style>
@@ -304,10 +337,12 @@
     <th:block id="page-scripts">
         <script>
             document.addEventListener("DOMContentLoaded", () => {
+
                 // --- JS VARIABLES ---
-                let animationFrameId, idleTimer, feedbackTimeout;
+                let animationFrameId, idleTimer, feedbackTimeout, clickTimeout, mobileFeedbackTimeout;
                 const video = document.getElementById('mainPlayer');
                 const videoWrapper = document.getElementById('videoWrapper');
+                const videoContainer = document.getElementById('videoContainer');
                 const canvas = document.getElementById('ambientCanvas');
 
                 // Controls & Settings
@@ -325,57 +360,59 @@
                 const fullscreenBtn = document.getElementById('fullscreenBtn');
                 const settingsBtn = document.getElementById('settingsBtn');
                 const settingsMenu = document.getElementById('settingsMenu');
-                const toggleAmbientBtn = document.getElementById('toggleAmbientBtn');
-                const ambientSwitchBg = document.getElementById('ambientSwitchBg');
-                const ambientSwitchKnob = document.getElementById('ambientSwitchKnob');
-                const seekSettingSlider = document.getElementById('seekSettingSlider');
-                const seekSettingValue = document.getElementById('seekSettingValue');
+
+                // Seek Elements
                 const seekOverlay = document.getElementById('seekOverlay');
                 const seekText = document.getElementById('seekText');
                 const seekIcon = document.getElementById('seekIcon');
+                const mobileSeekLeft = document.getElementById('mobileSeekLeft');
+                const mobileSeekRight = document.getElementById('mobileSeekRight');
+                const mobileSeekLeftText = document.getElementById('mobileSeekLeftText');
+                const mobileSeekRightText = document.getElementById('mobileSeekRightText');
+
+                // Settings Toggles
+                const toggleAmbientBtn = document.getElementById('toggleAmbientBtn');
+                const ambientSwitchBg = document.getElementById('ambientSwitchBg');
+                const ambientSwitchKnob = document.getElementById('ambientSwitchKnob');
+                const toggleLoopBtn = document.getElementById('toggleLoopBtn');
+                const loopSwitchBg = document.getElementById('loopSwitchBg');
+                const loopSwitchKnob = document.getElementById('loopSwitchKnob');
+                const toggleAutoplayBtn = document.getElementById('toggleAutoplayBtn');
+                const autoplaySwitchBg = document.getElementById('autoplaySwitchBg');
+                const autoplaySwitchKnob = document.getElementById('autoplaySwitchKnob');
+                const seekSettingSlider = document.getElementById('seekSettingSlider');
+                const seekSettingValue = document.getElementById('seekSettingValue');
 
                 const mainGrid = document.getElementById('mainGrid');
                 const leftCol = document.getElementById('leftCol');
                 const rightCol = document.getElementById('rightCol');
                 const playlistFab = document.getElementById('playlistFab');
                 const sidebarHeader = document.getElementById('sidebarHeader');
-                const videoContainer = document.getElementById('videoContainer');
+                const sidebarOverlay = document.getElementById('sidebarOverlay');
 
                 const theaterBtn = document.getElementById('theaterBtn');
-                const toggleLoopBtn = document.getElementById('toggleLoopBtn');
-                const loopSwitchBg = document.getElementById('loopSwitchBg');
-                const loopSwitchKnob = document.getElementById('loopSwitchKnob');
 
-                const toggleAutoplayBtn = document.getElementById('toggleAutoplayBtn');
-                const autoplaySwitchBg = document.getElementById('autoplaySwitchBg');
-                const autoplaySwitchKnob = document.getElementById('autoplaySwitchKnob');
-
-                // States mới
+                // States
                 let isLoop = localStorage.getItem('isLoop') === 'true';
                 let isAutoplay = localStorage.getItem('isAutoplay') === 'true';
                 let isTheater = localStorage.getItem('isTheater') === 'true';
-
                 let isAmbientOn = localStorage.getItem('ambientMode') !== 'false';
                 let seekStep = parseInt(localStorage.getItem('seekStep')) || 5;
                 const ctx = canvas.getContext('2d', {alpha: false, desynchronized: true});
 
-                // --- 1. PLAYLIST & TAG FILTER LOGIC (NEW) ---
+                // --- 1. PLAYLIST & TAG FILTER LOGIC ---
                 const activeTags = new Set();
                 const playlistItems = document.querySelectorAll('.playlist-item');
                 const btnResetTags = document.getElementById('btnResetTags');
 
                 // Scroll to active item on load
                 const activeItem = document.querySelector('.playlist-item[data-active="true"]');
-                if (activeItem) {
-                    activeItem.scrollIntoView({block: 'center', behavior: 'smooth'});
-                }
 
-                // --- NEW: SIDEBAR LOGIC ---
+                // --- SIDEBAR LOGIC ---
                 window.openSidebar = function () {
                     rightCol.classList.remove('translate-x-full', 'invisible');
                     rightCol.classList.add('translate-x-0', 'visible');
                     sidebarOverlay.classList.remove('hidden');
-                    // Tắt scroll body
                     document.body.style.overflow = 'hidden';
                 }
 
@@ -391,45 +428,27 @@
                     const shouldBeSidebar = isTheater || isMobile;
 
                     if (shouldBeSidebar) {
-                        // CHUYỂN SANG CHẾ ĐỘ SIDEBAR
-                        // 1. Setup Class cho Sidebar Fixed
                         rightCol.classList.add('fixed', 'top-0', 'right-0', 'h-screen', 'w-80', 'bg-[#1e1e1e]', 'z-[70]', 'shadow-2xl', 'transition-transform', 'duration-300', 'p-3');
-
-                        // 2. Ẩn nó đi (trạng thái đóng ban đầu)
-                        // Lưu ý: Chỉ thêm 'translate-x-full' nếu nó chưa được mở (để tránh đóng lại nếu đang mở)
                         if (!rightCol.classList.contains('translate-x-0')) {
                             rightCol.classList.add('translate-x-full', 'invisible');
                         }
-
-                        // 3. Xóa các class của Grid Mode
                         rightCol.classList.remove('lg:col-span-1', 'relative', 'h-fit');
-
-                        // 4. UI phụ
                         sidebarHeader.classList.remove('hidden');
                         playlistFab.classList.remove('hidden');
-
-                        // 5. Mở rộng cột trái (Theater Mode)
                         if (isTheater) {
                             leftCol.classList.remove('lg:col-span-3');
                             leftCol.classList.add('lg:col-span-4');
                         }
+
+                        rightCol.classList.remove('hidden');
                     } else {
-                        // CHUYỂN VỀ CHẾ ĐỘ GRID (DESKTOP NORMAL)
-                        // 1. Đóng sidebar nếu đang mở
+                        rightCol.classList.remove('hidden');
                         window.closeSidebar();
-
-                        // 2. Xóa các class Fixed
                         rightCol.classList.remove('fixed', 'top-0', 'right-0', 'h-screen', 'w-80', 'bg-[#1e1e1e]', 'z-[70]', 'shadow-2xl', 'translate-x-full', 'invisible');
-
-                        // 3. Thêm lại class Grid
                         rightCol.classList.add('lg:col-span-1', 'relative', 'h-fit', 'visible');
-                        rightCol.style.transform = ''; // Reset transform style inline
-
-                        // 4. Ẩn UI phụ
+                        rightCol.style.transform = '';
                         sidebarHeader.classList.add('hidden');
                         playlistFab.classList.add('hidden');
-
-                        // 5. Trả cột trái về bình thường
                         leftCol.classList.remove('lg:col-span-4');
                         leftCol.classList.add('lg:col-span-3');
                     }
@@ -447,15 +466,12 @@
                         btn.classList.remove('bg-surface-dark', 'text-gray-300', 'border-white/10');
                         btn.classList.add('bg-primary', 'text-white', 'border-primary');
                     }
-
-                    // Toggle Active Visuals for Reset Btn
                     if (activeTags.size > 0) {
                         btnResetTags.classList.remove('bg-white', 'text-black');
                         btnResetTags.classList.add('bg-surface-dark', 'text-gray-300');
                     } else {
-                        resetTagFilter(false); // Reset visuals only
+                        resetTagFilter(false);
                     }
-
                     applyPlaylistFilter();
                 };
 
@@ -467,7 +483,6 @@
                     });
                     btnResetTags.classList.add('bg-white', 'text-black');
                     btnResetTags.classList.remove('bg-surface-dark', 'text-gray-300');
-
                     if (apply)
                         applyPlaylistFilter();
                 };
@@ -475,8 +490,6 @@
                 function applyPlaylistFilter() {
                     playlistItems.forEach(item => {
                         const itemTags = (item.getAttribute('data-tags') || '').split(' ').map(Number);
-
-                        // AND Logic: Item must have ALL selected tags
                         let isVisible = true;
                         if (activeTags.size > 0) {
                             for (let tag of activeTags) {
@@ -486,7 +499,6 @@
                                 }
                             }
                         }
-
                         item.style.display = isVisible ? 'flex' : 'none';
                         if (!isVisible)
                             item.classList.remove('visible-item');
@@ -494,8 +506,6 @@
                             item.classList.add('visible-item');
                     });
                 }
-
-                // Mark initial visible items
                 playlistItems.forEach(item => item.classList.add('visible-item'));
 
 
@@ -534,44 +544,132 @@
                     }
                 }
 
-                // --- 3. INIT ---
+                // --- 3. INIT SETTINGS ---
                 applyAmbientState();
                 seekSettingSlider.value = seekStep;
                 seekSettingValue.innerText = `${seekStep}s`;
 
+                function updateSwitchUI(isOn, bg, knob) {
+                    if (isOn) {
+                        bg.classList.replace('bg-gray-600', 'bg-primary');
+                        knob.classList.add('translate-x-5');
+                        knob.classList.remove('translate-x-1');
+                    } else {
+                        bg.classList.replace('bg-primary', 'bg-gray-600');
+                        knob.classList.remove('translate-x-5');
+                        knob.classList.add('translate-x-1');
+                    }
+                }
+                updateSwitchUI(isLoop, loopSwitchBg, loopSwitchKnob);
+                updateSwitchUI(isAutoplay, autoplaySwitchBg, autoplaySwitchKnob);
+
+                // Settings Listeners
                 toggleAmbientBtn.addEventListener('click', () => {
                     isAmbientOn = !isAmbientOn;
                     localStorage.setItem('ambientMode', isAmbientOn);
                     applyAmbientState();
                 });
-
                 seekSettingSlider.addEventListener('input', (e) => {
                     seekStep = parseInt(e.target.value);
                     seekSettingValue.innerText = `${seekStep}s`;
                     localStorage.setItem('seekStep', seekStep);
                 });
-
-                // --- 4. IDLE MODE ---
-                function resetIdleTimer() {
-                    videoWrapper.classList.remove('idle-mode');
-                    clearTimeout(idleTimer);
-                    if (!video.paused) {
-                        idleTimer = setTimeout(() => {
-                            if (!settingsMenu.contains(document.activeElement)) {
-                                videoWrapper.classList.add('idle-mode');
-                            }
-                        }, 2500);
-                    }
-                }
-                videoWrapper.addEventListener('mousemove', resetIdleTimer);
-                videoWrapper.addEventListener('mousedown', resetIdleTimer);
-                videoWrapper.addEventListener('keydown', resetIdleTimer);
-                videoWrapper.addEventListener('mouseleave', () => {
-                    if (!video.paused)
-                        videoWrapper.classList.add('idle-mode');
+                toggleLoopBtn.addEventListener('click', () => {
+                    isLoop = !isLoop;
+                    localStorage.setItem('isLoop', isLoop);
+                    updateSwitchUI(isLoop, loopSwitchBg, loopSwitchKnob);
+                });
+                toggleAutoplayBtn.addEventListener('click', () => {
+                    isAutoplay = !isAutoplay;
+                    localStorage.setItem('isAutoplay', isAutoplay);
+                    updateSwitchUI(isAutoplay, autoplaySwitchBg, autoplaySwitchKnob);
                 });
 
-                // --- 5. PLAYER LOGIC ---
+                // --- 4. PLAYER LOGIC & MOBILE EVENTS ---
+
+                // Click Handling (Single vs Double)
+                const handleSingleClick = (e) => {
+                    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('#settingsMenu'))
+                        return;
+                    if (clickTimeout)
+                        clearTimeout(clickTimeout);
+                    clickTimeout = setTimeout(() => {
+                        togglePlay();
+                    }, 300);
+                };
+                videoContainer.addEventListener('click', handleSingleClick);
+
+                // Double Tap Handling
+                let lastTapTime = 0;
+                videoContainer.addEventListener('touchstart', (e) => {
+                    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('#settingsMenu'))
+                        return;
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTapTime;
+                    if (tapLength < 300 && tapLength > 0) {
+                        e.preventDefault();
+                        if (clickTimeout) {
+                            clearTimeout(clickTimeout);
+                            clickTimeout = null;
+                        }
+                        const rect = videoContainer.getBoundingClientRect();
+                        const touchX = e.touches[0].clientX - rect.left;
+                        const width = rect.width;
+                        if (touchX < width * 0.35) {
+                            performSeek(-seekStep, true);
+                            showMobileFeedback(mobileSeekLeft, `-${seekStep}s`);
+                        } else if (touchX > width * 0.65) {
+                            performSeek(seekStep, true);
+                            showMobileFeedback(mobileSeekRight, `+${seekStep}s`);
+                        } else {
+                            togglePlay();
+                        }
+                    }
+                    lastTapTime = currentTime;
+                });
+
+                function showMobileFeedback(element, text) {
+                    if (text) {
+                        if (element === mobileSeekLeft)
+                            mobileSeekLeftText.innerText = text;
+                        if (element === mobileSeekRight)
+                            mobileSeekRightText.innerText = text;
+                    }
+                    element.classList.remove('opacity-0');
+                    clearTimeout(mobileFeedbackTimeout);
+                    mobileFeedbackTimeout = setTimeout(() => {
+                        element.classList.add('opacity-0');
+                    }, 500);
+                }
+
+                function performSeek(seconds, suppressCenterFeedback = false) {
+                    if (seconds > 0) {
+                        video.currentTime = Math.min(video.duration, video.currentTime + seconds);
+                        if (!suppressCenterFeedback)
+                            showSeekFeedback('forward');
+                    } else {
+                        video.currentTime = Math.max(0, video.currentTime + seconds);
+                        if (!suppressCenterFeedback)
+                            showSeekFeedback('backward');
+                    }
+                    if (isAmbientOn)
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    resetIdleTimer();
+                }
+
+                function showSeekFeedback(direction) {
+                    const iconName = direction === 'forward' ? 'fast_forward' : 'fast_rewind';
+                    seekText.innerText = direction === 'forward' ? `${seekStep}s` : `${seekStep}s`;
+                    seekIcon.innerText = iconName;
+                    seekOverlay.classList.remove('opacity-0', 'scale-90');
+                    seekOverlay.classList.add('opacity-100', 'scale-110');
+                    clearTimeout(feedbackTimeout);
+                    feedbackTimeout = setTimeout(() => {
+                        seekOverlay.classList.remove('opacity-100', 'scale-110');
+                        seekOverlay.classList.add('opacity-0', 'scale-90');
+                    }, 600);
+                }
+
                 function togglePlay(e) {
                     if (e)
                         e.stopPropagation();
@@ -580,6 +678,7 @@
                     else
                         video.pause();
                 }
+
                 video.addEventListener('play', () => {
                     playIcon.innerText = 'pause';
                     centerPlayBtn.classList.add('hidden');
@@ -593,60 +692,35 @@
                     videoWrapper.classList.remove('idle-mode');
                 });
                 video.addEventListener('ended', () => {
-                    playIcon.innerText = 'replay';
-                    centerPlayBtn.classList.remove('hidden');
-                    stopAmbientLoop();
-                    videoWrapper.classList.remove('idle-mode');
+                    if (isLoop) {
+                        video.currentTime = 0;
+                        video.play();
+                    } else if (isAutoplay) {
+                        const hasNext = playNextVideo();
+                        if (!hasNext) {
+                            playIcon.innerText = 'replay';
+                            centerPlayBtn.classList.remove('hidden');
+                            stopAmbientLoop();
+                            videoWrapper.classList.remove('idle-mode');
+                        }
+                    } else {
+                        playIcon.innerText = 'replay';
+                        centerPlayBtn.classList.remove('hidden');
+                        stopAmbientLoop();
+                        videoWrapper.classList.remove('idle-mode');
+                    }
                 });
                 centerPlayBtn.addEventListener('click', togglePlay);
                 playBtn.addEventListener('click', togglePlay);
-                video.addEventListener('click', togglePlay);
 
-                if (video.paused) {
-                    centerPlayBtn.classList.remove('hidden');
-                    playIcon.innerText = 'play_arrow';
-                } else {
-                    centerPlayBtn.classList.add('hidden');
-                    playIcon.innerText = 'pause';
-                    startAmbientLoop();
-                }
-
-                // --- 6. SEEK FEEDBACK ---
-                function showSeekFeedback(direction) {
-                    const symbol = direction === 'forward' ? '' : '';
-                    const iconName = direction === 'forward' ? 'fast_forward' : 'fast_rewind';
-                    seekText.innerText = direction === 'forward' ? `${seekStep}s ${symbol}` : `${symbol} ${seekStep}s`;
-                    seekIcon.innerText = iconName;
-                    seekOverlay.classList.remove('opacity-0', 'scale-90');
-                    seekOverlay.classList.add('opacity-100', 'scale-110');
-                    clearTimeout(feedbackTimeout);
-                    feedbackTimeout = setTimeout(() => {
-                        seekOverlay.classList.remove('opacity-100', 'scale-110');
-                        seekOverlay.classList.add('opacity-0', 'scale-90');
-                    }, 600);
-                }
-                function performSeek(seconds) {
-                    if (seconds > 0) {
-                        video.currentTime = Math.min(video.duration, video.currentTime + seconds);
-                        showSeekFeedback('forward');
-                    } else {
-                        video.currentTime = Math.max(0, video.currentTime + seconds);
-                        showSeekFeedback('backward');
-                    }
-                    if (isAmbientOn)
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    resetIdleTimer();
-                }
-
-                // Time & Progress
+                // --- 5. PROGRESS & VOLUME ---
                 function formatTime(time) {
                     const minutes = Math.floor(time / 60);
                     const seconds = Math.floor(time % 60);
                     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
                 }
                 video.addEventListener('timeupdate', () => {
-                    const ct = video.currentTime;
-                    const d = video.duration;
+                    const ct = video.currentTime, d = video.duration;
                     if (!isNaN(d)) {
                         const pct = (ct / d) * 100;
                         seekSlider.value = pct;
@@ -673,8 +747,6 @@
                 video.addEventListener('loadedmetadata', () => {
                     durationElem.textContent = formatTime(video.duration);
                 });
-
-                // Volume
                 volumeSlider.addEventListener('input', (e) => {
                     video.volume = e.target.value;
                     video.muted = video.volume === 0;
@@ -682,17 +754,11 @@
                 });
                 muteBtn.addEventListener('click', () => {
                     video.muted = !video.muted;
-                    if (video.muted) {
-                        volumeIcon.textContent = 'volume_off';
-                        volumeSlider.value = 0;
-                    } else {
-                        volumeIcon.textContent = 'volume_up';
-                        volumeSlider.value = 1;
-                        video.volume = 1;
-                    }
+                    volumeIcon.textContent = video.muted ? 'volume_off' : 'volume_up';
+                    volumeSlider.value = video.muted ? 0 : video.volume;
                 });
 
-                // Fullscreen
+                // --- 6. FULLSCREEN FIX ---
                 fullscreenBtn.addEventListener('click', () => {
                     if (!document.fullscreenElement) {
                         videoWrapper.requestFullscreen().catch(err => alert(`Error: ${err.message}`));
@@ -703,175 +769,128 @@
                 document.addEventListener('fullscreenchange', () => {
                     if (document.fullscreenElement) {
                         fullscreenBtn.querySelector('span').textContent = 'close_fullscreen';
-                        videoWrapper.classList.add('bg-black');
+                        videoWrapper.classList.add('bg-black', 'fullscreen-mode');
                         videoContainer.classList.remove('rounded-xl');
 
-                        // --- THÊM DÒNG NÀY: Bật chế độ Fullscreen Mode ---
-                        videoWrapper.classList.add('fullscreen-mode');
+                        // FIX: Remove fixed aspect ratio so video fills screen
+                        video.classList.remove('aspect-video');
+                        video.classList.add('h-full', 'w-full');
+
+                        if (screen.orientation && screen.orientation.lock) {
+                            screen.orientation.lock('landscape').catch(e => {
+                            });
+                        }
                     } else {
                         fullscreenBtn.querySelector('span').textContent = 'fullscreen';
-                        videoWrapper.classList.remove('bg-black');
+                        videoWrapper.classList.remove('bg-black', 'fullscreen-mode');
                         videoContainer.classList.add('rounded-xl');
 
-                        // --- THÊM DÒNG NÀY: Tắt chế độ Fullscreen Mode ---
-                        videoWrapper.classList.remove('fullscreen-mode');
+                        // Restore aspect ratio if not in theater mode
+                        if (!isTheater) {
+                            video.classList.add('aspect-video');
+                            video.classList.remove('h-full', 'w-full');
+                        } else {
+                            applyTheaterState();
+                        }
                     }
                 });
 
-                // Settings Menu
-                settingsBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const isHidden = settingsMenu.classList.contains('invisible');
-                    if (isHidden) {
-                        settingsMenu.classList.remove('invisible', 'opacity-0', 'translate-y-4');
-                        settingsMenu.classList.add('opacity-100', 'translate-y-0');
-                        settingsBtn.classList.add('rotate-90', 'text-primary');
-                        videoWrapper.classList.remove('idle-mode');
-                    } else {
-                        closeSettings();
-                    }
-                });
-                function closeSettings() {
+                // --- 7. SETTINGS MENU (DIALOG) ---
+                window.openSettings = function () {
+                    settingsMenu.classList.remove('invisible', 'opacity-0', 'translate-y-4');
+                    settingsMenu.classList.add('opacity-100', 'translate-y-0');
+                    settingsBtn.classList.add('rotate-90', 'text-primary');
+                    videoWrapper.classList.remove('idle-mode');
+                }
+                window.closeSettings = function () {
                     settingsMenu.classList.add('invisible', 'opacity-0', 'translate-y-4');
                     settingsMenu.classList.remove('opacity-100', 'translate-y-0');
                     settingsBtn.classList.remove('rotate-90', 'text-primary');
                 }
-                document.addEventListener('click', (e) => {
-                    if (!settingsMenu.contains(e.target) && e.target !== settingsBtn)
+                settingsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isHidden = settingsMenu.classList.contains('invisible');
+                    if (isHidden)
+                        openSettings();
+                    else
                         closeSettings();
                 });
-
-                // --- 1. SETTINGS STATE MANAGEMENT (LOOP & AUTOPLAY) ---
-                function updateSwitchUI(isOn, bg, knob) {
-                    if (isOn) {
-                        bg.classList.replace('bg-gray-600', 'bg-primary');
-                        knob.classList.add('translate-x-5');
-                        knob.classList.remove('translate-x-1');
-                    } else {
-                        bg.classList.replace('bg-primary', 'bg-gray-600');
-                        knob.classList.remove('translate-x-5');
-                        knob.classList.add('translate-x-1');
+                document.addEventListener('click', (e) => {
+                    if (settingsMenu.contains(e.target) && e.target === settingsMenu) {
+                        closeSettings(); // Click backdrop
+                    } else if (!settingsMenu.contains(e.target) && e.target !== settingsBtn && !settingsMenu.classList.contains('invisible')) {
+                        closeSettings(); // Click outside
                     }
-                }
-
-                // Init UI
-                updateSwitchUI(isLoop, loopSwitchBg, loopSwitchKnob);
-                updateSwitchUI(isAutoplay, autoplaySwitchBg, autoplaySwitchKnob);
-
-                // Events
-                toggleLoopBtn.addEventListener('click', () => {
-                    isLoop = !isLoop;
-                    localStorage.setItem('isLoop', isLoop);
-                    updateSwitchUI(isLoop, loopSwitchBg, loopSwitchKnob);
                 });
 
-                toggleAutoplayBtn.addEventListener('click', () => {
-                    isAutoplay = !isAutoplay;
-                    localStorage.setItem('isAutoplay', isAutoplay);
-                    updateSwitchUI(isAutoplay, autoplaySwitchBg, autoplaySwitchKnob);
-                });
-
-                // --- 2. THEATER MODE LOGIC ---
+                // --- 8. THEATER MODE ---
                 function applyTheaterState() {
                     if (isTheater) {
-                        // 1. Layout: Mở rộng chiều ngang (Full Width)
                         leftCol.classList.remove('lg:col-span-3');
                         leftCol.classList.add('lg:col-span-4');
-
-                        // 2. Height Control: Cố định chiều cao, KHÔNG cho giãn tự do
-                        // Xóa 'aspect-video' để video không tự cao lên theo chiều ngang
                         video.classList.remove('aspect-video');
-                        // Thêm chiều cao cố định (75% chiều cao màn hình là chuẩn cho rạp chiếu)
                         video.classList.add('h-[80vh]');
-
-                        // 3. UI Styles
                         theaterBtn.classList.add('text-primary');
                         videoContainer.classList.add('ring-primary/50');
-
-                        // 4. Scroll to top
-                        window.scrollTo({top: 0, behavior: 'smooth'});
+                        videoContainer.classList.add('flex');
+                        videoContainer.classList.add('justify-center');
+                        document.getElementById("video-title-container").classList.add("mt-20");
                     } else {
-                        // 1. Layout: Trả về bình thường
                         leftCol.classList.remove('lg:col-span-4');
                         leftCol.classList.add('lg:col-span-3');
-
-                        // 2. Height Control: Trả về tỷ lệ 16:9 tự động
                         video.classList.add('aspect-video');
                         video.classList.remove('h-[80vh]');
-
-                        // 3. UI Styles
                         theaterBtn.classList.remove('text-primary');
                         videoContainer.classList.remove('ring-primary/50');
+                        document.getElementById("video-title-container").classList.remove("mt-20");
                     }
-
                     checkResponsiveLayout();
-
-                    // Cập nhật lại kích thước Ambient Light sau khi layout đổi (chờ hiệu ứng CSS 500ms)
                     setTimeout(() => {
                         if (isAmbientOn && !video.paused)
                             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     }, 550);
                 }
-
-                // Init Theater
                 applyTheaterState();
-
                 theaterBtn.addEventListener('click', () => {
                     isTheater = !isTheater;
                     localStorage.setItem('isTheater', isTheater);
                     applyTheaterState();
                 });
 
-                // --- 3. ENDED EVENT LOGIC (LOOP -> AUTOPLAY -> STOP) ---
+                // --- 9. IDLE TIMER ---
+                function resetIdleTimer() {
+                    videoWrapper.classList.remove('idle-mode');
+                    clearTimeout(idleTimer);
+                    if (!video.paused) {
+                        idleTimer = setTimeout(() => {
+                            if (!settingsMenu.classList.contains('invisible'))
+                                return;
+                            videoWrapper.classList.add('idle-mode');
+                        }, 2500);
+                    }
+                }
+                videoWrapper.addEventListener('mousemove', resetIdleTimer);
+                videoWrapper.addEventListener('mousedown', resetIdleTimer);
+                videoWrapper.addEventListener('keydown', resetIdleTimer);
+
+                // --- 10. SHORTCUTS & NEXT VIDEO ---
                 function playNextVideo() {
-                    // Logic tìm video tiếp theo (Tái sử dụng logic của phím 'E')
                     const visibleItems = Array.from(document.querySelectorAll('.playlist-item.visible-item'));
                     const currentIndex = visibleItems.findIndex(item => item.getAttribute('data-active') === 'true');
-
                     if (currentIndex !== -1 && currentIndex < visibleItems.length - 1) {
                         const nextItem = visibleItems[currentIndex + 1];
-                        // Visual Feedback
                         nextItem.style.backgroundColor = 'rgba(131, 60, 246, 0.4)';
-                        nextItem.scrollIntoView({block: 'center', behavior: 'smooth'});
-
-                        // Delay chút để người dùng thấy hiệu ứng chuyển
                         setTimeout(() => nextItem.click(), 1000);
                         return true;
                     }
                     return false;
                 }
 
-                video.addEventListener('ended', () => {
-                    if (isLoop) {
-                        // 1. Nếu Loop bật -> Phát lại ngay
-                        video.currentTime = 0;
-                        video.play();
-                    } else if (isAutoplay) {
-                        // 2. Nếu Autoplay bật -> Chuyển bài
-                        const hasNext = playNextVideo();
-                        if (!hasNext) {
-                            // Hết bài -> Hiện UI Replay
-                            playIcon.innerText = 'replay';
-                            centerPlayBtn.classList.remove('hidden');
-                            stopAmbientLoop();
-                            videoWrapper.classList.remove('idle-mode');
-                        }
-                    } else {
-                        // 3. Bình thường -> Dừng
-                        playIcon.innerText = 'replay';
-                        centerPlayBtn.classList.remove('hidden');
-                        stopAmbientLoop();
-                        videoWrapper.classList.remove('idle-mode');
-                    }
-                });
-
-                // --- 7. NAVIGATION SHORTCUTS (UPDATED) ---
                 document.addEventListener('keydown', (e) => {
                     if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName))
                         return;
                     const key = e.key.toLowerCase();
                     resetIdleTimer();
-
                     switch (key) {
                         case ' ':
                         case 'k':
@@ -886,27 +905,16 @@
                         case 'd':
                             performSeek(seekStep);
                             break;
-                        case 'e': // NEXT
-                        case 'q': // PREV
-                            // Logic: Tìm danh sách các item ĐANG HIỆN (visible)
+                        case 'e':
+                        case 'n':
+                            playNextVideo();
+                            break;
+                        case 'q':
+                        case 'p':
                             const visibleItems = Array.from(document.querySelectorAll('.playlist-item.visible-item'));
-                            // Tìm index của video hiện tại trong danh sách visible
                             const currentIndex = visibleItems.findIndex(item => item.getAttribute('data-active') === 'true');
-
-                            if (currentIndex !== -1) {
-                                let targetItem;
-                                if ((key === 'e' || key === 'n') && currentIndex < visibleItems.length - 1) {
-                                    targetItem = visibleItems[currentIndex + 1]; // Next
-                                } else if ((key === 'q' || key === 'p') && currentIndex > 0) {
-                                    targetItem = visibleItems[currentIndex - 1]; // Prev
-                                }
-
-                                if (targetItem) {
-                                    // Visual click effect
-                                    targetItem.style.backgroundColor = 'rgba(131, 60, 246, 0.4)';
-                                    setTimeout(() => targetItem.click(), 100);
-                                }
-                            }
+                            if (currentIndex > 0)
+                                visibleItems[currentIndex - 1].click();
                             break;
                         case 'f':
                             fullscreenBtn.click();
@@ -914,13 +922,11 @@
                         case 'm':
                             muteBtn.click();
                             break;
-                        case 't': // Shortcut T cho Theater
+                        case 't':
                             theaterBtn.click();
                             break;
                     }
                 });
-
-                window.scrollTo({top: 0, behavior: 'smooth'});
             });
         </script>
     </th:block>
