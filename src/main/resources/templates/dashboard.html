@@ -130,6 +130,69 @@
 
                 <div class="relative">
                     <div class="flex items-center justify-between mb-4 px-1">
+                        <h3 class="text-white text-xl font-bold flex items-center gap-2">
+                            <span class="material-symbols-outlined text-yellow-500">movie</span> Latest Movies
+                        </h3>
+                        <a href="/movies" class="text-xs text-gray-400 hover:text-white transition-colors">View All</a>
+                    </div>
+
+                    <div class="relative group">
+                        <button onclick="scrollCarousel('movieCarousel', -1)" 
+                                class="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-30 w-12 h-full items-center justify-center text-white translate-x-0 bg-gradient-to-r from-black/50 to-transparent rounded-l-xl hover:bg-black/30 transition-colors">
+                            <span class="material-symbols-outlined text-3xl">chevron_left</span>
+                        </button>
+
+                        <div id="movieCarousel" class="flex overflow-x-auto gap-4 sm:gap-5 px-1 no-scrollbar snap-x snap-mandatory scroll-smooth">
+
+                            <div th:each="movie : ${recentMovies}" 
+                                 onclick="window.location.href = this.getAttribute('data-url')"
+                                 th:data-url="@{/movies/{id}(id=${movie.id})}"
+                                 class="snap-start shrink-0 w-[160px] sm:w-[200px] h-[260px] sm:h-[320px] relative rounded-xl overflow-hidden cursor-pointer group/card border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20 bg-[#2e2839]">
+
+                                <img th:src="@{/movies/image/{id}(id=${movie.id}, thumb=true)}" 
+                                     loading="lazy"
+                                     class="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110 filter brightness-90 group-hover/card:brightness-100"
+                                     onerror="this.src='https://placehold.co/200x320/1e1e1e/FFF?text=No+Cover'">
+
+                                <div class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-bold text-white bg-black/60 backdrop-blur-md border border-white/10 shadow-sm flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[10px] text-yellow-500 fill-current">star</span>
+                                    <span th:text="${movie.rating != null ? movie.rating : 'N/A'}">8.5</span>
+                                </div>
+
+                                <div class="absolute inset-0 bg-gradient-to-t from-[#171022] via-transparent to-transparent opacity-90"></div>
+
+                                <div class="absolute bottom-0 left-0 w-full p-4">
+                                    <p class="text-primary text-[10px] font-bold uppercase truncate mb-1" 
+                                       th:if="${not #lists.isEmpty(movie.studios)}" 
+                                       th:text="${movie.studios[0].name}">Studio</p>
+
+                                    <h4 class="text-base sm:text-lg font-bold text-white leading-tight mb-1 line-clamp-2 drop-shadow-md group-hover/card:text-primary transition-colors" 
+                                        th:text="${movie.title}">Movie Title</h4>
+
+                                    <div class="flex items-center justify-between text-gray-400 text-[10px] sm:text-xs mt-2">
+                                        <span class="flex items-center gap-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/5">
+                                            <span class="material-symbols-outlined text-[12px]">video_library</span>
+                                            <span th:text="${movie.episodes.size()}">0</span>
+                                        </span>
+                                        <span th:text="${movie.releaseYear != null ? movie.releaseYear : 'Unknown'}">2024</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div th:if="${recentMovies.isEmpty()}" class="w-full h-40 flex items-center justify-center text-gray-500 border border-dashed border-white/10 rounded-xl">
+                                No movies added yet.
+                            </div>
+                        </div>
+
+                        <button onclick="scrollCarousel('movieCarousel', 1)" 
+                                class="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 z-30 w-12 h-full items-center justify-center text-white translate-x-0 bg-gradient-to-l from-black/50 to-transparent rounded-r-xl hover:bg-black/30 transition-colors">
+                            <span class="material-symbols-outlined text-3xl">chevron_right</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="relative">
+                    <div class="flex items-center justify-between mb-4 px-1">
                         <h3 class="text-white text-xl font-bold flex items-center gap-2">Latest Manga</h3>
                         <a href="/manga" class="text-xs text-gray-400 hover:text-white transition-colors">View All</a>
                     </div>
