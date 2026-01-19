@@ -20,7 +20,9 @@
                     <div id="videoContainer" class="relative w-full h-full bg-transparent rounded-xl overflow-hidden touch-manipulation">
 
                         <video id="mainPlayer" class="w-full aspect-video object-contain cursor-pointer"
-                               style="-webkit-mask-image: radial-gradient(ellipse at center, black 75%, transparent 100%);">
+                               <!--phần làm mờ viền của khung video-->
+                               <!--style="-webkit-mask-image: radial-gradient(ellipse at center, black 75%, transparent 100%);"-->
+                               >
                             <source th:src="@{/api/media/stream/{id}(id=${file.id})}" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
