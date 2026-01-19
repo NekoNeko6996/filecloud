@@ -23,4 +23,10 @@ public interface ContentSubjectRepository extends JpaRepository<ContentSubject, 
             +
             "AND (:platformId IS NULL OR EXISTS (SELECT l FROM SubjectSocialLink l WHERE l.subject.id = s.id AND l.platform.id = :platformId))")
     List<Object[]> searchSubjectsWithStats(@Param("keyword") String keyword, @Param("platformId") Integer platformId);
+
+    @Query("SELECT s FROM ContentSubject s WHERE " +
+            "LOWER(s.mainName) IN :names OR " +
+            "LOWER(s.aliasName1) IN :names OR " +
+            "LOWER(s.aliasName2) IN :names")
+    Optional<ContentSubject> findFirstByAnyName(@Param("names") List<String> names);
 }

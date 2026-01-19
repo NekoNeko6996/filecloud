@@ -80,7 +80,8 @@ public class MediaScanService {
                     int count = countMediaFiles(folder);
 
                     // Kiểm tra DB xem Subject tồn tại chưa
-                    boolean exists = subjectRepository.findByMainName(mainName).isPresent();
+                    List<String> lowerNames = names.stream().map(String::toLowerCase).toList();
+                    boolean exists = subjectRepository.findFirstByAnyName(lowerNames).isPresent();
 
                     results.add(SubjectScanResult.builder()
                             .folderName(folderName)
@@ -105,7 +106,8 @@ public class MediaScanService {
             try {
                 // GỌI QUA PROXY -> Transaction sẽ hoạt động
                 currentIndex++;
-                log.info("------------------------ [START IMPORTING SUBJECT (" + currentIndex + "/" + folderCounts + ")] ------------------------");
+                log.info("------------------------ [START IMPORTING SUBJECT (" + currentIndex + "/" + folderCounts
+                        + ")] ------------------------");
                 proxy.processPathWithMapping(pathStr, userId);
             } catch (Exception e) {
                 log.error("Lỗi xử lý thư mục {}: {}", pathStr, e.getMessage());
@@ -150,14 +152,14 @@ public class MediaScanService {
             return;
         }
 
-        String mainName = names.get(0);
+        List<String> lowerNames = names.stream().map(String::toLowerCase).toList();
 
         // 3. Tìm hoặc tạo Subject
-        ContentSubject subject = subjectRepository.findByMainName(mainName)
+        ContentSubject subject = subjectRepository.findFirstByAnyName(lowerNames)
                 .orElseGet(() -> subjectRepository.save(ContentSubject.builder()
-                .mainName(mainName)
-                .aliasName1(names.size() > 1 ? names.get(1) : null)
-                .build()));
+                        .mainName(names.get(0))
+                        .aliasName1(names.size() > 1 ? names.get(1) : null)
+                        .build()));
 
         // 4. Tạo Mapping
         String root = folderPath.getRoot().toString(); // VD: F:\
@@ -167,16 +169,17 @@ public class MediaScanService {
         SubjectFolderMapping mapping = mappingRepository
                 .findBySubjectIdAndVolumeIdAndRelativePath(subject.getId(), volume.getId(), relativePath)
                 .orElseGet(() -> mappingRepository.save(SubjectFolderMapping.builder()
-                .subject(subject)
-                .volume(volume)
-                .relativePath(relativePath)
-                .build()));
+                        .subject(subject)
+                        .volume(volume)
+                        .relativePath(relativePath)
+                        .build()));
 
         // 5. Import File (Transaction đang Active ở đây)
         importFilesToMapping(folderPath, subject, mapping, volume, userId);
     }
 
-    private void importFilesToMapping(Path folderPath, ContentSubject subject, SubjectFolderMapping mapping, StorageVolume volume, String userId) {
+    private void importFilesToMapping(Path folderPath, ContentSubject subject, SubjectFolderMapping mapping,
+            StorageVolume volume, String userId) {
         try {
             // BƯỚC 1: Đếm tổng số file video trước để tính %
             long totalFiles;
@@ -208,9 +211,11 @@ public class MediaScanService {
                         if (isVideoFile(fileName)) { // Gọi hàm helper cũ
                             String fileRelPath = mapping.getRelativePath() + "\\" + fileName;
 
-                            if (fileNodeRepository.findByVolumeIdAndRelativePath(volume.getId(), fileRelPath).isPresent()) {
+                            if (fileNodeRepository.findByVolumeIdAndRelativePath(volume.getId(), fileRelPath)
+                                    .isPresent()) {
                                 log.info("Duplicate File!");
-                                reportProgress(userId, subject.getMainName(), fileName, "Skipped (Exists)", 100, current, total);
+                                reportProgress(userId, subject.getMainName(), fileName, "Skipped (Exists)", 100,
+                                        current, total);
                                 return;
                             }
 
@@ -249,8 +254,10 @@ public class MediaScanService {
                             log.info("File Mapped [" + current + "/" + total + "]: " + fileName);
 
                             // === 2. GỌI XỬ LÝ MEDIA (METADATA & THUMBNAIL) ===
-                            // QUAN TRỌNG: Sử dụng TransactionSynchronizationManager để đợi Commit xong mới chạy Async
-                            // Nếu gọi trực tiếp mediaService.processMedia() ở đây, luồng Async sẽ chạy trước khi DB có dữ liệu -> Lỗi FK
+                            // QUAN TRỌNG: Sử dụng TransactionSynchronizationManager để đợi Commit xong mới
+                            // chạy Async
+                            // Nếu gọi trực tiếp mediaService.processMedia() ở đây, luồng Async sẽ chạy
+                            // trước khi DB có dữ liệu -> Lỗi FK
                             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                                 @Override
                                 public void afterCommit() {
@@ -266,7 +273,8 @@ public class MediaScanService {
                     } catch (Exception e) {
                         // Log lỗi file lẻ nhưng không ném exception để không rollback cả folder
                         log.error("Skipping file " + file + ": " + e.getMessage());
-                        reportProgress(userId, subject.getMainName(), fileName, "Error: " + e.getMessage(), 100, current, total);
+                        reportProgress(userId, subject.getMainName(), fileName, "Error: " + e.getMessage(), 100,
+                                current, total);
                     }
 
                     log.info("-----");
@@ -342,24 +350,28 @@ public class MediaScanService {
                 continue;
             }
 
-            String mainName = names.get(0);
-            log.info("   Subject MainName parse: '{}'", mainName);
+            List<String> lowerNames = names.stream().map(String::toLowerCase).toList();
+            log.info("   Subject Names parse: {}", names);
 
-            Optional<ContentSubject> subjectOpt = subjectRepository.findByMainName(mainName);
+            Optional<ContentSubject> subjectOpt = subjectRepository.findFirstByAnyName(lowerNames);
 
             if (subjectOpt.isEmpty()) {
                 // ĐIỂM MÙ SỐ 1: Subject chưa có trong DB (Import mới) -> Bỏ qua check trùng
-                log.warn("   [SKIP] Subject '{}' does not exist in the database -> No duplicates allowed (New Import Logic).", mainName);
+                log.warn(
+                        "   [SKIP] Subject with names {} does not exist in the database -> No duplicates allowed (New Import Logic).",
+                        names);
                 continue;
             }
 
             ContentSubject subject = subjectOpt.get();
+            String mainName = subject.getMainName();
             log.info("   Subject ID found: {}", subject.getId());
 
             List<DuplicateFileGroup.DuplicatePair> pairs = new ArrayList<>();
 
             try (Stream<Path> stream = Files.list(folderPath)) {
-                List<Path> importFiles = stream.filter(Files::isRegularFile).filter(p -> isVideoFile(p.toString())).toList();
+                List<Path> importFiles = stream.filter(Files::isRegularFile).filter(p -> isVideoFile(p.toString()))
+                        .toList();
                 int totalFiles = importFiles.size();
                 log.info("   The {} video file was found in the import folder.", totalFiles);
 
@@ -374,10 +386,13 @@ public class MediaScanService {
                     List<FileNode> candidates = fileNodeRepository.findBySubjectIdAndSize(subject.getId(), size);
 
                     if (candidates.isEmpty()) {
-                        // File này kích thước độc nhất -> Chắc chắn không trùng -> Bỏ qua Hash cho nhanh
-                        // log.debug("      File '{}' ({} bytes) không có candidate cùng size -> OK.", fileName, size);
+                        // File này kích thước độc nhất -> Chắc chắn không trùng -> Bỏ qua Hash cho
+                        // nhanh
+                        // log.debug(" File '{}' ({} bytes) không có candidate cùng size -> OK.",
+                        // fileName, size);
                     } else {
-                        log.info("      File '{}' ({} bytes) has {} candidate of the same size -> Start Hash...", fileName, size, candidates.size());
+                        log.info("      File '{}' ({} bytes) has {} candidate of the same size -> Start Hash...",
+                                fileName, size, candidates.size());
 
                         String importHash = calculateQuickHash(importFile);
 
@@ -441,13 +456,15 @@ public class MediaScanService {
                         case "KEEP_NEW" -> {
                             // LOGIC MỚI: TÁI SỬ DỤNG DATABASE CŨ CHO FILE MỚI
                             // 1. Tìm bản ghi cũ trong DB
-                            FileNode existingNode = fileNodeRepository.findById(action.getExistingFileId()).orElse(null);
+                            FileNode existingNode = fileNodeRepository.findById(action.getExistingFileId())
+                                    .orElse(null);
 
                             if (existingNode != null) {
                                 // 2. Xóa file vật lý CŨ
                                 StorageVolume oldVol = storageVolumeService.getVolumeById(existingNode.getVolumeId());
                                 if (oldVol != null) {
-                                    Path oldPhysicalPath = Paths.get(oldVol.getMountPoint(), existingNode.getRelativePath());
+                                    Path oldPhysicalPath = Paths.get(oldVol.getMountPoint(),
+                                            existingNode.getRelativePath());
                                     log.info("KEEP_NEW: Xóa file vật lý cũ tại: " + oldPhysicalPath);
                                     try {
                                         Files.deleteIfExists(oldPhysicalPath);
@@ -477,13 +494,17 @@ public class MediaScanService {
                                     existingNode.setSize(Files.size(newFile));
                                     // existingNode.setFileHash(...); // Hash giống nhau nên không cần update
 
-                                    // Cập nhật Mapping ID mới nếu file mới nằm trong thư mục Subject khác (ít khi xảy ra nhưng nên làm)
-                                    // (Ở đây ta tạm giữ mapping cũ hoặc cần logic phức tạp hơn để tìm mapping mới, 
+                                    // Cập nhật Mapping ID mới nếu file mới nằm trong thư mục Subject khác (ít khi
+                                    // xảy ra nhưng nên làm)
+                                    // (Ở đây ta tạm giữ mapping cũ hoặc cần logic phức tạp hơn để tìm mapping mới,
                                     // nhưng vì thường là cùng Subject nên Mapping giữ nguyên là ổn)
                                     fileNodeRepository.save(existingNode);
-                                    log.info("KEEP_NEW: Đã cập nhật DB Node {} trỏ sang đường dẫn mới. Giữ nguyên Thumbnail/Metadata.", existingNode.getId());
+                                    log.info(
+                                            "KEEP_NEW: Đã cập nhật DB Node {} trỏ sang đường dẫn mới. Giữ nguyên Thumbnail/Metadata.",
+                                            existingNode.getId());
                                 } else {
-                                    log.error("KEEP_NEW Lỗi: Không tìm thấy Volume cho đường dẫn mới: " + action.getNewFilePath());
+                                    log.error("KEEP_NEW Lỗi: Không tìm thấy Volume cho đường dẫn mới: "
+                                            + action.getNewFilePath());
                                 }
                             }
                         }
@@ -499,8 +520,9 @@ public class MediaScanService {
         }
 
         // 2. Tiếp tục quy trình Import các file còn lại
-        // Lưu ý: Với KEEP_NEW, do ta đã update DB trỏ vào file mới, 
-        // hàm importWithMapping sẽ thấy file này đã tồn tại trong DB (do check RelativePath) -> và sẽ TỰ ĐỘNG BỎ QUA.
+        // Lưu ý: Với KEEP_NEW, do ta đã update DB trỏ vào file mới,
+        // hàm importWithMapping sẽ thấy file này đã tồn tại trong DB (do check
+        // RelativePath) -> và sẽ TỰ ĐỘNG BỎ QUA.
         // Điều này rất hoàn hảo!
         importWithMapping(resolution.getSafePaths(), userId);
     }
@@ -508,12 +530,14 @@ public class MediaScanService {
     /**
      * Tính Hash MD5 với hiệu năng cao (Buffer 64KB) và báo cáo tiến độ qua SSE.
      */
-    private String calculateFileHashWithProgress(Path path, String userId, String subjectName, int currentIdx, int totalFiles) {
+    private String calculateFileHashWithProgress(Path path, String userId, String subjectName, int currentIdx,
+            int totalFiles) {
         // 1. Tăng Buffer lên 64KB (Nhanh hơn gấp 64 lần so với 1KB cũ)
         byte[] buffer = new byte[64 * 1024];
 
-        try (FileInputStream fis = new FileInputStream(path.toFile()); // Dùng BufferedInputStream để hệ điều hành tối ưu việc đọc trước (Read-ahead)
-                 BufferedInputStream bis = new BufferedInputStream(fis)) {
+        try (FileInputStream fis = new FileInputStream(path.toFile()); // Dùng BufferedInputStream để hệ điều hành tối
+                                                                       // ưu việc đọc trước (Read-ahead)
+                BufferedInputStream bis = new BufferedInputStream(fis)) {
 
             MessageDigest digest = MessageDigest.getInstance("MD5");
             long fileSize = Files.size(path);
@@ -560,7 +584,8 @@ public class MediaScanService {
 
             // Nếu file nhỏ (< 48KB), Quick Hash = Full Hash
             if (fileSize < chunkSize * 3) {
-                // Gọi hàm full hash với userId = null để không gửi SSE (tránh lỗi null pointer/spam)
+                // Gọi hàm full hash với userId = null để không gửi SSE (tránh lỗi null
+                // pointer/spam)
                 return calculateFileHashWithProgress(path, null, null, 0, 0);
             }
 
@@ -599,7 +624,8 @@ public class MediaScanService {
         }
     }
 
-    private void reportProgress(String userId, String subject, String fileName, String status, int percent, int current, int total) {
+    private void reportProgress(String userId, String subject, String fileName, String status, int percent, int current,
+            int total) {
         try {
             if (userId == null) {
                 log.info("Send report error because USERID is null!");
