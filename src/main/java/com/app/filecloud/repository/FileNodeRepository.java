@@ -43,4 +43,6 @@ public interface FileNodeRepository extends JpaRepository<FileNode, String> {
 
     @Query("SELECT COALESCE(SUM(f.size), 0) FROM FileNode f WHERE f.subjectMappingId = :mappingId")
     Long sumSizeByMappingId(@Param("mappingId") Integer mappingId);
+
+    List<FileNode> findBySubjectMappingId(Integer mappingId);
 }

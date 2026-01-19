@@ -201,6 +201,7 @@ public class SubjectController {
             // Lưu ý: m.getVolume().getId() là ID của ổ đĩa
             long usedByFolder = fileNodeRepository.sumSizeByMappingId(m.getId());
             map.put("folderUsage", usedByFolder);
+            map.put("folderUsageFormatted", formatSize(usedByFolder));
 
             // 2. Thông tin ổ đĩa (để tính % hiển thị nếu cần)
             if (m.getVolume() != null) {
@@ -739,7 +740,6 @@ public class SubjectController {
                 }
             }
 
-            // 2. Cập nhật DB
             fileNode.setName(finalName);
             fileNodeRepository.save(fileNode);
 
@@ -747,6 +747,68 @@ public class SubjectController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+        }
+    }
+
+    // === 4. UNMOUNT FOLDER (KÈM OPTION XÓA VẬT LÝ) ===
+    @PostMapping("/folder/unmount")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> unmountFolder(@RequestParam("mappingId") Integer mappingId,
+            @RequestParam(value = "deletePhysical", defaultValue = "false") boolean deletePhysical) {
+        try {
+            SubjectFolderMapping mapping = mappingRepository.findById(mappingId)
+                    .orElseThrow(() -> new IllegalArgumentException("Mapping not found"));
+
+            // 1. Lấy danh sách file trong mapping này
+            List<FileNode> files = fileNodeRepository.findBySubjectMappingId(mappingId); // Cần thêm hàm này vào Repo
+
+            // 2. Xóa File Vật lý (Nếu user yêu cầu)
+            if (deletePhysical) {
+                StorageVolume vol = mapping.getVolume();
+                if (vol != null) {
+                    try {
+                        Path physicalPath = Paths.get(vol.getMountPoint(), mapping.getRelativePath());
+                        // Dùng hàm deleteRecursive để xóa cả thư mục
+                        deleteDirectoryRecursively(physicalPath);
+                    } catch (Exception e) {
+                        e.printStackTrace(); // Log lỗi nhưng vẫn tiếp tục xóa DB
+                    }
+                }
+            }
+
+            // 3. Luôn xóa Thumbnail rác (Dù có xóa vật lý hay không, file trong DB cũng sẽ
+            // mất -> thumb thành rác)
+            for (FileNode file : files) {
+                try {
+                    Path thumbDir = Paths.get(rootUploadDir, ".cache", "thumbnails");
+                    Files.deleteIfExists(thumbDir.resolve(file.getId() + "_small.jpg"));
+                    Files.deleteIfExists(thumbDir.resolve(file.getId() + "_medium.jpg"));
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+
+            // 3. Xóa Dữ liệu DB
+            // Xóa hết FileNode (Cascade: FileSubject, FileTag, MediaMetadata)
+            fileNodeRepository.deleteAllInBatch(files);
+
+            // Xóa Mapping
+            mappingRepository.delete(mapping);
+
+            return ResponseEntity.ok("Unmounted successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+        }
+    }
+
+    private void deleteDirectoryRecursively(Path path) throws java.io.IOException {
+        if (Files.exists(path)) {
+            Files.walk(path)
+                    .sorted(Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .forEach(File::delete);
         }
     }
 }
