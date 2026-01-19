@@ -10,23 +10,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpRange;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
-import java.nio.channels.Channels;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/media")
@@ -63,7 +55,8 @@ public class MediaStreamController {
 
     // 2. API Stream Video (Hỗ trợ tua - Range Request)
     @GetMapping("/stream/{fileId}")
-    public ResponseEntity<Resource> streamVideo(@PathVariable String fileId, @RequestHeader(value = "Range", required = false) String rangeHeader) {
+    public ResponseEntity<Resource> streamVideo(@PathVariable String fileId,
+            @RequestHeader(value = "Range", required = false) String rangeHeader) {
         FileNode fileNode = fileNodeRepository.findById(fileId).orElse(null);
 
         if (fileNode == null || fileNode.getRelativePath() == null || fileNode.getVolumeId() == null) {
@@ -99,7 +92,8 @@ public class MediaStreamController {
         // Trả về Resource hỗ trợ Range (Tua video)
         Resource videoResource = new FileSystemResource(videoPath);
         return ResponseEntity.status(HttpStatus.OK)
-                .contentType(MediaTypeFactory.getMediaType(videoPath.getFileName().toString()).orElse(MediaType.APPLICATION_OCTET_STREAM))
+                .contentType(MediaTypeFactory.getMediaType(videoPath.getFileName().toString())
+                        .orElse(MediaType.APPLICATION_OCTET_STREAM))
                 .body(videoResource);
     }
 

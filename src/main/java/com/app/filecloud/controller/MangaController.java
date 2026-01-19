@@ -45,7 +45,6 @@ public class MangaController {
     private final MangaPageRepository pageRepository;
     private final MangaAuthorRepository authorRepository;
     private final TagRepository tagRepository;
-    private final MangaAuthorRepository mangaAuthorRepository;
 
     @Value("${app.storage.root:uploads}")
     private String rootUploadDir;
@@ -57,7 +56,8 @@ public class MangaController {
             @RequestParam(required = false, defaultValue = "latest") String sort,
             Model model) {
 
-        // 1. Lấy tất cả Manga (Nếu dữ liệu lớn nên dùng JPA Specification, ở đây dùng Stream cho đơn giản)
+        // 1. Lấy tất cả Manga (Nếu dữ liệu lớn nên dùng JPA Specification, ở đây dùng
+        // Stream cho đơn giản)
         List<MangaSeries> allMangas = mangaRepository.findAll();
         Stream<MangaSeries> stream = allMangas.stream();
 
@@ -183,7 +183,8 @@ public class MangaController {
             MangaSeries savedManga = mangaRepository.save(manga);
 
             // --- 2. XỬ LÝ CHAPTERS (PHẦN QUAN TRỌNG) ---
-            if (dto.getChapterFiles() != null && !dto.getChapterFiles().isEmpty() && dto.getChapterMetadataJson() != null) {
+            if (dto.getChapterFiles() != null && !dto.getChapterFiles().isEmpty()
+                    && dto.getChapterMetadataJson() != null) {
 
                 // [KHỞI TẠO BIẾN CÒN THIẾU]
                 ObjectMapper mapper = new ObjectMapper(); // <-- Khai báo mapper
@@ -198,8 +199,8 @@ public class MangaController {
                 if (rootNode.isArray()) {
                     for (JsonNode node : rootNode) {
                         // Lấy dữ liệu an toàn từ JSON
-                        String fileName = node.path("fileName").asText();
-                        String newChapterName = node.path("newChapterName").asText();
+                        String fileName = node.path("fileName").asString();
+                        String newChapterName = node.path("newChapterName").asString();
                         int order = node.path("order").asInt(0);
 
                         // Tìm file zip tương ứng trong Map
@@ -223,7 +224,8 @@ public class MangaController {
     /**
      * Hàm xử lý giải nén và lưu 1 chapter cụ thể
      */
-    private void processUploadedChapter(MangaSeries manga, MultipartFile zipFile, String customChapterName, Integer order) throws Exception {
+    private void processUploadedChapter(MangaSeries manga, MultipartFile zipFile, String customChapterName,
+            Integer order) throws Exception {
         // 1. Tạo Chapter Entity
         // Nếu không có tên custom, fallback về tên file gốc (bỏ đuôi zip)
         String finalName = (customChapterName != null && !customChapterName.isEmpty())
@@ -270,14 +272,16 @@ public class MangaController {
                 }
 
                 // Tái sử dụng hàm saveImage có sẵn trong Controller của bạn
-                // Lưu ý: Hàm saveImage của bạn tự trích xuất pageOrder từ tên file (vd: 01.jpg -> 1)
+                // Lưu ý: Hàm saveImage của bạn tự trích xuất pageOrder từ tên file (vd: 01.jpg
+                // -> 1)
                 saveImage(zis, manga, finalName, fileName, entry.getSize(), singleChapterCache);
             }
         }
     }
 
     // Hàm xử lý chung cho việc lưu file ảnh
-    private void saveImage(InputStream inputStream, MangaSeries manga, String chapterName, String fileName, long inputSize, Map<String, MangaChapter> chapterCache) throws Exception {
+    private void saveImage(InputStream inputStream, MangaSeries manga, String chapterName, String fileName,
+            long inputSize, Map<String, MangaChapter> chapterCache) throws Exception {
         MangaChapter chapter = chapterCache.get(chapterName);
 
         if (chapter == null) {
@@ -366,7 +370,8 @@ public class MangaController {
 
             // Cover Path trong DB dạng: /manga/covers/abc.jpg
             // Cần chuyển thành: {root}/manga/covers/.thumbs/abc.jpg
-            String relativePath = manga.getCoverPath().startsWith("/") ? manga.getCoverPath().substring(1) : manga.getCoverPath();
+            String relativePath = manga.getCoverPath().startsWith("/") ? manga.getCoverPath().substring(1)
+                    : manga.getCoverPath();
             Path originalFile = Paths.get(rootUploadDir, relativePath);
             Path thumbFile = originalFile.getParent().resolve(".thumbs").resolve(originalFile.getFileName());
 
@@ -412,7 +417,8 @@ public class MangaController {
     public ResponseEntity<List<MangaAuthor>> searchAuthors(@RequestParam("query") String query) {
         // Giả sử bạn có method này trong AuthorRepository:
         // List<MangaAuthor> findByNameContainingIgnoreCase(String name);
-        // Ở đây tôi demo tạm bằng cách find all rồi filter (không tối ưu cho production)
+        // Ở đây tôi demo tạm bằng cách find all rồi filter (không tối ưu cho
+        // production)
         List<MangaAuthor> allAuthors = authorRepository.findAll();
         List<MangaAuthor> filtered = allAuthors.stream()
                 .filter(a -> a.getName().toLowerCase().contains(query.toLowerCase()))
@@ -441,62 +447,6 @@ public class MangaController {
             }
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    // --- HÀM XỬ LÝ ZIP MỚI ---
-    private void processZipFile(MultipartFile zipFile, MangaSeries manga) throws Exception {
-        Map<String, MangaChapter> chapterCache = new HashMap<>();
-
-        try (ZipInputStream zis = new ZipInputStream(zipFile.getInputStream())) {
-            ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                if (entry.isDirectory()) {
-                    continue;
-                }
-
-                String entryName = entry.getName(); // VD: "Naruto/Chap 1/01.jpg"
-                String[] parts = entryName.split("/");
-
-                // Cần ít nhất: FolderChap/Image
-                if (parts.length < 2) {
-                    continue;
-                }
-
-                String fileName = parts[parts.length - 1];
-                String chapterName = parts[parts.length - 2];
-
-                if (isImageFile(fileName)) {
-                    saveImage(zis, manga, chapterName, fileName, entry.getSize(), chapterCache);
-                }
-            }
-        }
-    }
-
-    // --- HÀM XỬ LÝ FOLDER CŨ (Tách ra từ hàm upload cũ) ---
-    private void processFolderUpload(MultipartFile[] files, MangaSeries manga) throws Exception {
-        Map<String, MangaChapter> chapterCache = new HashMap<>();
-        for (MultipartFile file : files) {
-            if (file.isEmpty()) {
-                continue;
-            }
-            String originalPath = file.getOriginalFilename();
-            if (originalPath == null) {
-                continue;
-            }
-
-            String[] parts = originalPath.split("/");
-            if (parts.length < 2) {
-                continue;
-            }
-
-            String fileName = parts[parts.length - 1];
-            String chapterName = parts[parts.length - 2];
-
-            if (isImageFile(fileName)) {
-                // Với MultipartFile, ta dùng file.getInputStream() và file.getSize()
-                saveImage(file.getInputStream(), manga, chapterName, fileName, file.getSize(), chapterCache);
-            }
         }
     }
 
@@ -539,7 +489,8 @@ public class MangaController {
         // Lấy list chapter (Sắp xếp theo tên hoặc ngày tạo)
         List<MangaChapter> chapters = chapterRepository.findByMangaIdOrderByChapterNameAsc(id);
 
-        // Sắp xếp lại chapter theo logic số học (Chap 1, Chap 2, Chap 10...) thay vì String (1, 10, 2)
+        // Sắp xếp lại chapter theo logic số học (Chap 1, Chap 2, Chap 10...) thay vì
+        // String (1, 10, 2)
         // Đây là xử lý java đơn giản, sau này có thể tối ưu DB
         chapters.sort((c1, c2) -> {
             int order1 = c1.getChapterOrder() != null ? c1.getChapterOrder() : 0;
@@ -594,7 +545,8 @@ public class MangaController {
                 .orElseThrow(() -> new IllegalArgumentException("Chapter not found"));
 
         // 1. Lấy danh sách chapter của truyện này và sort đúng thứ tự
-        List<MangaChapter> allChapters = chapterRepository.findByMangaIdOrderByChapterNameAsc(currentChapter.getManga().getId());
+        List<MangaChapter> allChapters = chapterRepository
+                .findByMangaIdOrderByChapterNameAsc(currentChapter.getManga().getId());
         allChapters.sort((c1, c2) -> extractPageNumber(c1.getChapterName()) - extractPageNumber(c2.getChapterName()));
 
         // 2. Tìm vị trí chapter hiện tại
@@ -730,7 +682,8 @@ public class MangaController {
                         continue;
                     }
 
-                    saveImage(zis, manga, chapterName, fileName, entry.getSize(), new HashMap<>()); // Tận dụng hàm saveImage cũ
+                    saveImage(zis, manga, chapterName, fileName, entry.getSize(), new HashMap<>()); // Tận dụng hàm
+                                                                                                    // saveImage cũ
                 }
             }
 
@@ -784,7 +737,8 @@ public class MangaController {
     }
 
     // --- HELPER: Hàm xử lý logic tạo Chapter và giải nén ZIP ---
-    private void processChapterZipUpload(MangaSeries manga, String chapterName, MultipartFile zipFile) throws Exception {
+    private void processChapterZipUpload(MangaSeries manga, String chapterName, MultipartFile zipFile)
+            throws Exception {
         // 1. Tạo Chapter trong DB
         MangaChapter chapter = MangaChapter.builder()
                 .manga(manga)
@@ -880,8 +834,10 @@ public class MangaController {
             response.put("currentTags", currentTagIds);
             response.put("manga", manga);
             response.put("allTags", allTags);
-            // Giả sử MangaSeries có field 'tags' (@ManyToMany), nếu chưa có bạn cần thêm vào Entity
-            // response.put("currentTags", manga.getTags().stream().map(Tag::getId).collect(Collectors.toList())); 
+            // Giả sử MangaSeries có field 'tags' (@ManyToMany), nếu chưa có bạn cần thêm
+            // vào Entity
+            // response.put("currentTags",
+            // manga.getTags().stream().map(Tag::getId).collect(Collectors.toList()));
             response.put("covers", potentialCovers);
 
             return ResponseEntity.ok(response);
@@ -946,7 +902,8 @@ public class MangaController {
 
                 manga.setCoverPath("/manga/covers/" + coverName);
             } // Option 2: Chọn từ Chapter
-            else if ("select".equals(dto.getCoverOption()) && dto.getCoverPageId() != null && !dto.getCoverPageId().isEmpty()) {
+            else if ("select".equals(dto.getCoverOption()) && dto.getCoverPageId() != null
+                    && !dto.getCoverPageId().isEmpty()) {
                 MangaPage page = pageRepository.findById(dto.getCoverPageId()).orElseThrow();
 
                 Path sourceImg = Paths.get(rootUploadDir, page.getChapter().getFolderPath(), page.getFileName());
@@ -989,8 +946,7 @@ public class MangaController {
 
     @GetMapping("/chapter/{id}/details")
     @ResponseBody
-    public ResponseEntity<Map<String, Object>> getChapterDetails(@PathVariable String id
-    ) {
+    public ResponseEntity<Map<String, Object>> getChapterDetails(@PathVariable String id) {
         try {
             MangaChapter chapter = chapterRepository.findById(id).orElseThrow();
             List<MangaPage> pages = pageRepository.findByChapterIdOrderByPageOrderAsc(id);
@@ -1002,8 +958,7 @@ public class MangaController {
             res.put("pages", pages.stream().map(p -> Map.of(
                     "id", p.getId(),
                     "fileName", p.getFileName(),
-                    "url", "/manga/image/" + p.getId()
-            )).collect(Collectors.toList()));
+                    "url", "/manga/image/" + p.getId())).collect(Collectors.toList()));
 
             return ResponseEntity.ok(res);
         } catch (Exception e) {
@@ -1015,8 +970,7 @@ public class MangaController {
     @PostMapping("/chapter/update-info")
     @ResponseBody
     @Transactional
-    public ResponseEntity<String> updateChapterInfo(@RequestParam("id") String id, @RequestParam("name") String name
-    ) {
+    public ResponseEntity<String> updateChapterInfo(@RequestParam("id") String id, @RequestParam("name") String name) {
         try {
             MangaChapter chapter = chapterRepository.findById(id).orElseThrow();
             chapter.setChapterName(name);
@@ -1031,8 +985,7 @@ public class MangaController {
     @PostMapping("/chapter/reorder-pages")
     @ResponseBody
     @Transactional
-    public ResponseEntity<String> reorderPages(@RequestBody Map<String, List<String>> payload
-    ) {
+    public ResponseEntity<String> reorderPages(@RequestBody Map<String, List<String>> payload) {
         try {
             List<String> pageIds = payload.get("pageIds");
             for (int i = 0; i < pageIds.size(); i++) {
@@ -1047,14 +1000,15 @@ public class MangaController {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }
-    // *LƯU Ý: Cần thêm method updatePageOrder vào MangaPageRepository (xem bên dưới)
+    // *LƯU Ý: Cần thêm method updatePageOrder vào MangaPageRepository (xem bên
+    // dưới)
 
     // D. Xóa 1 trang ảnh
     @PostMapping("/page/delete")
     @ResponseBody
     @Transactional
-    public ResponseEntity<String> deletePage(@RequestParam("id") String id, @RequestParam(defaultValue = "true") boolean deletePhysical
-    ) {
+    public ResponseEntity<String> deletePage(@RequestParam("id") String id,
+            @RequestParam(defaultValue = "true") boolean deletePhysical) {
         try {
             MangaPage page = pageRepository.findById(id).orElseThrow();
             if (deletePhysical) {
@@ -1072,14 +1026,13 @@ public class MangaController {
     @PostMapping("/chapter/{id}/add-images")
     @ResponseBody
     @Transactional
-    public ResponseEntity<String> addImagesToChapter(@PathVariable String id, @RequestParam("files") MultipartFile[] files
-    ) {
+    public ResponseEntity<String> addImagesToChapter(@PathVariable String id,
+            @RequestParam("files") MultipartFile[] files) {
         try {
             MangaChapter chapter = chapterRepository.findById(id).orElseThrow();
-            MangaSeries manga = chapter.getManga();
 
             // Tìm pageOrder lớn nhất hiện tại để cộng dồn
-            // Integer maxOrder = pageRepository.findMaxPageOrderByChapterId(id); 
+            // Integer maxOrder = pageRepository.findMaxPageOrderByChapterId(id);
             // int startOrder = (maxOrder == null) ? 0 : maxOrder + 1;
             // Để đơn giản, ta lấy list size
             int startOrder = pageRepository.findByChapterIdOrderByPageOrderAsc(id).size();
@@ -1089,7 +1042,8 @@ public class MangaController {
             cache.put(chapter.getChapterName(), chapter);
 
             for (MultipartFile file : files) {
-                // Tái sử dụng logic saveImage, nhưng cần sửa lại saveImage chút để nhận pageOrder tùy chỉnh
+                // Tái sử dụng logic saveImage, nhưng cần sửa lại saveImage chút để nhận
+                // pageOrder tùy chỉnh
                 // Hoặc viết logic lưu thẳng ở đây cho nhanh:
                 String fileName = file.getOriginalFilename();
                 Path destFile = Paths.get(rootUploadDir, chapter.getFolderPath(), fileName);

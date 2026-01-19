@@ -13,7 +13,6 @@ import com.app.filecloud.repository.ContentSubjectRepository;
 import com.app.filecloud.repository.FileNodeRepository;
 import com.app.filecloud.repository.FileTagRepository;
 import com.app.filecloud.repository.SocialPlatformRepository;
-import com.app.filecloud.repository.StorageVolumeRepository;
 import com.app.filecloud.repository.SubjectFolderMappingRepository;
 import com.app.filecloud.repository.SubjectSocialLinkRepository;
 import com.app.filecloud.repository.TagRepository;
@@ -76,8 +75,6 @@ public class SubjectController {
     private final SubjectSocialLinkRepository socialLinkRepository;
 
     private final TagRepository tagRepository;
-    private final StorageVolumeRepository volumeRepository;
-
     // root path
     @Value("${app.storage.root:uploads}")
     private String rootUploadDir;
@@ -92,8 +89,7 @@ public class SubjectController {
         // 1. Lấy dữ liệu thô (Object Array) từ DB
         List<Object[]> rawResults = subjectRepository.searchSubjectsWithStats(
                 (keyword != null && !keyword.isBlank()) ? keyword : null,
-                platformId
-        );
+                platformId);
 
         // 2. Map từ Object[] sang DTO
         List<SubjectCardDTO> subjects = new ArrayList<>();
@@ -115,7 +111,8 @@ public class SubjectController {
             dto.setTotalSize(totalSize);
 
             // Hibernate sẽ tự fetch socialLinks khi gọi getter (Lazy Loading)
-            // Vì đang trong session (OpenEntityManagerInView mặc định true), điều này hoạt động tốt.
+            // Vì đang trong session (OpenEntityManagerInView mặc định true), điều này hoạt
+            // động tốt.
             dto.setSocialLinks(sub.getSocialLinks());
 
             subjects.add(dto);
@@ -124,7 +121,8 @@ public class SubjectController {
         // 3. Xử lý Sắp xếp (In-Memory Sorting)
         switch (sort) {
             case "name_desc" ->
-                subjects.sort(Comparator.comparing(SubjectCardDTO::getMainName, String.CASE_INSENSITIVE_ORDER).reversed());
+                subjects.sort(
+                        Comparator.comparing(SubjectCardDTO::getMainName, String.CASE_INSENSITIVE_ORDER).reversed());
             case "size_desc" ->
                 subjects.sort(Comparator.comparing(SubjectCardDTO::getTotalSize).reversed());
             case "size_asc" ->
@@ -163,10 +161,11 @@ public class SubjectController {
 
         // Lấy danh sách Files
         List<FileNode> files = fileNodeRepository.findBySubjectId(id);
-        
+
         switch (sort) {
             case "name_asc" -> files.sort(Comparator.comparing(FileNode::getName, String.CASE_INSENSITIVE_ORDER));
-            case "name_desc" -> files.sort(Comparator.comparing(FileNode::getName, String.CASE_INSENSITIVE_ORDER).reversed());
+            case "name_desc" ->
+                files.sort(Comparator.comparing(FileNode::getName, String.CASE_INSENSITIVE_ORDER).reversed());
             case "size_desc" -> files.sort(Comparator.comparing(FileNode::getSize).reversed());
             case "size_asc" -> files.sort(Comparator.comparing(FileNode::getSize));
             case "oldest" -> files.sort(Comparator.comparing(FileNode::getCreatedAt));
@@ -233,7 +232,7 @@ public class SubjectController {
         model.addAttribute("mappings", safeMappings);
 
         model.addAttribute("selectedSort", sort);
-        
+
         return "subject-profile";
     }
 
@@ -242,9 +241,10 @@ public class SubjectController {
         if (size <= 0) {
             return "0 MB";
         }
-        final String[] units = new String[]{"B", "KB", "MB", "GB", "TB"};
+        final String[] units = new String[] { "B", "KB", "MB", "GB", "TB" };
         int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
-        return new java.text.DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " " + units[digitGroups];
+        return new java.text.DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " "
+                + units[digitGroups];
     }
 
     // API tạo nhanh Subject
@@ -498,6 +498,7 @@ public class SubjectController {
     public ResponseEntity<String> deleteSubjectMedia(@RequestBody Map<String, Object> payload) {
         try {
             // 1. Parse dữ liệu từ Client
+            @SuppressWarnings("unchecked")
             List<String> fileIds = (List<String>) payload.get("fileIds");
             boolean deletePhysical = (Boolean) payload.getOrDefault("deletePhysical", false);
 
@@ -528,13 +529,15 @@ public class SubjectController {
                     Files.deleteIfExists(thumbDir.resolve(file.getId() + "_small.jpg"));
                     Files.deleteIfExists(thumbDir.resolve(file.getId() + "_medium.jpg"));
                     // Xóa luôn thư mục temp_frames nếu còn sót
-                    Files.deleteIfExists(Paths.get(rootUploadDir, ".cache", "temp_frames", file.getId() + "_source.jpg"));
+                    Files.deleteIfExists(
+                            Paths.get(rootUploadDir, ".cache", "temp_frames", file.getId() + "_source.jpg"));
                 } catch (Exception e) {
                     // Ignore error
                 }
             }
 
-            // 3. Xóa dữ liệu trong DB (Dùng batch để tự động cascade xóa Metadata, Tag, FileSubject)
+            // 3. Xóa dữ liệu trong DB (Dùng batch để tự động cascade xóa Metadata, Tag,
+            // FileSubject)
             fileNodeRepository.deleteAllInBatch(files);
 
             return ResponseEntity.ok("Deleted " + files.size() + " files successfully");
@@ -549,7 +552,8 @@ public class SubjectController {
     @ResponseBody
     public ResponseEntity<List<Tag>> getFileTags(@RequestParam("fileId") String fileId) {
         // Query tìm các Tag dựa trên fileId thông qua bảng trung gian file_tags
-        // Lưu ý: Cần thêm hàm findTagsByFileId vào TagRepository hoặc dùng logic dưới đây
+        // Lưu ý: Cần thêm hàm findTagsByFileId vào TagRepository hoặc dùng logic dưới
+        // đây
         List<FileTag> fileTags = fileTagRepository.findByFileId(fileId);
         List<Integer> tagIds = fileTags.stream().map(FileTag::getTagId).toList();
 
@@ -564,7 +568,8 @@ public class SubjectController {
     @ResponseBody
     public ResponseEntity<List<Tag>> searchTags(@RequestParam("q") String query) {
         // Cần thêm hàm findByNameContainingIgnoreCase vào TagRepository
-        // return ResponseEntity.ok(tagRepository.findByNameContainingIgnoreCase(query));
+        // return
+        // ResponseEntity.ok(tagRepository.findByNameContainingIgnoreCase(query));
 
         // Demo đơn giản nếu chưa có hàm custom: lấy tất cả rồi lọc (chỉ ổn với data ít)
         List<Tag> all = tagRepository.findAll();
@@ -716,7 +721,8 @@ public class SubjectController {
 
                     // Cập nhật Relative Path trong DB
                     // relativePath cũ: \Folder\OldName.mp4 -> lấy parent folder
-                    String parentRelPath = fileNode.getRelativePath().substring(0, fileNode.getRelativePath().lastIndexOf(File.separator));
+                    String parentRelPath = fileNode.getRelativePath().substring(0,
+                            fileNode.getRelativePath().lastIndexOf(File.separator));
                     // Handle trường hợp file ở root
                     if (fileNode.getRelativePath().lastIndexOf(File.separator) == -1) {
                         parentRelPath = "";

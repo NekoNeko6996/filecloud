@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
@@ -43,29 +42,25 @@ public class MangaSeries {
     @Builder.Default
     @OneToMany(mappedBy = "manga", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<MangaChapter> chapters = new ArrayList<>();
-    
+
     @ManyToMany(fetch = FetchType.LAZY, cascade = CascadeType.PERSIST)
-    @JoinTable(
-        name = "manga_series_authors",
-        joinColumns = @JoinColumn(name = "manga_id"),
-        inverseJoinColumns = @JoinColumn(name = "author_id")
-    )
+    @JoinTable(name = "manga_series_authors", joinColumns = @JoinColumn(name = "manga_id"), inverseJoinColumns = @JoinColumn(name = "author_id"))
     private Set<MangaAuthor> authors;
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "manga_tags",
-        joinColumns = @JoinColumn(name = "manga_id"),
-        inverseJoinColumns = @JoinColumn(name = "tag_id")
-    )
+    @JoinTable(name = "manga_tags", joinColumns = @JoinColumn(name = "manga_id"), inverseJoinColumns = @JoinColumn(name = "tag_id"))
     private Set<Tag> tags = new HashSet<>();
-    
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @PrePersist
-    protected void onCreate() { createdAt = LocalDateTime.now(); }
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 
-    public enum Status { ONGOING, COMPLETED, HIATUS, DROPPED }
+    public enum Status {
+        ONGOING, COMPLETED, HIATUS, DROPPED
+    }
 }

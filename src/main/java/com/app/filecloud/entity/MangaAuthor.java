@@ -2,7 +2,6 @@ package com.app.filecloud.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.util.List;
 
 @Entity
 @Table(name = "manga_authors")
@@ -19,7 +18,7 @@ public class MangaAuthor {
     private String name;
 
     private String biography;
-    
+
     // Nếu muốn hiển thị ảnh tác giả
-    // private String avatarUrl; 
+    // private String avatarUrl;
 }

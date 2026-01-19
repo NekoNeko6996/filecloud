@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -62,13 +61,13 @@ public class SubjectScanController {
             return ResponseEntity.badRequest().build();
         }
     }
-    
+
     @GetMapping("/progress")
     public SseEmitter subscribe() {
         String userId = getCurrentUserId();
         if (userId == null) {
             // Nếu chưa login, trả về null hoặc throw lỗi tùy bạn
-            return null; 
+            return null;
         }
         // Gọi service để tạo và lưu emitter
         return progressService.subscribe(userId);

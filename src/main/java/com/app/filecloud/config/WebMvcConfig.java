@@ -22,7 +22,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public LocaleResolver localeResolver() {
         SessionLocaleResolver slr = new SessionLocaleResolver();
         // Default language vi_VN
-        slr.setDefaultLocale(new Locale("vi"));
+        slr.setDefaultLocale(Locale.of("vi"));
         return slr;
     }
 
@@ -40,7 +40,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(localeChangeInterceptor());
     }
-    
+
     @Value("${app.storage.root:uploads}")
     private String rootUploadDir;
 
@@ -52,7 +52,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
         registry.addResourceHandler("/avatars/**")
                 .addResourceLocations("file:/" + uploadPath + "/avatars/");
-        
+
         registry.addResourceHandler("/manga/covers/**")
                 .addResourceLocations("file:/" + uploadPath + "/manga/covers/");
     }

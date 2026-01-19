@@ -21,7 +21,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import com.app.filecloud.repository.spec.MovieSpecification; // Import class mới tạo
 import org.springframework.data.jpa.domain.Specification;
 
 import java.io.File;
@@ -103,7 +102,9 @@ public class MovieService {
             // Copy đoạn logic xử lý file từ code cũ vào đây
             // Hoặc để gọn tôi chỉ ghi chú là giữ nguyên logic xử lý file
             String originalFilename = coverFile.getOriginalFilename();
-            String ext = originalFilename != null && originalFilename.contains(".") ? originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
+            String ext = originalFilename != null && originalFilename.contains(".")
+                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                    : ".jpg";
             String coverName = "cover" + ext;
             Path destCover = movieDir.resolve(coverName);
             Files.copy(coverFile.getInputStream(), destCover, StandardCopyOption.REPLACE_EXISTING);
@@ -162,7 +163,8 @@ public class MovieService {
         Path libRoot = getMovieLibraryRoot();
 
         // 1. Xóa thư mục vật lý
-        // Logic: Lấy đường dẫn ảnh bìa (VD: "Inception (2010)/cover.jpg") -> Lấy thư mục cha -> Xóa
+        // Logic: Lấy đường dẫn ảnh bìa (VD: "Inception (2010)/cover.jpg") -> Lấy thư
+        // mục cha -> Xóa
         String relPath = movie.getCoverImageUrl();
         if (relPath != null) {
             Path relativeFilePath = Paths.get(relPath);
@@ -232,11 +234,13 @@ public class MovieService {
                 Files.createDirectories(thumbDir);
             }
 
-            String thumbName = "ep_" + (episodeNumber != null ? episodeNumber : "x") + "_" + System.currentTimeMillis() + ".jpg";
+            String thumbName = "ep_" + (episodeNumber != null ? episodeNumber : "x") + "_" + System.currentTimeMillis()
+                    + ".jpg";
             Path destThumb = thumbDir.resolve(thumbName);
 
             // Gọi hàm tạo thumb thông minh (copy từ MediaService)
-            generateSmartVideoThumbnail(destVideo.toAbsolutePath().toString(), destThumb.toAbsolutePath().toString(), duration);
+            generateSmartVideoThumbnail(destVideo.toAbsolutePath().toString(), destThumb.toAbsolutePath().toString(),
+                    duration);
 
             thumbRelPath = relativeMovieDir.resolve(".thumbs").resolve(thumbName).toString();
 
@@ -312,8 +316,7 @@ public class MovieService {
             MultipartFile coverFile,
             Double rating,
             String studioInput,
-            String tagInput
-    ) throws IOException {
+            String tagInput) throws IOException {
         Movie movie = getMovie(id);
 
         // 1. Cập nhật thông tin cơ bản
@@ -336,7 +339,8 @@ public class MovieService {
             } else {
                 // Fallback: Nếu phim chưa có ảnh bìa, tìm theo folder tên phim (logic cũ)
                 // Hoặc đơn giản là tạo folder mới nếu cần (ở đây giả định folder đã có)
-                String folderName = title.replaceAll("[^a-zA-Z0-9 ._-]", "") + (releaseYear != null ? " (" + releaseYear + ")" : "");
+                String folderName = title.replaceAll("[^a-zA-Z0-9 ._-]", "")
+                        + (releaseYear != null ? " (" + releaseYear + ")" : "");
                 movieDir = libRoot.resolve(folderName);
                 if (!Files.exists(movieDir)) {
                     Files.createDirectories(movieDir);
@@ -345,13 +349,16 @@ public class MovieService {
 
             // A. Lưu ảnh gốc mới (Ghi đè cover.jpg hoặc cover.png)
             String originalFilename = coverFile.getOriginalFilename();
-            String ext = originalFilename != null && originalFilename.contains(".") ? originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
+            String ext = originalFilename != null && originalFilename.contains(".")
+                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                    : ".jpg";
             String coverName = "cover" + ext; // Luôn đặt tên chuẩn
 
             Path destCover = movieDir.resolve(coverName);
             Files.copy(coverFile.getInputStream(), destCover, StandardCopyOption.REPLACE_EXISTING);
 
-            // Cập nhật path (thực ra path ko đổi nếu tên file ko đổi, nhưng set lại cho chắc)
+            // Cập nhật path (thực ra path ko đổi nếu tên file ko đổi, nhưng set lại cho
+            // chắc)
             String folderName = movieDir.getFileName().toString();
             String coverRelPath = folderName + File.separator + coverName;
             movie.setCoverImageUrl(coverRelPath);
@@ -395,8 +402,7 @@ public class MovieService {
                     String slug = toSlug(cleanName);
                     Studio studio = studioRepository.findBySlug(slug)
                             .orElseGet(() -> studioRepository.save(
-                            Studio.builder().name(cleanName).slug(slug).build()
-                    ));
+                                    Studio.builder().name(cleanName).slug(slug).build()));
                     movie.getStudios().add(studio);
                 }
             }
@@ -413,8 +419,7 @@ public class MovieService {
                     String slug = toSlug(tagName);
                     Tag tag = tagRepository.findBySlug(slug)
                             .orElseGet(() -> tagRepository.save(
-                            Tag.builder().name(tagName).slug(slug).colorHex("#6366f1").build()
-                    ));
+                                    Tag.builder().name(tagName).slug(slug).colorHex("#6366f1").build()));
                     movie.getTags().add(tag);
                 }
             }
@@ -448,13 +453,16 @@ public class MovieService {
         movieAlternativeTitleRepository.deleteById(titleId);
     }
 
-    public Page<Movie> searchMovies(String keyword, Integer year, String studioId, java.util.List<String> tagIds, Pageable pageable) {
-        Specification<Movie> spec = com.app.filecloud.repository.spec.MovieSpecification.filterMovies(keyword, year, studioId, tagIds);
+    public Page<Movie> searchMovies(String keyword, Integer year, String studioId, java.util.List<String> tagIds,
+            Pageable pageable) {
+        Specification<Movie> spec = com.app.filecloud.repository.spec.MovieSpecification.filterMovies(keyword, year,
+                studioId, tagIds);
         return movieRepository.findAll(spec, pageable);
     }
 
     @Transactional
-    public void updateEpisode(String episodeId, String title, Integer episodeNumber, MultipartFile file) throws IOException {
+    public void updateEpisode(String episodeId, String title, Integer episodeNumber, MultipartFile file)
+            throws IOException {
         MovieEpisode episode = movieEpisodeRepository.findById(episodeId)
                 .orElseThrow(() -> new RuntimeException("Episode not found"));
 
@@ -508,7 +516,8 @@ public class MovieService {
                 String thumbName = "ep_" + episodeNumber + "_" + System.currentTimeMillis() + ".jpg";
                 Path destThumb = thumbDir.resolve(thumbName);
 
-                generateSmartVideoThumbnail(destVideo.toAbsolutePath().toString(), destThumb.toAbsolutePath().toString(), duration);
+                generateSmartVideoThumbnail(destVideo.toAbsolutePath().toString(),
+                        destThumb.toAbsolutePath().toString(), duration);
                 thumbRelPath = relativeMovieDir.resolve(".thumbs").resolve(thumbName).toString();
             } catch (Exception e) {
                 System.err.println("Warning processing new video media: " + e.getMessage());

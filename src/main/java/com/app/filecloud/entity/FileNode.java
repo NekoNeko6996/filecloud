@@ -3,7 +3,6 @@ package com.app.filecloud.entity;
 import jakarta.persistence.*;
 import java.text.DecimalFormat;
 import lombok.*;
-import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 import org.springframework.data.domain.Persistable;
@@ -17,7 +16,7 @@ import org.springframework.data.domain.Persistable;
 public class FileNode implements Persistable<String> {
 
     @Id
-//    @UuidGenerator
+    // @UuidGenerator
     @Column(columnDefinition = "CHAR(36)")
     private String id;
 
@@ -48,7 +47,7 @@ public class FileNode implements Persistable<String> {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
-    
+
     @Column(name = "modified_at")
     private LocalDateTime modifiedAt;
 
@@ -98,7 +97,8 @@ public class FileNode implements Persistable<String> {
 
     public String getDurationFormatted() {
         // Kiểm tra null safety
-        if (this.metadata == null || this.metadata.getDurationSeconds() == null || this.metadata.getDurationSeconds() == 0) {
+        if (this.metadata == null || this.metadata.getDurationSeconds() == null
+                || this.metadata.getDurationSeconds() == 0) {
             return null;
         }
 

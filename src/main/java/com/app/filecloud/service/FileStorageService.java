@@ -33,7 +33,6 @@ public class FileStorageService {
 
     private final SubjectFolderMappingRepository mappingRepository;
     private final FileSubjectsRepository fileSubjectsRepository;
-    private final StorageVolumeService storageVolumeService;
 
     @Value("${app.storage.root:uploads}")
     private String rootUploadDir;
@@ -112,7 +111,8 @@ public class FileStorageService {
         String relativeFolderPath = buildFolderPath(parentId);
         Path targetFolder = Paths.get(rootUploadDir).resolve(relativeFolderPath);
 
-        // Tạo thư mục nếu chưa có (Phòng trường hợp tạo folder DB nhưng xóa tay folder vật lý)
+        // Tạo thư mục nếu chưa có (Phòng trường hợp tạo folder DB nhưng xóa tay folder
+        // vật lý)
         if (!Files.exists(targetFolder)) {
             Files.createDirectories(targetFolder);
         }
@@ -129,7 +129,9 @@ public class FileStorageService {
         Path targetPath = targetFolder.resolve(storedFileName);
 
         if (Files.exists(targetPath)) {
-            String nameWithoutExt = originalName.contains(".") ? originalName.substring(0, originalName.lastIndexOf('.')) : originalName;
+            String nameWithoutExt = originalName.contains(".")
+                    ? originalName.substring(0, originalName.lastIndexOf('.'))
+                    : originalName;
             String ext = originalName.contains(".") ? originalName.substring(originalName.lastIndexOf('.')) : "";
             storedFileName = nameWithoutExt + "_" + System.currentTimeMillis() + ext;
             targetPath = targetFolder.resolve(storedFileName);
@@ -174,7 +176,9 @@ public class FileStorageService {
         Path targetPath = folderPath.resolve(storedFileName);
 
         if (Files.exists(targetPath)) {
-            String nameWithoutExt = originalName.contains(".") ? originalName.substring(0, originalName.lastIndexOf('.')) : originalName;
+            String nameWithoutExt = originalName.contains(".")
+                    ? originalName.substring(0, originalName.lastIndexOf('.'))
+                    : originalName;
             String ext = originalName.contains(".") ? originalName.substring(originalName.lastIndexOf('.')) : "";
             storedFileName = nameWithoutExt + "_" + System.currentTimeMillis() + ext;
             targetPath = folderPath.resolve(storedFileName);
