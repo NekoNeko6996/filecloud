@@ -1,9 +1,12 @@
 package com.app.filecloud.controller;
 
+import com.app.filecloud.entity.FileNode;
 import com.app.filecloud.entity.StorageVolume;
 import com.app.filecloud.entity.SysConfig;
+import com.app.filecloud.repository.FileNodeRepository;
 import com.app.filecloud.repository.StorageVolumeRepository;
 import com.app.filecloud.repository.SysConfigRepository;
+import com.app.filecloud.service.MediaScanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,8 +21,13 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
 @RequestMapping("/admin/config")
@@ -28,6 +36,8 @@ public class AdminConfigController {
 
     private final SysConfigRepository sysConfigRepository;
     private final StorageVolumeRepository volumeRepository;
+    private final FileNodeRepository fileNodeRepository;
+    private final MediaScanService mediaScanService;
 
     private static final String KEY_MOVIE_PATH = "MOVIE_STORE_PHYSICAL_MAIN_PATH";
 
@@ -53,7 +63,7 @@ public class AdminConfigController {
                     // Reconstruct full path: E:\ + movie_data
                     Path fullPath = Paths.get(vol.getMountPoint(), relPath);
                     displayPath = fullPath.toString();
-                    
+
                     if (Files.exists(fullPath)) {
                         status = "ACTIVE";
                     } else {
@@ -98,7 +108,7 @@ public class AdminConfigController {
             // Kiểm tra xem inputPath có nằm trong volPath không
             if (normalizedInput.startsWith(volPath)) {
                 matchedVolume = vol;
-                break; 
+                break;
             }
         }
 
@@ -111,7 +121,7 @@ public class AdminConfigController {
         // VD: Input: E:\data\movies, Vol: E:\ -> Relative: data\movies
         String volRoot = Paths.get(matchedVolume.getMountPoint()).toAbsolutePath().toString();
         String relativePath = normalizedInput.substring(volRoot.length());
-        
+
         // Xóa dấu separator ở đầu nếu có (\data -> data)
         if (relativePath.startsWith(File.separator)) {
             relativePath = relativePath.substring(1);
@@ -135,5 +145,83 @@ public class AdminConfigController {
         config.setDataType(SysConfig.DataType.STRING);
         config.setIsSystem(true);
         sysConfigRepository.save(config);
+    }
+
+    @PostMapping("/actions/fix-hashes")
+    public String fixMissingHashes(RedirectAttributes redirectAttributes) {
+        try {
+            // 1. Tìm tất cả file có hash null hoặc rỗng
+            // Lưu ý: Nếu FileNodeRepository chưa có hàm này, bạn có thể dùng findAll rồi filter stream, 
+            // hoặc thêm query vào repo: List<FileNode> findByHashIsNullOrHash(String empty);
+            List<FileNode> allNodes = fileNodeRepository.findAll();
+
+            long count = 0;
+            int errorCount = 0;
+
+            for (FileNode node : allNodes) {
+                // Chỉ xử lý FILE và HASH bị thiếu
+                if (node.getType() == FileNode.Type.FILE && (node.getFileHash() == null || node.getFileHash().trim().isEmpty())) {
+
+                    // Lấy Volume
+                    Optional<StorageVolume> volOpt = volumeRepository.findById(node.getVolumeId());
+                    if (volOpt.isPresent()) {
+                        Path fullPath = Paths.get(volOpt.get().getMountPoint(), node.getRelativePath());
+
+                        if (Files.exists(fullPath)) {
+                            // Tính Quick Hash
+                            String newHash = mediaScanService.calculateQuickHash(fullPath);
+
+                            if (newHash != null) {
+                                node.setFileHash(newHash);
+                                fileNodeRepository.save(node);
+                                count++;
+                            } else {
+                                errorCount++;
+                            }
+                        } else {
+                            System.out.println("File not found on disk: " + fullPath);
+                            errorCount++;
+                        }
+                    }
+                }
+            }
+
+            if (count > 0) {
+                redirectAttributes.addFlashAttribute("success", "Successfully re-hashed " + count + " files. (Errors/Skipped: " + errorCount + ")");
+            } else {
+                redirectAttributes.addFlashAttribute("info", "No missing hashes found or file system inaccessible.");
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error fixing hashes " + e);
+            redirectAttributes.addFlashAttribute("error", "An error occurred: " + e.getMessage());
+        }
+
+        return "redirect:/admin/config";
+    }
+
+    @GetMapping("/api/missing-hashes")
+    @ResponseBody
+    public ResponseEntity<List<Map<String, Object>>> getMissingHashFiles() {
+        List<FileNode> allNodes = fileNodeRepository.findAll();
+
+        List<Map<String, Object>> missingFiles = allNodes.stream()
+                // Lọc các file chưa có hash
+                .filter(node -> node.getType() == FileNode.Type.FILE && (node.getFileHash() == null || node.getFileHash().trim().isEmpty()))
+                .map(node -> {
+                    // [FIX 2] Sử dụng HashMap thay vì Map.of để tránh lỗi Type Inference
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", node.getId());
+                    map.put("name", node.getName());
+                    map.put("path", node.getRelativePath());
+
+                    // [FIX 1] Bỏ check null vì node.getSize() là kiểu primitive long (luôn có giá trị)
+                    map.put("size", node.getSize());
+
+                    return map;
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(missingFiles);
     }
 }
