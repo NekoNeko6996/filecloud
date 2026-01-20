@@ -43,6 +43,9 @@ public class ContentSubject {
     @OneToMany(mappedBy = "subject", fetch = FetchType.LAZY)
     private java.util.List<SubjectSocialLink> socialLinks;
     
+    @OneToMany(mappedBy = "subject", fetch = FetchType.LAZY)
+    private java.util.List<SubjectFolderMapping> folderMappings;
+    
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

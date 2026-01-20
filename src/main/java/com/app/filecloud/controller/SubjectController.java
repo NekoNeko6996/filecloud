@@ -163,14 +163,20 @@ public class SubjectController {
         List<FileNode> files = fileNodeRepository.findBySubjectId(id);
 
         switch (sort) {
-            case "name_asc" -> files.sort(Comparator.comparing(FileNode::getName, String.CASE_INSENSITIVE_ORDER));
+            case "name_asc" ->
+                files.sort(Comparator.comparing(FileNode::getName, String.CASE_INSENSITIVE_ORDER));
             case "name_desc" ->
                 files.sort(Comparator.comparing(FileNode::getName, String.CASE_INSENSITIVE_ORDER).reversed());
-            case "size_desc" -> files.sort(Comparator.comparing(FileNode::getSize).reversed());
-            case "size_asc" -> files.sort(Comparator.comparing(FileNode::getSize));
-            case "oldest" -> files.sort(Comparator.comparing(FileNode::getCreatedAt));
-            case "newest" -> files.sort(Comparator.comparing(FileNode::getCreatedAt).reversed());
-            default -> files.sort(Comparator.comparing(FileNode::getCreatedAt).reversed());
+            case "size_desc" ->
+                files.sort(Comparator.comparing(FileNode::getSize).reversed());
+            case "size_asc" ->
+                files.sort(Comparator.comparing(FileNode::getSize));
+            case "oldest" ->
+                files.sort(Comparator.comparing(FileNode::getCreatedAt));
+            case "newest" ->
+                files.sort(Comparator.comparing(FileNode::getCreatedAt).reversed());
+            default ->
+                files.sort(Comparator.comparing(FileNode::getCreatedAt).reversed());
         }
 
         // --- XỬ LÝ TAGS ---
@@ -216,6 +222,36 @@ public class SubjectController {
             return map;
         }).collect(Collectors.toList());
 
+        Map<Integer, VolumeStats> volumeStatsMap = new HashMap<>();
+
+        if (subject.getFolderMappings() != null) {
+            for (SubjectFolderMapping mapping : subject.getFolderMappings()) {
+                StorageVolume vol = mapping.getVolume();
+                if (vol != null && !volumeStatsMap.containsKey(vol.getId())) {
+                    File root = new File(vol.getMountPoint());
+                    if (root.exists()) {
+                        long total = root.getTotalSpace();
+                        long free = root.getFreeSpace();
+                        long used = total - free;
+                        int percent = (total > 0) ? (int) ((used * 100) / total) : 0;
+
+                        // Tạo object stats
+                        VolumeStats stats = new VolumeStats(
+                                formatSize(free) + " free",
+                                percent,
+                                vol.getMountPoint()
+                        );
+                        volumeStatsMap.put(vol.getId(), stats);
+                    } else {
+                        // Ổ đĩa bị ngắt kết nối
+                        volumeStatsMap.put(vol.getId(), new VolumeStats("Offline", 0, vol.getMountPoint()));
+                    }
+                }
+            }
+        }
+
+        model.addAttribute("volumeStatsMap", volumeStatsMap);
+
         // --- ADD ATTRIBUTES ---
         model.addAttribute("subject", subject);
         model.addAttribute("files", files);
@@ -236,13 +272,15 @@ public class SubjectController {
 
         return "subject-profile";
     }
+    
+    public record VolumeStats(String text, int percent, String mountPoint) {}
 
     // Helper format size (để tính tổng dung lượng hiển thị)
     private String formatSize(long size) {
         if (size <= 0) {
             return "0 MB";
         }
-        final String[] units = new String[] { "B", "KB", "MB", "GB", "TB" };
+        final String[] units = new String[]{"B", "KB", "MB", "GB", "TB"};
         int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
         return new java.text.DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " "
                 + units[digitGroups];
