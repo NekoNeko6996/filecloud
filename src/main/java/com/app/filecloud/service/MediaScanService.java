@@ -577,7 +577,7 @@ public class MediaScanService {
         }
     }
 
-    private String calculateQuickHash(Path path) {
+    public String calculateQuickHash(Path path) {
         try {
             long fileSize = Files.size(path);
             long chunkSize = 16 * 1024; // 16KB

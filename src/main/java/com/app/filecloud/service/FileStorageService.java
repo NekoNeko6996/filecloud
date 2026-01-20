@@ -33,6 +33,7 @@ public class FileStorageService {
 
     private final SubjectFolderMappingRepository mappingRepository;
     private final FileSubjectsRepository fileSubjectsRepository;
+    private final MediaScanService mediaScanService;
 
     @Value("${app.storage.root:uploads}")
     private String rootUploadDir;
@@ -186,6 +187,8 @@ public class FileStorageService {
 
         // 4. Lưu file vật lý
         Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+        String fileHash = mediaScanService.calculateQuickHash(targetPath);
+        log.info("Uploaded file: {} | Hash: {}", storedFileName, fileHash);
 
         // 5. Lưu FileNode vào DB
         // Tính lại relative path chuẩn để lưu DB (Bắt đầu bằng \)
@@ -204,6 +207,7 @@ public class FileStorageService {
                 .subjectMappingId(mapping.getId())
                 .relativePath(dbRelativePath)
                 .ownerId(userId)
+                .fileHash(fileHash)
                 .createdAt(java.time.LocalDateTime.now())
                 .isNew(true)
                 .build();
