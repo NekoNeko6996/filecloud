@@ -34,26 +34,6 @@
             </div>
 
             <div class="flex-1 overflow-y-auto scrollbar-hide p-6">
-                <div th:if="${not #lists.isEmpty(albums)}" class="space-y-2">
-                    <h3 class="text-white font-bold text-lg px-1">Albums</h3>
-                    <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                        <a th:each="album : ${albums}" 
-                           th:href="@{/gallery/{id}(id=${album.id})}"
-                           class="min-w-[200px] w-[200px] group bg-[#1e1e1e] border border-white/10 hover:border-primary/50 rounded-xl overflow-hidden transition-all hover:-translate-y-1 relative">
-                            <div class="aspect-[3/2] bg-black/40 relative">
-                                <img th:if="${album.coverPhoto}" th:src="@{'/gallery/thumb/' + ${album.coverPhoto.id}}" class="w-full h-full object-cover">
-                                <div th:unless="${album.coverPhoto}" class="w-full h-full flex items-center justify-center text-white/10">
-                                    <span class="material-symbols-outlined text-4xl">image</span>
-                                </div>
-                            </div>
-                            <div class="p-3">
-                                <p class="text-white font-medium truncate" th:text="${album.title}">Title</p>
-                                <p class="text-xs text-[#a79cba]" th:text="${album.artist != null ? album.artist.mainName : 'Unknown'}">Artist</p>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-
                 <div>
                     <h3 class="text-white font-bold text-lg px-1 mb-4">Recent Photos</h3>
                     <div id="photoGrid" class="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4">
@@ -61,9 +41,11 @@
                              th:id="'file-card-' + ${photo.id}"
                              th:data-id="${photo.id}"
                              th:data-name="${photo.originalFilename}"
+
                              onclick="handleFileClick(event, this.getAttribute('data-id'))"
                              oncontextmenu="showMediaContextMenu(event, this.getAttribute('data-id'))"
-                             class="file-item break-inside-avoid relative group rounded-xl overflow-hidden bg-[#1e1e1e] border border-white/5 cursor-pointer transition-all duration-200 select-none">
+                             th:style="${photo.width != null && photo.height != null} ? 'aspect-ratio: ' + ${photo.width} + '/' + ${photo.height} : ''"
+                             class="file-item skeleton-loader break-inside-avoid relative group rounded-xl overflow-hidden bg-gray-800 animate-pulse border border-white/5 cursor-pointer transition-all duration-200 select-none mb-4">
 
                             <div class="selection-checkbox absolute top-2 left-2 z-30 hidden">
                                 <input type="checkbox" class="hidden w-5 h-5 rounded border-gray-500 text-primary focus:ring-0 cursor-pointer pointer-events-none">
@@ -71,16 +53,18 @@
 
                             <img th:src="@{'/gallery/thumb/' + ${photo.id}}" 
                                  loading="lazy" 
-                                 class="w-full h-auto object-cover transition-transform duration-500">
+                                 class="w-full h-full object-cover opacity-0 transition-opacity duration-500 ease-in-out"
+                                 onload="this.classList.remove('opacity-0'); this.closest('.file-item').classList.remove('animate-pulse', 'bg-gray-800', 'skeleton-loader'); this.closest('.file-item').classList.add('bg-[#1e1e1e]');"
+                                 onerror="this.closest('.file-item').classList.remove('animate-pulse');">
 
-                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10">
                                 <button onclick="event.stopPropagation(); openLightbox(this.closest('.file-item').getAttribute('data-id'))" 
-                                        class="flex items-center p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-md hover-action">
+                                        class="flex items-center p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-md hover-action transition-transform hover:scale-110">
                                     <span class="material-symbols-outlined">zoom_in</span>
                                 </button>
                             </div>
 
-                            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-6">
+                            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-6 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                                 <p class="text-white text-xs truncate font-medium" th:text="${photo.originalFilename}">Name</p>
                             </div>
                         </div>
@@ -267,8 +251,7 @@
         <script th:inline="javascript">
             const dropOverlay = document.getElementById('dropOverlay');
             const duplicateDialog = document.getElementById('duplicateDialog');
-                    const defaultAlbumId = [[${defaultAlbum.id}
-                    ]];
+                    const defaultAlbumId = /*[[${defaultAlbum.id}]]*/;
             let dragCounter = 0;
 
             // --- DRAG & DROP LOGIC ---

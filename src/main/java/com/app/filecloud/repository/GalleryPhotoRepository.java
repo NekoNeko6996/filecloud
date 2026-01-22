@@ -16,4 +16,6 @@ public interface GalleryPhotoRepository extends JpaRepository<GalleryPhoto, Stri
     long countByAlbumId(String albumId);
     
     Optional<GalleryPhoto> findFirstByFileHash(String fileHash);
+    
+    List<GalleryPhoto> findTop3ByAlbumIdOrderByCreatedAtDesc(String albumId);
 }

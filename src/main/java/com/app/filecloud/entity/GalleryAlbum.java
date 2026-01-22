@@ -2,10 +2,13 @@ package com.app.filecloud.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
+import static jakarta.persistence.GenerationType.UUID;
 import lombok.*;
 import org.springframework.data.domain.Persistable;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "gallery_albums")
@@ -38,12 +41,11 @@ public class GalleryAlbum implements Persistable<String> {
     @Builder.Default
     private PrivacyMode privacyMode = PrivacyMode.PRIVATE;
 
-    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "artist_id", insertable = false, updatable = false)
     @ToString.Exclude
     private ContentSubject artist;
-    
+
     // Ảnh bìa - Quan hệ OneToOne (hoặc ManyToOne) tới GalleryPhoto
     // Dùng FetchType.LAZY để tránh load thừa dữ liệu
     @OneToOne(fetch = FetchType.LAZY)
@@ -58,7 +60,7 @@ public class GalleryAlbum implements Persistable<String> {
     @Column(name = "updated_at")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;
-    
+
     @Transient
     private List<GalleryPhoto> previewPhotos = new ArrayList<>();
 
@@ -68,8 +70,17 @@ public class GalleryAlbum implements Persistable<String> {
 
     @PrePersist
     protected void onCreate() {
-        if (this.createdAt == null) this.createdAt = LocalDateTime.now();
-        if (this.updatedAt == null) this.updatedAt = LocalDateTime.now();
+        // [FIX] Thêm dòng này để tự tạo UUID nếu chưa có
+        if (this.id == null) {
+            this.id = java.util.UUID.randomUUID().toString();
+        }
+
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+        if (this.updatedAt == null) {
+            this.updatedAt = LocalDateTime.now();
+        }
     }
 
     @PreUpdate

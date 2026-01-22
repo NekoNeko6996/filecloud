@@ -12,13 +12,12 @@
 
             <div class="px-6 py-4 flex justify-between items-center shrink-0 z-20 glass-header sticky top-0 border-b border-white/5">
                 <div class="flex items-center gap-4">
-                    <a href="/gallery" 
+                    <a href="/gallery/albums" 
                        class="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
                         <span class="material-symbols-outlined">arrow_back</span>
                     </a>
                     <div>
                         <h1 class="text-xl font-bold font-space text-white flex items-center gap-2">
-                            <span class="material-symbols-outlined text-primary">photo_album</span>
                             <span th:text="${album.title}">Album Title</span>
                         </h1>
                         <p class="text-[#a79cba] text-xs mt-0.5">
@@ -41,15 +40,16 @@
                 </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto scrollbar-hide relative p-6">
-                <div class="p-6">
-
-                    <div th:if="${#lists.isEmpty(photos)}" class="flex flex-col items-center justify-center py-20 text-gray-500">
-                        <div class="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-4">
-                            <span class="material-symbols-outlined text-4xl opacity-50">image_not_supported</span>
+            <div class="flex-1 overflow-y-auto scrollbar-hide relative">
+                <div class="p-6 h-full">
+                    <div th:if="${#lists.isEmpty(photos)}" 
+                         onclick="document.getElementById('fileInput').click()"
+                         class="flex flex-col items-center justify-center py-20 text-gray-500 border-2 border-dashed border-white/5 rounded-xl hover:bg-white/5 hover:border-primary/30 cursor-pointer transition-all group h-full">
+                        <div class="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <span class="material-symbols-outlined text-4xl opacity-50 group-hover:opacity-100 group-hover:text-primary">cloud_upload</span>
                         </div>
                         <h3 class="text-white font-bold text-lg">This album is empty</h3>
-                        <p class="text-sm">Drag and drop photos here to upload.</p>
+                        <p class="text-sm">Drag photos here or <span class="text-primary underline">click to upload</span>.</p>
                     </div>
 
                     <div id="photoGrid" class="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4">
@@ -57,27 +57,31 @@
                              th:id="'file-card-' + ${photo.id}"
                              th:data-id="${photo.id}"
                              th:data-name="${photo.originalFilename}"
+
                              onclick="handleFileClick(event, this.getAttribute('data-id'))"
                              oncontextmenu="showMediaContextMenu(event, this.getAttribute('data-id'))"
-                             class="file-item break-inside-avoid relative group rounded-xl overflow-hidden bg-[#1e1e1e] border border-white/5 cursor-pointer transition-all duration-200 select-none">
+                             th:style="${photo.width != null && photo.height != null} ? 'aspect-ratio: ' + ${photo.width} + '/' + ${photo.height} : ''"
+                             class="file-item skeleton-loader break-inside-avoid relative group rounded-xl overflow-hidden bg-gray-800 animate-pulse border border-white/5 cursor-pointer transition-all duration-200 select-none mb-4">
 
-                            <div class="selection-checkbox absolute top-2 left-2 z-30 hidden">
-                                <input type="checkbox" class="hidden w-5 h-5 rounded border-gray-500 text-primary focus:ring-0 cursor-pointer pointer-events-none">
+                             <div class="selection-checkbox absolute top-2 left-2 z-30 hidden">
+                                <input type="checkbox" class="w-5 h-5 rounded border-gray-500 text-primary focus:ring-0 cursor-pointer pointer-events-none">
                             </div>
 
                             <img th:src="@{'/gallery/thumb/' + ${photo.id}}" 
                                  loading="lazy" 
-                                 class="w-full h-auto object-cover transition-transform duration-500">
+                                 class="w-full h-full object-cover opacity-0 transition-opacity duration-500 ease-in-out"
+                                 onload="this.classList.remove('opacity-0'); this.closest('.file-item').classList.remove('animate-pulse', 'bg-gray-800', 'skeleton-loader'); this.closest('.file-item').classList.add('bg-[#1e1e1e]');"
+                                 onerror="this.closest('.file-item').classList.remove('animate-pulse');">
 
-                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10">
                                 <button onclick="event.stopPropagation(); openLightbox(this.closest('.file-item').getAttribute('data-id'))" 
-                                        class="flex items-center p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-md hover-action">
+                                        class="flex items-center p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-md hover-action transition-transform hover:scale-110">
                                     <span class="material-symbols-outlined">zoom_in</span>
                                 </button>
                             </div>
 
-                            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <p class="text-white text-xs truncate font-medium" th:text="${photo.originalFilename}">Name</p>
+                            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 pt-8 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                <p class="text-white text-xs truncate font-medium font-mono" th:text="${photo.originalFilename}">Name</p>
                             </div>
                         </div>
                     </div>
@@ -181,79 +185,169 @@
                 </div>
             </dialog>
 
+            <dialog id="progressModal" class="p-0 rounded-xl shadow-2xl backdrop:bg-black/80 w-full max-w-lg bg-transparent focus:outline-none">
+                <div class="flex flex-col w-full bg-[#1e1e1e] text-white rounded-xl border border-gray-700 overflow-hidden p-6 gap-4">
+                    <h3 class="font-bold text-xl flex items-center gap-2">
+                        <span class="material-symbols-outlined animate-spin text-primary">sync</span> 
+                        Uploading Media...
+                    </h3>
+                    <div class="bg-[#2e2839] p-4 rounded-lg border border-white/5 space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Target Album:</span>
+                            <span class="font-bold text-primary" th:text="${album.title}">Album</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Current File:</span>
+                            <span class="text-white truncate max-w-[200px]" id="progFile">Initializing...</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-2 border-t border-white/5 pt-2">
+                            <span>Queue Progress</span>
+                            <span id="progCount">0 / 0</span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden relative">
+                        <div id="progBar" class="bg-primary h-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                        <span id="progPercent" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow">0%</span>
+                    </div>
+                </div>
+            </dialog>
         </section>
 
         <script th:inline="javascript">
-            // --- KHAI BÁO BIẾN CHO VIEW NÀY ---
-            // [QUAN TRỌNG] Lấy ID của Album hiện tại thay vì Default Album
-            const currentAlbumId = [[${album.id}]];
-
+            // --- KHAI BÁO BIẾN ---
+            const currentAlbumId = /*[[${album.id}]]*/ 'dummy-id';
             const dropOverlay = document.getElementById('dropOverlay');
             const duplicateDialog = document.getElementById('duplicateDialog');
             const mediaMenu = document.getElementById('mediaContextMenu');
             const detailsPanel = document.getElementById('detailsPanel');
+
             let rightClickedFileId = null;
             let isSelectionMode = false;
-            let dragCounter = 0;
+            let dragCounter = 0; // Biến đếm để xử lý drag enter/leave chính xác
 
-            // --- UPLOAD LOGIC (Đã cập nhật dùng currentAlbumId) ---
+            // --- 1. UPLOAD LOGIC (DRAG & DROP) ---
+            const fileInput = document.getElementById('fileInput');
+
+            // Sự kiện kéo file vào cửa sổ
             window.addEventListener('dragenter', (e) => {
                 e.preventDefault();
                 dragCounter++;
                 dropOverlay.classList.remove('hidden');
                 dropOverlay.style.pointerEvents = 'auto';
             });
+
             window.addEventListener('dragleave', (e) => {
+                e.preventDefault();
                 dragCounter--;
                 if (dragCounter === 0) {
                     dropOverlay.classList.add('hidden');
                     dropOverlay.style.pointerEvents = 'none';
                 }
             });
+
             window.addEventListener('dragover', e => e.preventDefault());
+
+            // Sự kiện thả file
             window.addEventListener('drop', (e) => {
                 e.preventDefault();
                 dragCounter = 0;
                 dropOverlay.classList.add('hidden');
                 dropOverlay.style.pointerEvents = 'none';
-                if (e.dataTransfer.files.length > 0)
+
+                if (e.dataTransfer && e.dataTransfer.files.length > 0) {
                     handleUploadQueue(e.dataTransfer.files);
-            });
-            document.getElementById('fileInput').addEventListener('change', (e) => {
-                if (e.target.files.length > 0)
-                    handleUploadQueue(e.target.files);
+                }
             });
 
-            async function handleUploadQueue(fileList) {
-                const files = Array.from(fileList);
-                for (const file of files) {
-                    await uploadOneFile(file); }
-                window.location.reload();
+            // Sự kiện chọn file từ dialog
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleUploadQueue(e.target.files);
+                }
+            });
+
+            // Hàm cập nhật giao diện Progress Bar
+            function updateProgressUI(fileName, current, total) {
+                document.getElementById('progFile').innerText = fileName;
+                document.getElementById('progCount').innerText = `${current} / ${total}`;
+
+                let percent = 0;
+                if (total > 0) {
+                    percent = Math.round((current / total) * 100);
+                }
+
+                document.getElementById('progBar').style.width = `${percent}%`;
+                document.getElementById('progPercent').innerText = `${percent}%`;
             }
 
+            // Xử lý hàng đợi upload
+            async function handleUploadQueue(fileList) {
+                const files = Array.from(fileList);
+                const total = files.length;
+
+                if (total === 0)
+                    return;
+
+                // 1. Mở Modal Progress
+                const modal = document.getElementById('progressModal');
+                modal.showModal();
+
+                // Reset UI ban đầu
+                updateProgressUI("Starting...", 0, total);
+
+                // 2. Duyệt từng file để upload
+                for (let i = 0; i < total; i++) {
+                    const file = files[i];
+
+                    // Cập nhật tên file đang xử lý
+                    updateProgressUI(file.name, i, total);
+
+                    // Gọi hàm upload (chờ xong mới qua file tiếp theo)
+                    await uploadOneFile(file);
+
+                    // Cập nhật tiến độ sau khi xong file này
+                    updateProgressUI(file.name, i + 1, total);
+                }
+
+                // 3. Hoàn tất & Reload
+                document.getElementById('progFile').innerText = "All done! Reloading...";
+                document.getElementById('progBar').classList.add('bg-green-500'); // Đổi màu xanh thành công
+
+                setTimeout(() => {
+                    modal.close();
+                    window.location.reload();
+                }, 800); // Đợi xíu cho người dùng thấy 100%
+            }
+
+            // Upload 1 file (Có check trùng)
             function uploadOneFile(file, forceKeep = false) {
                 return new Promise((resolve) => {
                     const formData = new FormData();
                     formData.append('file', file);
-                    formData.append('albumId', currentAlbumId); // Dùng Album hiện tại
+                    formData.append('albumId', currentAlbumId);
                     formData.append('forceKeep', forceKeep);
 
+                    // Lấy CSRF Token
                     const csrfMeta = document.querySelector('meta[name="_csrf"]');
                     const csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
                     const headers = {};
-                    if (csrfMeta && csrfHeaderMeta)
+                    if (csrfMeta && csrfHeaderMeta) {
                         headers[csrfHeaderMeta.getAttribute('content')] = csrfMeta.getAttribute('content');
+                    }
 
                     fetch('/gallery/upload-check', {method: 'POST', headers: headers, body: formData})
                             .then(res => res.json())
                             .then(data => {
-                                if (data.status === 'SUCCESS')
+                                if (data.status === 'SUCCESS') {
+                                    console.log("Uploaded: " + file.name);
                                     resolve();
-                                else if (data.status === 'DUPLICATE') {
+                                } else if (data.status === 'DUPLICATE') {
+                                    // Gọi dialog xử lý trùng
                                     showDuplicateDialog(data, file).then(action => {
-                                        if (action === 'KEEP_BOTH')
+                                        if (action === 'KEEP_BOTH') {
                                             uploadOneFile(file, true).then(resolve);
-                                        else {
+                                        } else {
+                                            // Nếu Skip -> Gọi API xóa file tạm
                                             fetch('/gallery/resolve-duplicate', {
                                                 method: 'POST',
                                                 headers: {...headers, 'Content-Type': 'application/x-www-form-urlencoded'},
@@ -261,58 +355,85 @@
                                             }).then(resolve);
                                         }
                                     });
-                                } else
+                                } else {
+                                    console.error("Upload error", data);
                                     resolve();
-                            }).catch(() => resolve());
+                                }
+                            })
+                            .catch(err => {
+                                console.error(err);
+                                resolve();
+                            });
                 });
             }
 
             function showDuplicateDialog(data, newFileBlob) {
                 return new Promise((resolve) => {
+                    // Fill data vào modal
                     document.getElementById('dupNewName').textContent = data.newFileName;
                     document.getElementById('dupExistingName').textContent = data.existing.name;
                     document.getElementById('dupExistingImg').src = '/gallery/thumb/' + data.existing.id;
+
                     duplicateDialog.showModal();
 
+                    // Clone nút để xóa event listener cũ
                     const btnSkip = document.getElementById('btnSkip');
                     const btnKeep = document.getElementById('btnKeepBoth');
-                    btnSkip.replaceWith(btnSkip.cloneNode(true));
-                    btnKeep.replaceWith(btnKeep.cloneNode(true));
+                    const newBtnSkip = btnSkip.cloneNode(true);
+                    const newBtnKeep = btnKeep.cloneNode(true);
+                    btnSkip.parentNode.replaceChild(newBtnSkip, btnSkip);
+                    btnKeep.parentNode.replaceChild(newBtnKeep, btnKeep);
 
-                    document.getElementById('btnSkip').addEventListener('click', () => {
+                    newBtnSkip.addEventListener('click', () => {
                         duplicateDialog.close();
                         resolve('SKIP');
                     });
-                    document.getElementById('btnKeepBoth').addEventListener('click', () => {
+
+                    newBtnKeep.addEventListener('click', () => {
                         duplicateDialog.close();
                         resolve('KEEP_BOTH');
                     });
                 });
             }
 
-            // --- CONTEXT MENU & INTERACTION ---
+            // --- 2. INTERACTION (Click, Context Menu) ---
+
+            // Mở Context Menu
             function showMediaContextMenu(e, id) {
                 e.preventDefault();
                 if (isSelectionMode)
-                    return;
+                    return; // Nếu đang chọn nhiều thì không hiện menu
+
                 rightClickedFileId = id;
-                let x = e.clientX, y = e.clientY;
+
+                let x = e.clientX;
+                let y = e.clientY;
+                // Điều chỉnh vị trí nếu sát lề phải
                 if (window.innerWidth - x < 240)
                     x -= 240;
+
                 mediaMenu.style.left = `${x}px`;
                 mediaMenu.style.top = `${y}px`;
                 mediaMenu.classList.remove('hidden');
             }
 
+            // Đóng menu khi click ra ngoài
             document.addEventListener('click', (e) => {
-                if (mediaMenu && !mediaMenu.contains(e.target))
+                if (mediaMenu && !mediaMenu.contains(e.target)) {
                     mediaMenu.classList.add('hidden');
-                if (detailsPanel && !detailsPanel.contains(e.target) && !detailsPanel.classList.contains('translate-x-full'))
-                    closeDetails();
+                }
+                // Đóng details panel nếu click ra ngoài
+                if (detailsPanel && !detailsPanel.contains(e.target) && !detailsPanel.classList.contains('translate-x-full')) {
+                    // Kiểm tra xem có phải click vào nút info trong menu không (để tránh conflict)
+                    const isMenuClick = e.target.closest('#mediaContextMenu');
+                    if (!isMenuClick)
+                        closeDetails();
+                }
             });
+
             document.addEventListener('scroll', () => mediaMenu.classList.add('hidden'));
 
-            // --- SELECTION LOGIC ---
+            // --- 3. SELECTION LOGIC (Chọn nhiều) ---
             function toggleSelectionMode() {
                 isSelectionMode = !isSelectionMode;
                 mediaMenu.classList.add('hidden');
@@ -323,7 +444,9 @@
                 if (isSelectionMode) {
                     toolbar.classList.remove('hidden');
                     checkboxes.forEach(el => el.classList.remove('hidden'));
-                    zoomBtns.forEach(el => el.classList.add('hidden'));
+                    zoomBtns.forEach(el => el.classList.add('hidden')); // Ẩn nút zoom
+
+                    // Auto select item vừa click chuột phải
                     if (rightClickedFileId)
                         selectFile(rightClickedFileId, true);
                 } else {
@@ -333,7 +456,8 @@
 
             function handleFileClick(e, id) {
                 if (!isSelectionMode)
-                    return;
+                    return; // Nếu không phải mode chọn -> Ko làm gì (hoặc mở lightbox)
+
                 const card = document.getElementById('file-card-' + id);
                 const checkbox = card.querySelector('input[type="checkbox"]');
                 selectFile(id, !checkbox.checked);
@@ -343,12 +467,15 @@
                 const card = document.getElementById('file-card-' + id);
                 if (!card)
                     return;
+
                 const checkbox = card.querySelector('input[type="checkbox"]');
                 checkbox.checked = isSelected;
+
                 if (isSelected)
                     card.classList.add('ring-4', 'ring-primary');
                 else
                     card.classList.remove('ring-4', 'ring-primary');
+
                 updateSelectionCount();
             }
 
@@ -364,10 +491,12 @@
                 isSelectionMode = false;
                 rightClickedFileId = null;
                 document.getElementById('selectionToolbar').classList.add('hidden');
+
                 document.querySelectorAll('.selection-checkbox').forEach(el => {
                     el.classList.add('hidden');
                     el.querySelector('input').checked = false;
                 });
+
                 document.querySelectorAll('.file-item').forEach(el => el.classList.remove('ring-4', 'ring-primary'));
                 document.querySelectorAll('.hover-action').forEach(el => el.classList.remove('hidden'));
                 document.getElementById('selectedCount').innerText = '0';
@@ -380,14 +509,36 @@
                     if (item)
                         ids.push(item.getAttribute('data-id'));
                 });
+                // Nếu không có checkbox nào được chọn nhưng có chuột phải -> lấy item đó
                 if (ids.length === 0 && rightClickedFileId)
                     ids.push(rightClickedFileId);
                 return ids;
             }
 
-            // --- OPERATIONS (Delete, Rename, Download, Details) ---
+            // --- 4. ACTIONS (Delete, Rename, Download, Details) ---
+
+            // [FIX] Hàm Download mà bạn bị thiếu
+            function downloadSingleMedia() {
+                mediaMenu.classList.add('hidden');
+                if (!rightClickedFileId)
+                    return;
+
+                // Tạo thẻ a ảo để trigger download
+                const link = document.createElement('a');
+                link.href = `/gallery/download/${rightClickedFileId}`;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
             function confirmDeleteMedia() {
                 mediaMenu.classList.add('hidden');
+                const ids = getSelectedIds();
+                if (ids.length === 0)
+                    return;
+
+                document.getElementById('delMediaCount').innerText = ids.length + " item(s)";
                 document.getElementById('deleteMediaModal').showModal();
             }
 
@@ -395,6 +546,7 @@
                 const physical = document.getElementById('checkDelMediaPhysical').checked;
                 const btn = document.getElementById('btnExecDel');
                 btn.innerText = "Deleting...";
+
                 const ids = getSelectedIds();
                 const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
                 const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
@@ -418,12 +570,14 @@
                 mediaMenu.classList.add('hidden');
                 if (!rightClickedFileId)
                     return;
+
                 const card = document.getElementById('file-card-' + rightClickedFileId);
                 const currentName = card.getAttribute('data-name');
                 document.getElementById('inputNewFileName').value = currentName || "";
                 document.getElementById('renameMediaModal').showModal();
             }
 
+            // [FIX] Thêm async để dùng await
             async function executeRenameMedia() {
                 const newName = document.getElementById('inputNewFileName').value;
                 const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
@@ -436,6 +590,7 @@
                     const res = await fetch('/gallery/media/rename', {method: 'POST', headers: {[csrfHeader]: csrfToken}, body: formData});
                     if (res.ok) {
                         const finalName = await res.text();
+                        // Update UI ngay lập tức
                         const card = document.getElementById('file-card-' + rightClickedFileId);
                         if (card) {
                             card.setAttribute('data-name', finalName);
@@ -444,23 +599,12 @@
                                 textEl.innerText = finalName;
                         }
                         document.getElementById('renameMediaModal').close();
-                    } else
+                    } else {
                         alert("Failed: " + await res.text());
+                    }
                 } catch (e) {
-                    alert("Error");
+                    alert("Error: " + e);
                 }
-            }
-
-            function downloadSingleMedia() {
-                mediaMenu.classList.add('hidden');
-                if (!rightClickedFileId)
-                    return;
-                const link = document.createElement('a');
-                link.href = `/gallery/download/${rightClickedFileId}`;
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
             }
 
             function viewMediaDetails(e) {
@@ -468,27 +612,31 @@
                     e.stopPropagation();
                 mediaMenu.classList.add('hidden');
                 detailsPanel.classList.remove('translate-x-full');
+
                 document.getElementById('detailName').innerText = "Loading...";
                 document.getElementById('metaContainer').innerHTML = 'Loading...';
                 document.getElementById('detailPreview').src = `/gallery/thumb/${rightClickedFileId}`;
 
-                fetch(`/gallery/api/details/${rightClickedFileId}`).then(res => res.json()).then(data => {
-                    document.getElementById('detailName').innerText = data.name;
-                    document.getElementById('detailSize').innerText = data.size;
-                    const meta = document.getElementById('metaContainer');
-                    meta.innerHTML = '';
-                    const addMeta = (label, val) => {
-                        if (val)
-                            meta.innerHTML += `<div class="flex justify-between py-2 border-b border-white/5"><span class="text-[#a79cba]">${label}</span><span class="text-white truncate pl-4">${val}</span></div>`;
-                    };
-                    addMeta("Camera", data.camera);
-                    addMeta("Lens", data.lens);
-                    addMeta("ISO", data.iso);
-                    addMeta("Aperture", data.aperture ? `f/${data.aperture}` : '');
-                    addMeta("Shutter", data.shutter ? `${data.shutter}s` : '');
-                    addMeta("Date", data.takenAt);
-                    addMeta("Resolution", data.width ? `${data.width} x ${data.height}` : '');
-                });
+                fetch(`/gallery/api/details/${rightClickedFileId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            document.getElementById('detailName').innerText = data.name;
+                            document.getElementById('detailSize').innerText = data.size;
+
+                            const meta = document.getElementById('metaContainer');
+                            meta.innerHTML = '';
+                            const addMeta = (label, val) => {
+                                if (val)
+                                    meta.innerHTML += `<div class="flex justify-between py-2 border-b border-white/5"><span class="text-[#a79cba]">${label}</span><span class="text-white truncate pl-4">${val}</span></div>`;
+                            };
+                            addMeta("Camera", data.camera);
+                            addMeta("Lens", data.lens);
+                            addMeta("ISO", data.iso);
+                            addMeta("Aperture", data.aperture ? `f/${data.aperture}` : '');
+                            addMeta("Shutter", data.shutter ? `${data.shutter}s` : '');
+                            addMeta("Date", data.takenAt);
+                            addMeta("Resolution", data.width ? `${data.width} x ${data.height}` : '');
+                        });
             }
 
             function closeDetails() {

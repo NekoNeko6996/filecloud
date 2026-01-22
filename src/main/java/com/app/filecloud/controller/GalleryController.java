@@ -93,7 +93,7 @@ public class GalleryController {
 
         album.setUserId(currentUserId);
         galleryService.createAlbum(album);
-        return "redirect:/gallery";
+        return "redirect:/gallery/albums";
     }
 
     // 4. Upload API (Delegate to Service)

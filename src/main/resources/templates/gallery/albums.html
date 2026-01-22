@@ -30,20 +30,47 @@
                         <div th:each="album : ${albums}" class="group relative flex flex-col gap-2">
 
                             <a th:href="@{/gallery/{id}(id=${album.id})}" 
-                               class="aspect-[4/3] w-full bg-[#1e1e1e] border border-white/10 rounded-2xl overflow-hidden relative block hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/10">
+                               class="aspect-[4/3] w-full bg-[#1e1e1e] border border-white/10 rounded-2xl overflow-hidden relative block hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/10 group">
 
-                                <img th:if="${album.coverPhoto}" 
-                                     th:src="@{'/gallery/thumb/' + ${album.coverPhoto.id}}" 
-                                     class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
-
-                                <div th:unless="${album.coverPhoto}" class="w-full h-full flex flex-col items-center justify-center text-white/10 bg-[#171022]">
+                                <div th:if="${#lists.isEmpty(album.previewPhotos)}" 
+                                     class="w-full h-full flex flex-col items-center justify-center text-white/10 bg-[#171022]">
                                     <span class="material-symbols-outlined text-5xl mb-2">photo_album</span>
                                     <span class="text-xs font-bold uppercase">Empty</span>
                                 </div>
 
-                                <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
+                                <div th:if="${#lists.size(album.previewPhotos) == 1}" class="w-full h-full relative">
+                                    <img th:src="@{'/gallery/thumb/' + ${album.previewPhotos[0].id}}" 
+                                         class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+                                </div>
 
-                                <div class="absolute top-3 left-3 px-2 py-1 bg-black/40 backdrop-blur-md rounded-md border border-white/5 text-[10px] font-bold text-white flex items-center gap-1">
+                                <div th:if="${#lists.size(album.previewPhotos) == 2}" class="w-full h-full grid grid-cols-2">
+                                    <div class="relative overflow-hidden border-r border-white/10">
+                                        <img th:src="@{'/gallery/thumb/' + ${album.previewPhotos[0].id}}" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+                                    </div>
+                                    <div class="relative overflow-hidden">
+                                        <img th:src="@{'/gallery/thumb/' + ${album.previewPhotos[1].id}}" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+                                    </div>
+                                </div>
+
+                                <div th:if="${#lists.size(album.previewPhotos) >= 3}" class="w-full h-full grid grid-cols-3">
+                                    <div class="col-span-2 relative overflow-hidden border-r border-white/10">
+                                        <img th:src="@{'/gallery/thumb/' + ${album.previewPhotos[0].id}}" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+                                    </div>
+
+                                    <div class="col-span-1 flex flex-col h-full">
+                                        <div class="relative flex-1 overflow-hidden border-b border-white/10">
+                                            <img th:src="@{'/gallery/thumb/' + ${album.previewPhotos[1].id}}" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+                                        </div>
+                                        <div class="relative flex-1 overflow-hidden">
+                                            <img th:src="@{'/gallery/thumb/' + ${album.previewPhotos[2].id}}" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 pointer-events-none"></div>
+
+                                <div class="absolute top-3 left-3 px-2 py-1 bg-black/40 backdrop-blur-md rounded-md border border-white/10 text-[10px] font-bold text-white flex items-center gap-1 z-10 shadow-sm">
                                     <span class="material-symbols-outlined text-[12px]" th:text="${album.privacyMode == 'PRIVATE' ? 'lock' : 'public'}">lock</span>
                                     <span th:text="${album.privacyMode}">PRIVATE</span>
                                 </div>
@@ -60,7 +87,7 @@
                                 <button th:data-id="${album.id}" 
                                         th:data-title="${album.title}"
                                         onclick="openAlbumMenu(event, this.getAttribute('data-id'), this.getAttribute('data-title'))" 
-                                        class="text-gray-500 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors">
+                                        class="text-gray-500 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors flex items-center">
                                     <span class="material-symbols-outlined text-[20px]">more_vert</span>
                                 </button>
                             </div>

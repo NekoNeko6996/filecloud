@@ -38,7 +38,7 @@ public class GalleryService {
 
     private static final String KEY_GALLERY_PATH = "GALLERY_STORAGE_PATH";
     private static final String KEY_DEFAULT_ALBUM_NAME = "GALLERY_DEFAULT_ALBUM_NAME";
-    private static final String DEFAULT_ALBUM_NAME_VALUE = "Drop Zone";
+    private static final String DEFAULT_ALBUM_NAME_VALUE = "Gallery";
 
     // --- 1. LOGIC ALBUM & DASHBOARD ---
     /**
@@ -80,7 +80,17 @@ public class GalleryService {
     }
 
     public List<GalleryAlbum> getUserAlbums(String userId) {
-        return albumRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        List<GalleryAlbum> albums = albumRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        
+        // Duyệt qua từng album để lấy 3 ảnh preview
+        // (Lưu ý: Cách này sẽ tạo N+1 query, nhưng với số lượng album cá nhân thì chấp nhận được.
+        // Nếu muốn tối ưu hơn có thể dùng @Query fetch join hoặc batch fetching)
+        for (GalleryAlbum album : albums) {
+            List<GalleryPhoto> previews = photoRepository.findTop3ByAlbumIdOrderByCreatedAtDesc(album.getId());
+            album.setPreviewPhotos(previews);
+        }
+        
+        return albums;
     }
 
     public List<GalleryPhoto> getAlbumPhotos(String albumId) {
