@@ -1,5 +1,6 @@
 package com.app.filecloud.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.domain.Persistable;
@@ -37,6 +38,12 @@ public class GalleryAlbum implements Persistable<String> {
     @Builder.Default
     private PrivacyMode privacyMode = PrivacyMode.PRIVATE;
 
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "artist_id", insertable = false, updatable = false)
+    @ToString.Exclude
+    private ContentSubject artist;
+    
     // Ảnh bìa - Quan hệ OneToOne (hoặc ManyToOne) tới GalleryPhoto
     // Dùng FetchType.LAZY để tránh load thừa dữ liệu
     @OneToOne(fetch = FetchType.LAZY)
@@ -45,10 +52,15 @@ public class GalleryAlbum implements Persistable<String> {
     private GalleryPhoto coverPhoto;
 
     @Column(name = "created_at")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;
+    
+    @Transient
+    private List<GalleryPhoto> previewPhotos = new ArrayList<>();
 
     @Transient
     @Builder.Default

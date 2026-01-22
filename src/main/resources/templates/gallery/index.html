@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Gallery', 'gallery', ~{::section}, ~{::script})}">
+    <head>
+        <meta name="_csrf" th:content="${_csrf.token}"/>
+        <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+        <title th:text="${title}">MediaVault</title>
+    </head>
+    <body>
+
+        <section class="flex flex-col h-full w-full relative">
+
+            <div class="px-6 py-4 flex justify-between items-center shrink-0 z-20 glass-header sticky top-0">
+                <div>
+                    <h1 class="text-2xl font-bold font-space text-white">Gallery</h1>
+                    <p class="text-[#a79cba] text-sm">
+                        <span th:text="${#lists.size(photos)}">0</span> photos in 
+                        <span class="text-primary font-bold" th:text="${defaultAlbum.title}">Drop Zone</span>
+                    </p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="document.getElementById('fileInput').click()" 
+                            class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all">
+                        <span class="material-symbols-outlined text-[20px]">cloud_upload</span>
+                        <span>Upload</span>
+                    </button>
+                    <button onclick="document.getElementById('newAlbumModal').showModal()"
+                            class="bg-primary hover:bg-primary/80 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(131,60,246,0.3)]">
+                        <span class="material-symbols-outlined text-[20px]">create_new_folder</span>
+                        <span>New Album</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto scrollbar-hide p-6">
+                <div th:if="${not #lists.isEmpty(albums)}" class="space-y-2">
+                    <h3 class="text-white font-bold text-lg px-1">Albums</h3>
+                    <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+                        <a th:each="album : ${albums}" 
+                           th:href="@{/gallery/{id}(id=${album.id})}"
+                           class="min-w-[200px] w-[200px] group bg-[#1e1e1e] border border-white/10 hover:border-primary/50 rounded-xl overflow-hidden transition-all hover:-translate-y-1 relative">
+                            <div class="aspect-[3/2] bg-black/40 relative">
+                                <img th:if="${album.coverPhoto}" th:src="@{'/gallery/thumb/' + ${album.coverPhoto.id}}" class="w-full h-full object-cover">
+                                <div th:unless="${album.coverPhoto}" class="w-full h-full flex items-center justify-center text-white/10">
+                                    <span class="material-symbols-outlined text-4xl">image</span>
+                                </div>
+                            </div>
+                            <div class="p-3">
+                                <p class="text-white font-medium truncate" th:text="${album.title}">Title</p>
+                                <p class="text-xs text-[#a79cba]" th:text="${album.artist != null ? album.artist.mainName : 'Unknown'}">Artist</p>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-white font-bold text-lg px-1 mb-4">Recent Photos</h3>
+                    <div id="photoGrid" class="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4">
+                        <div th:each="photo : ${photos}" 
+                             th:id="'file-card-' + ${photo.id}"
+                             th:data-id="${photo.id}"
+                             th:data-name="${photo.originalFilename}"
+                             onclick="handleFileClick(event, this.getAttribute('data-id'))"
+                             oncontextmenu="showMediaContextMenu(event, this.getAttribute('data-id'))"
+                             class="file-item break-inside-avoid relative group rounded-xl overflow-hidden bg-[#1e1e1e] border border-white/5 cursor-pointer transition-all duration-200 select-none">
+
+                            <div class="selection-checkbox absolute top-2 left-2 z-30 hidden">
+                                <input type="checkbox" class="hidden w-5 h-5 rounded border-gray-500 text-primary focus:ring-0 cursor-pointer pointer-events-none">
+                            </div>
+
+                            <img th:src="@{'/gallery/thumb/' + ${photo.id}}" 
+                                 loading="lazy" 
+                                 class="w-full h-auto object-cover transition-transform duration-500">
+
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <button onclick="event.stopPropagation(); openLightbox(this.closest('.file-item').getAttribute('data-id'))" 
+                                        class="flex items-center p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-md hover-action">
+                                    <span class="material-symbols-outlined">zoom_in</span>
+                                </button>
+                            </div>
+
+                            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-6">
+                                <p class="text-white text-xs truncate font-medium" th:text="${photo.originalFilename}">Name</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dropOverlay" class="fixed inset-0 z-50 bg-primary/10 backdrop-blur-sm border-4 border-dashed border-primary/50 hidden flex flex-col items-center justify-center pointer-events-none">
+                <span class="material-symbols-outlined text-6xl text-primary mb-4 animate-bounce">cloud_upload</span>
+                <h2 class="text-3xl font-bold text-white">Drop files to upload</h2>
+                <p class="text-[#a79cba] mt-2">Photos will be added to "Drop Zone"</p>
+            </div>
+            <input type="file" id="fileInput" multiple class="hidden" accept="image/*">
+
+            <dialog id="duplicateDialog" class="bg-[#1e1e1e] border border-white/10 rounded-2xl p-0 backdrop:backdrop-blur-sm backdrop:bg-black/80 text-white w-full max-w-2xl shadow-2xl">
+                <div class="p-6">
+                    <h3 class="text-xl font-bold text-yellow-500 flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined">warning</span> Duplicate Content Detected
+                    </h3>
+                    <p class="text-[#a79cba] text-sm mb-6">This photo already exists in your library. What would you like to do?</p>
+
+                    <div class="grid grid-cols-2 gap-6 mb-8">
+                        <div class="bg-black/40 rounded-xl p-4 border border-white/5 flex flex-col items-center text-center">
+                            <span class="text-xs font-bold text-gray-400 uppercase mb-2">Existing in Library</span>
+                            <div class="aspect-square w-full bg-black/50 rounded-lg mb-2 overflow-hidden relative">
+                                <img id="dupExistingImg" src="" class="w-full h-full object-contain">
+                            </div>
+                            <p id="dupExistingName" class="text-sm font-mono text-white truncate w-full">name.jpg</p>
+                            <p id="dupExistingAlbum" class="text-xs text-primary mt-1">In album: Default</p>
+                        </div>
+
+                        <div class="bg-primary/5 rounded-xl p-4 border border-primary/20 flex flex-col items-center text-center relative">
+                            <span class="text-xs font-bold text-primary uppercase mb-2">New Upload</span>
+                            <div class="aspect-square w-full bg-black/50 rounded-lg mb-2 overflow-hidden">
+                                <span class="material-symbols-outlined text-5xl text-white/20 mt-8">image</span> 
+                            </div>
+                            <p id="dupNewName" class="text-sm font-mono text-white truncate w-full">new.jpg</p>
+                            <div class="absolute top-2 right-2">
+                                <span class="bg-primary text-white text-[10px] px-2 py-0.5 rounded-full">New</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 border-t border-white/10 pt-4">
+                        <button id="btnSkip" class="px-5 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-gray-300 transition-colors text-sm font-bold">
+                            Skip New
+                        </button>
+                        <button id="btnKeepBoth" class="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-dark text-white transition-colors text-sm font-bold flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">file_copy</span>
+                            Keep Both (Rename)
+                        </button>
+                    </div>
+                </div>
+            </dialog>
+
+            <dialog id="newAlbumModal">...</dialog>
+
+            <div id="mediaContextMenu"
+                 class="hidden fixed z-50 w-56 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-2xl overflow-hidden p-1.5 backdrop-blur-md">
+                <button onclick="viewMediaDetails(event)"
+                        class="w-full text-left px-3 py-2 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-3 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">info</span> Properties
+                </button>
+                <button onclick="toggleSelectionMode()"
+                        class="w-full text-left px-3 py-2 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-3 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">checklist</span> Select Multiple
+                </button>
+                <button onclick="downloadSingleMedia()"
+                        class="w-full text-left px-3 py-2 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-3 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">download</span> Download
+                </button>
+                <button onclick="openRenameModal()"
+                        class="w-full text-left px-3 py-2 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-3 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">edit</span> Rename
+                </button>
+                <div class="h-px bg-white/10 my-1 mx-2"></div>
+                <button onclick="confirmDeleteMedia()"
+                        class="w-full text-left px-3 py-2 text-sm text-red-400 rounded hover:bg-red-500/10 hover:text-red-300 flex items-center gap-3 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">delete</span> Delete
+                </button>
+            </div>
+
+            <div id="selectionToolbar"
+                 class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#1e1e1e]/90 backdrop-blur border border-white/10 rounded-full shadow-2xl px-6 py-3 flex items-center gap-6 animate-bounce-up">
+                <span class="text-white font-bold text-sm">
+                    <span id="selectedCount" class="text-primary text-lg">0</span> Selected
+                </span>
+                <div class="h-5 w-px bg-white/20"></div>
+                <button class="text-gray-300 hover:text-white flex items-center gap-2 text-sm font-bold disabled:opacity-50" title="Download Zip (Coming soon)" disabled>
+                    <span class="material-symbols-outlined text-[20px]">download</span> Download
+                </button>
+                <button onclick="confirmDeleteMedia()"
+                        class="text-red-400 hover:text-red-300 flex items-center gap-2 text-sm font-bold disabled:opacity-50"
+                        id="btnBatchDelete">
+                    <span class="material-symbols-outlined text-[20px]">delete</span> Delete
+                </button>
+                <div class="h-5 w-px bg-white/20"></div>
+                <button onclick="exitSelectionMode()"
+                        class="text-gray-400 hover:text-white flex items-center gap-2 text-sm font-medium">
+                    <span class="material-symbols-outlined text-[20px]">close</span> Cancel
+                </button>
+            </div>
+
+            <aside id="detailsPanel"
+                   class="glass-panel fixed right-0 top-0 h-screen w-80 flex flex-col border-l border-white/10 overflow-y-auto z-50 bg-[#171022]/95 shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
+                <div class="p-6 flex flex-col gap-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-white font-bold text-lg font-space">Properties</h3>
+                        <button onclick="closeDetails()" class="text-[#a79cba] hover:text-white transition-colors">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+
+                    <div class="aspect-square w-full rounded-xl bg-black/50 border border-white/10 relative overflow-hidden flex items-center justify-center group">
+                        <img id="detailPreview" src="" class="w-full h-full object-contain">
+                    </div>
+
+                    <div>
+                        <h2 id="detailName" class="text-white font-bold text-lg leading-tight break-words">Filename.jpg</h2>
+                        <p id="detailSize" class="text-primary text-sm font-mono mt-1">0 MB</p>
+                    </div>
+
+                    <div class="h-px bg-white/10 w-full"></div>
+
+                    <div class="flex flex-col gap-4">
+                        <h4 class="text-[#a79cba] text-xs font-bold uppercase tracking-widest">EXIF Data</h4>
+                        <div class="flex flex-col gap-3 text-sm" id="metaContainer">
+                            <p class="text-gray-500 italic">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <dialog id="deleteMediaModal" class="bg-[#1e1e1e] text-white p-6 rounded-2xl border border-white/10 shadow-2xl backdrop:bg-black/80 w-full max-w-sm">
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-center gap-3 text-red-500">
+                        <div class="p-2 bg-red-500/10 rounded-full"><span class="material-symbols-outlined text-3xl">delete</span></div>
+                        <h3 class="text-lg font-bold text-white">Delete Photos?</h3>
+                    </div>
+
+                    <p class="text-gray-300 text-sm">
+                        You are about to delete <strong id="delMediaCount" class="text-white">1 item</strong>.
+                    </p>
+
+                    <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-white/10 bg-black/20 hover:border-red-500/50 transition-all select-none">
+                        <input type="checkbox" id="checkDelMediaPhysical" checked
+                               class="mt-1 rounded bg-gray-700 border-gray-600 text-red-600 focus:ring-red-600">
+                        <div>
+                            <span class="font-bold text-white block text-sm">Delete from Disk</span>
+                            <span class="text-xs text-gray-500 block mt-0.5">
+                                Permanently remove files from storage. <span class="text-red-400">Cannot undo.</span>
+                            </span>
+                        </div>
+                    </label>
+
+                    <div class="flex justify-end gap-3 mt-4">
+                        <button onclick="document.getElementById('deleteMediaModal').close()"
+                                class="px-4 py-2 text-sm text-gray-400 hover:text-white font-medium">Cancel</button>
+                        <button onclick="executeDeleteMedia()" id="btnExecDel"
+                                class="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-lg shadow-red-900/20">Confirm Delete</button>
+                    </div>
+                </div>
+            </dialog>
+
+            <dialog id="renameMediaModal" class="bg-[#1e1e1e] text-white p-6 rounded-2xl border border-white/10 shadow-2xl backdrop:bg-black/80 w-full max-w-sm">
+                <div class="flex flex-col gap-4">
+                    <h3 class="font-bold text-lg">Rename Photo</h3>
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold">New Name</label>
+                        <input type="text" id="inputNewFileName"
+                               class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary">
+                    </div>
+                    <div class="flex justify-end gap-3 mt-2">
+                        <button onclick="document.getElementById('renameMediaModal').close()" class="text-gray-400 hover:text-white text-sm">Cancel</button>
+                        <button onclick="executeRenameMedia()" 
+                                class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold">
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </dialog>
+        </section>
+
+        <script th:inline="javascript">
+            const dropOverlay = document.getElementById('dropOverlay');
+            const duplicateDialog = document.getElementById('duplicateDialog');
+                    const defaultAlbumId = [[${defaultAlbum.id}
+                    ]];
+            let dragCounter = 0;
+
+            // --- DRAG & DROP LOGIC ---
+            window.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                dragCounter++;
+                dropOverlay.classList.remove('hidden');
+                dropOverlay.style.pointerEvents = 'auto'; // Catch events
+            });
+
+            window.addEventListener('dragleave', (e) => {
+                dragCounter--;
+                if (dragCounter === 0) {
+                    dropOverlay.classList.add('hidden');
+                    dropOverlay.style.pointerEvents = 'none';
+                }
+            });
+
+            window.addEventListener('dragover', e => e.preventDefault());
+
+            window.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dragCounter = 0;
+                dropOverlay.classList.add('hidden');
+                dropOverlay.style.pointerEvents = 'none';
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0)
+                    handleUploadQueue(files);
+            });
+
+            document.getElementById('fileInput').addEventListener('change', (e) => {
+                if (e.target.files.length > 0)
+                    handleUploadQueue(e.target.files);
+            });
+
+            // --- UPLOAD QUEUE & DUPLICATE HANDLING ---
+            async function handleUploadQueue(fileList) {
+                // Chuyển thành Array để dễ xử lý tuần tự
+                const files = Array.from(fileList);
+
+                for (const file of files) {
+                    await uploadOneFile(file);
+                }
+
+                // Reload sau khi xong tất cả (hoặc có thể append JS động vào Grid để mượt hơn)
+//                window.location.reload();
+            }
+
+            function uploadOneFile(file, forceKeep = false) {
+                return new Promise((resolve, reject) => {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('albumId', defaultAlbumId);
+                    formData.append('forceKeep', forceKeep);
+
+                    // [NEW] 1. Lấy CSRF Token từ thẻ Meta
+                    const csrfMeta = document.querySelector('meta[name="_csrf"]');
+                    const csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+
+                    // Fallback nếu không tìm thấy thẻ meta (đề phòng lỗi null pointer)
+                    const headers = {};
+                    if (csrfMeta && csrfHeaderMeta) {
+                        headers[csrfHeaderMeta.getAttribute('content')] = csrfMeta.getAttribute('content');
+                    }
+
+                    fetch('/gallery/upload-check', {
+                        method: 'POST',
+                        headers: headers, // [NEW] 2. Gửi kèm Header
+                        body: formData
+                    })
+                            .then(res => {
+                                if (res.status === 403) {
+                                    alert("Lỗi bảo mật (CSRF). Vui lòng tải lại trang (F5) và thử lại.");
+                                    resolve(); // Thoát để không treo hàng đợi
+                                    return null;
+                                }
+                                return res.json();
+                            })
+                            .then(data => {
+                                if (!data)
+                                    return; // Đã xử lý lỗi trên
+
+                                if (data.status === 'SUCCESS') {
+                                    console.log('Uploaded:', file.name);
+                                    resolve();
+                                } else if (data.status === 'DUPLICATE') {
+                                    showDuplicateDialog(data, file)
+                                            .then(userAction => {
+                                                if (userAction === 'KEEP_BOTH') {
+                                                    uploadOneFile(file, true).then(resolve);
+                                                } else {
+                                                    // Gửi CSRF cho cả request xóa file tạm
+                                                    fetch('/gallery/resolve-duplicate', {
+                                                        method: 'POST',
+                                                        headers: {...headers, 'Content-Type': 'application/x-www-form-urlencoded'},
+                                                        body: new URLSearchParams({tempPath: data.tempPath, action: 'SKIP'})
+                                                    }).then(resolve);
+                                                }
+                                            });
+                                } else {
+                                    console.error(data);
+                                    resolve();
+                                }
+                            })
+                            .catch(err => {
+                                console.error(err);
+                                resolve();
+                            });
+                });
+            }
+
+            // --- DIALOG LOGIC ---
+            function showDuplicateDialog(data, newFileBlob) {
+                return new Promise((resolve) => {
+                    // 1. Fill Data
+                    document.getElementById('dupNewName').textContent = data.newFileName;
+                    document.getElementById('dupExistingName').textContent = data.existing.name;
+                    document.getElementById('dupExistingAlbum').textContent = 'In album: ' + data.existing.albumName;
+
+                    // Existing Thumb
+                    document.getElementById('dupExistingImg').src = '/gallery/thumb/' + data.existing.id;
+
+                    // 2. Show Dialog
+                    duplicateDialog.showModal();
+
+                    // 3. Setup Buttons
+                    const btnSkip = document.getElementById('btnSkip');
+                    const btnKeep = document.getElementById('btnKeepBoth');
+
+                    // Xóa event listener cũ (trick cloneNode)
+                    btnSkip.replaceWith(btnSkip.cloneNode(true));
+                    btnKeep.replaceWith(btnKeep.cloneNode(true));
+
+                    document.getElementById('btnSkip').addEventListener('click', () => {
+                        duplicateDialog.close();
+                        resolve('SKIP');
+                    });
+
+                    document.getElementById('btnKeepBoth').addEventListener('click', () => {
+                        duplicateDialog.close();
+                        resolve('KEEP_BOTH');
+                    });
+                });
+            }
+        </script>
+        <script th:inline="javascript">
+            // --- VARIABLES ---
+            const mediaMenu = document.getElementById('mediaContextMenu');
+            const detailsPanel = document.getElementById('detailsPanel');
+            let rightClickedFileId = null;
+            let isSelectionMode = false;
+
+            // --- CONTEXT MENU LOGIC ---
+            // Gán sự kiện context menu cho tất cả ảnh (chạy sau khi load trang hoặc update list)
+            function attachContextMenuEvents() {
+                document.querySelectorAll('.group').forEach(card => { // .group là class của thẻ bao quanh ảnh
+                    // Gán ID vào thẻ cha để dễ tìm (nếu chưa có) - Backend nên render sẵn id="photo-{id}"
+                    const id = card.getAttribute('onclick').match(/openLightbox\(\[\['id':'(.*?)'/)[1]; // Parse ID từ hàm openLightbox cũ
+                    // Cách tốt hơn: Backend render: data-id="${photo.id}"
+
+                    // Tạm thời giả định bạn đã update HTML loop để có data-id
+                    // card.addEventListener('contextmenu', (e) => showMediaContextMenu(e, id));
+                });
+            }
+
+            // Hàm gọi từ HTML: oncontextmenu="showMediaContextMenu(event, '${photo.id}')"
+            // Bạn cần update vòng lặp th:each trong HTML để thêm oncontextmenu
+            function showMediaContextMenu(e, id) {
+                e.preventDefault();
+                if (isSelectionMode)
+                    return; // Đang chọn nhiều thì không hiện menu
+
+                rightClickedFileId = id;
+
+                // Tính vị trí
+                let x = e.clientX;
+                let y = e.clientY;
+                if (window.innerWidth - x < 240)
+                    x -= 240;
+
+                mediaMenu.style.left = `${x}px`;
+                mediaMenu.style.top = `${y}px`;
+                mediaMenu.classList.remove('hidden');
+            }
+
+            // Đóng menu khi click ra ngoài
+            // Sự kiện Click toàn trang để đóng các popup/panel
+            document.addEventListener('click', function (e) {
+                // 1. Xử lý đóng Context Menu
+                const mediaMenu = document.getElementById('mediaContextMenu');
+                if (mediaMenu && !mediaMenu.contains(e.target)) {
+                    mediaMenu.classList.add('hidden');
+                }
+
+                // 2. Xử lý đóng Aside Panel (Chi tiết ảnh)
+                const panel = document.getElementById('detailsPanel');
+                // Chỉ đóng nếu:
+                // - Panel tồn tại
+                // - Click KHÔNG nằm trong Panel
+                // - Panel ĐANG MỞ (không có class translate-x-full)
+                if (panel && !panel.contains(e.target) && !panel.classList.contains('translate-x-full')) {
+                    closeDetails();
+                }
+            });
+
+            // Sự kiện scroll cũng nên đóng menu chuột phải
+            document.addEventListener('scroll', () => {
+                document.getElementById('mediaContextMenu').classList.add('hidden');
+            });
+
+            // --- SELECTION LOGIC ---
+            function toggleSelectionMode() {
+                isSelectionMode = !isSelectionMode;
+                mediaMenu.classList.add('hidden');
+
+                const toolbar = document.getElementById('selectionToolbar');
+                const checkboxes = document.querySelectorAll('.selection-checkbox');
+                const zoomBtns = document.querySelectorAll('.hover-action'); // Nút zoom
+
+                if (isSelectionMode) {
+                    toolbar.classList.remove('hidden');
+                    // Hiện checkbox
+                    checkboxes.forEach(el => el.classList.remove('hidden'));
+                    // Ẩn nút zoom để đỡ rối
+                    zoomBtns.forEach(el => el.classList.add('hidden'));
+
+                    // Nếu click chuột phải vào 1 ảnh để mở menu -> Tự động chọn ảnh đó luôn
+                    if (rightClickedFileId) {
+                        selectFile(rightClickedFileId, true);
+                    }
+                } else {
+                    toolbar.classList.add('hidden');
+                    checkboxes.forEach(el => {
+                        el.classList.add('hidden');
+                        el.querySelector('input').checked = false;
+                    });
+                    zoomBtns.forEach(el => el.classList.remove('hidden'));
+
+                    // Xóa style viền tím
+                    document.querySelectorAll('.file-item').forEach(el => {
+                        el.classList.remove('ring-4', 'ring-primary', 'bg-primary/10');
+                    });
+                    document.getElementById('selectedCount').innerText = '0';
+                }
+            }
+
+            function handleFileClick(e, id) {
+                if (!isSelectionMode)
+                    return; // Nếu không phải chế độ chọn thì bỏ qua (hoặc mở lightbox)
+
+                const card = document.getElementById('file-card-' + id);
+                const checkbox = card.querySelector('input[type="checkbox"]');
+
+                // Đảo ngược trạng thái chọn
+                selectFile(id, !checkbox.checked);
+            }
+
+
+            function selectFile(id, isSelected) {
+                const card = document.getElementById('file-card-' + id);
+                if (!card)
+                    return;
+
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                checkbox.checked = isSelected;
+
+                if (isSelected) {
+                    // Thêm viền tím đậm (ring-4 để rõ hơn)
+                    card.classList.add('ring-4', 'ring-primary');
+                } else {
+                    card.classList.remove('ring-4', 'ring-primary');
+                }
+                updateSelectionCount();
+            }
+
+            function updateSelectionCount() {
+                const count = document.querySelectorAll('.file-item input:checked').length;
+                document.getElementById('selectedCount').innerText = count;
+                // Disable nút xóa nếu không chọn gì
+                const btnDelete = document.getElementById('btnBatchDelete');
+                if (btnDelete)
+                    btnDelete.disabled = count === 0;
+            }
+
+            // Helper lấy danh sách ID đã chọn (cho chức năng Xóa nhiều)
+            function getSelectedIds() {
+                let ids = [];
+                document.querySelectorAll('.file-item input:checked').forEach(cb => {
+                    const card = cb.closest('.file-item');
+                    if (card)
+                        ids.push(card.getAttribute('data-id'));
+                });
+                // Nếu không ở chế độ chọn mà click chuột phải -> Lấy ID ảnh đó
+                if (ids.length === 0 && rightClickedFileId) {
+                    ids.push(rightClickedFileId);
+                }
+                return ids;
+            }
+
+            function exitSelectionMode() {
+                isSelectionMode = false;
+                rightClickedFileId = null;
+
+                // 1. Ẩn Toolbar
+                document.getElementById('selectionToolbar').classList.add('hidden');
+
+                // 2. Ẩn Checkbox & Reset input
+                document.querySelectorAll('.selection-checkbox').forEach(el => {
+                    el.classList.add('hidden');
+                    el.querySelector('input').checked = false;
+                });
+
+                // 3. Xóa visual (viền tím) trên các thẻ ảnh
+                document.querySelectorAll('.file-item').forEach(el => {
+                    el.classList.remove('ring-4', 'ring-primary', 'bg-primary/10');
+                });
+
+                // 4. Hiện lại nút Zoom (nếu bị ẩn khi select)
+                document.querySelectorAll('.hover-action').forEach(el => el.classList.remove('hidden'));
+
+                // 5. Reset số lượng đếm
+                document.getElementById('selectedCount').innerText = '0';
+            }
+
+            // --- DETAILS SIDEBAR LOGIC ---
+            function viewMediaDetails(e) {
+                if (e)
+                    e.stopPropagation();
+                mediaMenu.classList.add('hidden');
+
+                detailsPanel.classList.remove('translate-x-full');
+
+                // Loading State
+                document.getElementById('detailName').innerText = "Loading...";
+                document.getElementById('metaContainer').innerHTML = 'Loading...';
+                document.getElementById('detailPreview').src = `/gallery/thumb/${rightClickedFileId}`;
+
+                // Fetch Data
+                fetch(`/gallery/api/details/${rightClickedFileId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            document.getElementById('detailName').innerText = data.name;
+                            document.getElementById('detailSize').innerText = data.size;
+
+                            const meta = document.getElementById('metaContainer');
+                            meta.innerHTML = '';
+
+                            const addMeta = (label, val) => {
+                                if (val)
+                                    meta.innerHTML += `
+                        <div class="flex justify-between py-2 border-b border-white/5">
+                            <span class="text-gray-400">${label}</span>
+                            <span class="text-white text-right truncate pl-4">${val}</span>
+                        </div>`;
+                            };
+
+                            addMeta("Camera", data.camera);
+                            addMeta("Lens", data.lens);
+                            addMeta("ISO", data.iso);
+                            addMeta("Aperture", data.aperture ? `f/${data.aperture}` : '');
+                            addMeta("Shutter", data.shutter ? `${data.shutter}s` : '');
+                            addMeta("Date", data.takenAt);
+                            addMeta("Resolution", data.width ? `${data.width} x ${data.height}` : '');
+                        });
+            }
+
+            function closeDetails() {
+                detailsPanel.classList.add('translate-x-full');
+            }
+
+            // --- DELETE LOGIC ---
+            function confirmDeleteMedia() {
+                mediaMenu.classList.add('hidden');
+                document.getElementById('deleteMediaModal').showModal();
+            }
+
+            function executeDeleteMedia() {
+                const physical = document.getElementById('checkDelMediaPhysical').checked;
+                const btn = document.getElementById('btnExecDel');
+                btn.innerText = "Deleting...";
+
+                // Lấy ID cần xóa (Single hoặc Batch)
+                let ids = isSelectionMode ? getSelectedIds() : [rightClickedFileId];
+
+                // Lấy CSRF Token
+                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+                fetch('/gallery/media/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        [csrfHeader]: csrfToken
+                    },
+                    body: JSON.stringify({fileIds: ids, deletePhysical: physical})
+                })
+                        .then(res => {
+                            if (res.ok) {
+                                window.location.reload(); // Reload để cập nhật grid
+                            } else {
+                                alert("Delete failed.");
+                            }
+                        })
+                        .finally(() => {
+                            btn.innerText = "Confirm Delete";
+                            document.getElementById('deleteMediaModal').close();
+                        });
+            }
+
+            // --- RENAME LOGIC ---
+            function openRenameModal() {
+                mediaMenu.classList.add('hidden');
+                if (!rightClickedFileId)
+                    return;
+
+                // Lấy tên file từ thuộc tính data-name trong DOM (HTML mới đã thêm ở trên)
+                const card = document.getElementById('file-card-' + rightClickedFileId);
+                const currentName = card.getAttribute('data-name');
+
+                document.getElementById('inputNewFileName').value = currentName || "";
+                document.getElementById('renameMediaModal').showModal();
+
+                // Focus và bôi đen tên file (trừ đuôi mở rộng)
+                setTimeout(() => {
+                    const input = document.getElementById('inputNewFileName');
+                    input.focus();
+                    const dotIndex = currentName.lastIndexOf('.');
+                    if (dotIndex > 0) {
+                        input.setSelectionRange(0, dotIndex);
+                    }
+                }, 100);
+            }
+
+            async function executeRenameMedia() {
+                const input = document.getElementById('inputNewFileName');
+                const newName = input.value;
+                const btn = document.getElementById('saveRenameBtn'); // Nếu có ID nút save, hoặc bỏ qua dòng này
+
+                if (!rightClickedFileId)
+                    return;
+
+                // Lấy CSRF Token
+                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+                const formData = new FormData();
+                formData.append('fileId', rightClickedFileId);
+                formData.append('newName', newName);
+
+                try {
+                    // Dùng await để đợi kết quả trả về từ server
+                    const res = await fetch('/gallery/media/rename', {
+                        method: 'POST',
+                        headers: {[csrfHeader]: csrfToken},
+                        body: formData
+                    });
+
+                    if (res.ok) {
+                        // Lấy tên chính thức từ server (đã xử lý trùng lặp/đuôi file)
+                        const finalName = await res.text();
+
+                        // --- CẬP NHẬT GIAO DIỆN NGAY LẬP TỨC (Không cần F5) ---
+                        const card = document.getElementById('file-card-' + rightClickedFileId);
+                        if (card) {
+                            // 1. Cập nhật thuộc tính data-name
+                            card.setAttribute('data-name', finalName);
+
+                            // 2. Tìm thẻ <p> hoặc thẻ hiển thị tên để cập nhật text
+                            // (Dựa trên HTML bạn cung cấp, tên file nằm trong thẻ <p class="...truncate...">)
+                            const textEl = card.querySelector('p');
+                            if (textEl)
+                                textEl.innerText = finalName;
+                        }
+
+                        // Đóng modal
+                        document.getElementById('renameMediaModal').close();
+                    } else {
+                        alert("Rename failed: " + await res.text());
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Error communicating with server");
+                }
+            }
+
+            // Helper lấy danh sách ID các ảnh đang được chọn
+            function getSelectedIds() {
+                const ids = [];
+                // 1. Tìm tất cả checkbox đang được tick (checked) bên trong các thẻ file-item
+                document.querySelectorAll('.file-item input[type="checkbox"]:checked').forEach(checkbox => {
+
+                    // 2. Từ checkbox, tìm ngược ra thẻ cha chứa data-id (thẻ div.file-item)
+                    const item = checkbox.closest('.file-item');
+
+                    if (item) {
+                        const id = item.getAttribute('data-id');
+                        if (id) {
+                            ids.push(id);
+                        }
+                    }
+                });
+                return ids;
+            }
+
+
+            // --- DOWNLOAD LOGIC ---
+            function downloadSingleMedia() {
+                mediaMenu.classList.add('hidden');
+                if (!rightClickedFileId)
+                    return;
+
+                // Tạo thẻ a ảo để trigger download
+                // Lưu ý: Cần đảm bảo Controller có endpoint này (Tôi sẽ bổ sung bên dưới)
+                const link = document.createElement('a');
+                link.href = `/gallery/download/${rightClickedFileId}`;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        </script>
+    </body>
+</html>

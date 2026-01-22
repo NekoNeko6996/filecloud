@@ -40,6 +40,7 @@ public class AdminConfigController {
     private final MediaScanService mediaScanService;
 
     private static final String KEY_MOVIE_PATH = "MOVIE_STORE_PHYSICAL_MAIN_PATH";
+    private static final String KEY_GALLERY_PATH = "GALLERY_STORAGE_PATH";
 
     @GetMapping
     public String configPage(Model model) {
@@ -78,8 +79,43 @@ public class AdminConfigController {
             }
         }
 
+        // config for gallery path
+        Optional<SysConfig> galleryConfigOpt = sysConfigRepository.findByKey(KEY_GALLERY_PATH);
+        String displayGalleryPath = "";
+        String galleryStatus = "NOT_CONFIGURED";
+
+        if (galleryConfigOpt.isPresent()) {
+            String rawValue = galleryConfigOpt.get().getValue();
+            if (rawValue != null && rawValue.contains("::")) {
+                String[] parts = rawValue.split("::", 2); // Tách UUID và Relative Path
+                String volUuid = parts[0];
+                String relPath = parts[1];
+
+                Optional<StorageVolume> volOpt = volumeRepository.findByUuid(volUuid);
+                if (volOpt.isPresent()) {
+                    StorageVolume vol = volOpt.get();
+                    Path fullPath = Paths.get(vol.getMountPoint(), relPath);
+                    displayGalleryPath = fullPath.toString();
+
+                    if (Files.exists(fullPath)) {
+                        galleryStatus = "ACTIVE";
+                    } else {
+                        galleryStatus = "PATH_NOT_FOUND";
+                    }
+                } else {
+                    galleryStatus = "VOLUME_OFFLINE";
+                    displayGalleryPath = "Volume (" + volUuid + ") is offline";
+                }
+            } else {
+                displayGalleryPath = rawValue;
+            }
+        }
+
         model.addAttribute("moviePath", displayPath);
         model.addAttribute("pathStatus", status);
+
+        model.addAttribute("galleryPath", displayGalleryPath);
+        model.addAttribute("galleryPathStatus", galleryStatus);
         return "admin/config";
     }
 
@@ -223,5 +259,53 @@ public class AdminConfigController {
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(missingFiles);
+    }
+
+    @PostMapping("/save-gallery-path")
+    @Transactional
+    public String saveGalleryPath(@RequestParam("path") String inputPath, RedirectAttributes redirectAttributes) {
+        inputPath = inputPath.trim();
+        Path pathObj = Paths.get(inputPath);
+
+        // 1. Validate đường dẫn vật lý tồn tại
+        if (!Files.exists(pathObj) || !Files.isDirectory(pathObj)) {
+            redirectAttributes.addFlashAttribute("error", "Gallery path does not exist or is not a directory!");
+            return "redirect:/admin/config";
+        }
+
+        // 2. Tìm StorageVolume chứa đường dẫn này
+        List<StorageVolume> volumes = volumeRepository.findAll();
+        StorageVolume matchedVolume = null;
+        String normalizedInput = pathObj.toAbsolutePath().toString();
+
+        for (StorageVolume vol : volumes) {
+            String volPath = Paths.get(vol.getMountPoint()).toAbsolutePath().toString();
+            if (normalizedInput.startsWith(volPath)) {
+                matchedVolume = vol;
+                break;
+            }
+        }
+
+        if (matchedVolume == null) {
+            redirectAttributes.addFlashAttribute("error", "The path is not inside any managed Storage Volume! Add drive first.");
+            return "redirect:/admin/config";
+        }
+
+        // 3. Tính toán Relative Path (Đường dẫn tương đối so với gốc ổ đĩa)
+        // VD: Input: F:\filecloud_data\gallery_data, Vol F:\ -> Relative: filecloud_data\gallery_data
+        String volRoot = Paths.get(matchedVolume.getMountPoint()).toAbsolutePath().toString();
+        String relativePath = normalizedInput.substring(volRoot.length());
+
+        if (relativePath.startsWith(File.separator)) {
+            relativePath = relativePath.substring(1);
+        }
+
+        // 4. Lưu config dạng: UUID::RelativePath
+        String configValue = matchedVolume.getUuid() + "::" + relativePath;
+
+        saveOrUpdateConfig(KEY_GALLERY_PATH, configValue, "Root path for Gallery photo storage (Smart mapped via Volume UUID)");
+
+        redirectAttributes.addFlashAttribute("success", "Gallery configuration saved! Mapped to Volume: " + matchedVolume.getLabel());
+        return "redirect:/admin/config";
     }
 }

@@ -1,5 +1,6 @@
 package com.app.filecloud.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.domain.Persistable;
@@ -55,6 +56,7 @@ public class GalleryPhoto implements Persistable<String> {
     private boolean isProcessed = false;
 
     @Column(name = "created_at")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
 
     // Quan hệ 1-1 với Metadata (MapsId vì dùng chung ID)

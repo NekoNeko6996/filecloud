@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(${album.title}, 'gallery', ~{::section}, ~{::script})}">
+    <head>
+        <meta name="_csrf" th:content="${_csrf.token}"/>
+        <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+        <title th:text="${album.title}">Album View</title>
+    </head>
+    <body>
+
+        <section class="flex flex-col h-full w-full relative">
+
+            <div class="px-6 py-4 flex justify-between items-center shrink-0 z-20 glass-header sticky top-0 border-b border-white/5">
+                <div class="flex items-center gap-4">
+                    <a href="/gallery" 
+                       class="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                    </a>
+                    <div>
+                        <h1 class="text-xl font-bold font-space text-white flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">photo_album</span>
+                            <span th:text="${album.title}">Album Title</span>
+                        </h1>
+                        <p class="text-[#a79cba] text-xs mt-0.5">
+                            <span th:text="${#lists.size(photos)}">0</span> photos • 
+                            Created <span th:text="${#temporals.format(album.createdAt, 'dd/MM/yyyy')}">Date</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="document.getElementById('fileInput').click()" 
+                            class="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-primary/20">
+                        <span class="material-symbols-outlined text-[20px]">add_photo_alternate</span>
+                        <span>Add Photos</span>
+                    </button>
+
+                    <button class="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+                        <span class="material-symbols-outlined">more_vert</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto scrollbar-hide relative p-6">
+                <div class="p-6">
+
+                    <div th:if="${#lists.isEmpty(photos)}" class="flex flex-col items-center justify-center py-20 text-gray-500">
+                        <div class="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-4">
+                            <span class="material-symbols-outlined text-4xl opacity-50">image_not_supported</span>
+                        </div>
+                        <h3 class="text-white font-bold text-lg">This album is empty</h3>
+                        <p class="text-sm">Drag and drop photos here to upload.</p>
+                    </div>
+
+                    <div id="photoGrid" class="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4 space-y-4">
+                        <div th:each="photo : ${photos}" 
+                             th:id="'file-card-' + ${photo.id}"
+                             th:data-id="${photo.id}"
+                             th:data-name="${photo.originalFilename}"
+                             onclick="handleFileClick(event, this.getAttribute('data-id'))"
+                             oncontextmenu="showMediaContextMenu(event, this.getAttribute('data-id'))"
+                             class="file-item break-inside-avoid relative group rounded-xl overflow-hidden bg-[#1e1e1e] border border-white/5 cursor-pointer transition-all duration-200 select-none">
+
+                            <div class="selection-checkbox absolute top-2 left-2 z-30 hidden">
+                                <input type="checkbox" class="hidden w-5 h-5 rounded border-gray-500 text-primary focus:ring-0 cursor-pointer pointer-events-none">
+                            </div>
+
+                            <img th:src="@{'/gallery/thumb/' + ${photo.id}}" 
+                                 loading="lazy" 
+                                 class="w-full h-auto object-cover transition-transform duration-500">
+
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <button onclick="event.stopPropagation(); openLightbox(this.closest('.file-item').getAttribute('data-id'))" 
+                                        class="flex items-center p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-md hover-action">
+                                    <span class="material-symbols-outlined">zoom_in</span>
+                                </button>
+                            </div>
+
+                            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <p class="text-white text-xs truncate font-medium" th:text="${photo.originalFilename}">Name</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dropOverlay" class="fixed inset-0 z-50 bg-primary/10 backdrop-blur-sm border-4 border-dashed border-primary/50 hidden flex flex-col items-center justify-center pointer-events-none">
+                <span class="material-symbols-outlined text-6xl text-primary mb-4 animate-bounce">cloud_upload</span>
+                <h2 class="text-3xl font-bold text-white">Add to "<span th:text="${album.title}">Album</span>"</h2>
+                <p class="text-[#a79cba] mt-2">Release to upload photos</p>
+            </div>
+            <input type="file" id="fileInput" multiple class="hidden" accept="image/*">
+
+            <dialog id="duplicateDialog" class="bg-[#1e1e1e] border border-white/10 rounded-2xl p-0 backdrop:backdrop-blur-sm backdrop:bg-black/80 text-white w-full max-w-2xl shadow-2xl">
+                <div class="p-6">
+                    <h3 class="text-xl font-bold text-yellow-500 flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined">warning</span> Duplicate Content
+                    </h3>
+                    <div class="grid grid-cols-2 gap-6 mb-8">
+                        <div class="bg-black/40 rounded-xl p-4 border border-white/5 flex flex-col items-center text-center">
+                            <span class="text-xs font-bold text-gray-400 uppercase mb-2">Existing</span>
+                            <div class="aspect-square w-full bg-black/50 rounded-lg mb-2 overflow-hidden relative">
+                                <img id="dupExistingImg" src="" class="w-full h-full object-contain">
+                            </div>
+                            <p id="dupExistingName" class="text-sm font-mono text-white truncate w-full">name.jpg</p>
+                        </div>
+                        <div class="bg-primary/5 rounded-xl p-4 border border-primary/20 flex flex-col items-center text-center relative">
+                            <span class="text-xs font-bold text-primary uppercase mb-2">New Upload</span>
+                            <div class="aspect-square w-full bg-black/50 rounded-lg mb-2 overflow-hidden">
+                                <span class="material-symbols-outlined text-5xl text-white/20 mt-8">image</span> 
+                            </div>
+                            <p id="dupNewName" class="text-sm font-mono text-white truncate w-full">new.jpg</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3 border-t border-white/10 pt-4">
+                        <button id="btnSkip" class="px-5 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-gray-300 font-bold">Skip</button>
+                        <button id="btnKeepBoth" class="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold">Keep Both</button>
+                    </div>
+                </div>
+            </dialog>
+
+            <div id="mediaContextMenu" class="hidden fixed z-50 w-56 bg-[#1e1e1e] border border-white/10 rounded-lg shadow-2xl overflow-hidden p-1.5 backdrop-blur-md">
+                <button onclick="viewMediaDetails(event)" class="w-full text-left px-3 py-2 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-3 transition-colors"><span class="material-symbols-outlined text-[18px]">info</span> Properties</button>
+                <button onclick="toggleSelectionMode()" class="w-full text-left px-3 py-2 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-3 transition-colors"><span class="material-symbols-outlined text-[18px]">checklist</span> Select Multiple</button>
+                <button onclick="downloadSingleMedia()" class="w-full text-left px-3 py-2 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-3 transition-colors"><span class="material-symbols-outlined text-[18px]">download</span> Download</button>
+                <button onclick="openRenameModal()" class="w-full text-left px-3 py-2 text-sm text-gray-300 rounded hover:bg-primary hover:text-white flex items-center gap-3 transition-colors"><span class="material-symbols-outlined text-[18px]">edit</span> Rename</button>
+                <div class="h-px bg-white/10 my-1 mx-2"></div>
+                <button onclick="confirmDeleteMedia()" class="w-full text-left px-3 py-2 text-sm text-red-400 rounded hover:bg-red-500/10 hover:text-red-300 flex items-center gap-3 transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span> Delete</button>
+            </div>
+
+            <div id="selectionToolbar" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#1e1e1e]/90 backdrop-blur border border-white/10 rounded-full shadow-2xl px-6 py-3 flex items-center gap-6 animate-bounce-up">
+                <span class="text-white font-bold text-sm"><span id="selectedCount" class="text-primary text-lg">0</span> Selected</span>
+                <div class="h-5 w-px bg-white/20"></div>
+                <button onclick="confirmDeleteMedia()" id="btnBatchDelete" class="text-red-400 hover:text-red-300 flex items-center gap-2 text-sm font-bold disabled:opacity-50"><span class="material-symbols-outlined text-[20px]">delete</span> Delete</button>
+                <div class="h-5 w-px bg-white/20"></div>
+                <button onclick="exitSelectionMode()" class="text-gray-400 hover:text-white flex items-center gap-2 text-sm font-medium"><span class="material-symbols-outlined text-[20px]">close</span> Cancel</button>
+            </div>
+
+            <aside id="detailsPanel" class="glass-panel fixed right-0 top-0 h-screen w-80 flex flex-col border-l border-white/10 overflow-y-auto z-50 bg-[#171022]/95 shadow-2xl translate-x-full transition-transform duration-300 ease-in-out">
+                <div class="p-6 flex flex-col gap-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-white font-bold text-lg font-space">Properties</h3>
+                        <button onclick="closeDetails()" class="text-[#a79cba] hover:text-white transition-colors"><span class="material-symbols-outlined">close</span></button>
+                    </div>
+                    <div class="aspect-square w-full rounded-xl bg-black/50 border border-white/10 relative overflow-hidden flex items-center justify-center"><img id="detailPreview" src="" class="w-full h-full object-contain"></div>
+                    <div>
+                        <h2 id="detailName" class="text-white font-bold text-lg leading-tight break-words">Filename.jpg</h2>
+                        <p id="detailSize" class="text-primary text-sm font-mono mt-1">0 MB</p>
+                    </div>
+                    <div class="h-px bg-white/10 w-full"></div>
+                    <div class="flex flex-col gap-4">
+                        <h4 class="text-[#a79cba] text-xs font-bold uppercase tracking-widest">EXIF Data</h4>
+                        <div class="flex flex-col gap-3 text-sm" id="metaContainer"><p class="text-gray-500 italic">Loading...</p></div>
+                    </div>
+                </div>
+            </aside>
+
+            <dialog id="deleteMediaModal" class="bg-[#1e1e1e] text-white p-6 rounded-2xl border border-white/10 shadow-2xl backdrop:bg-black/80 w-full max-w-sm">
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-center gap-3 text-red-500"><span class="material-symbols-outlined text-3xl">delete</span><h3 class="text-lg font-bold text-white">Delete Photos?</h3></div>
+                    <p class="text-gray-300 text-sm">Deleting <strong id="delMediaCount" class="text-white">1 item</strong>.</p>
+                    <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-white/10 bg-black/20 hover:border-red-500/50 transition-all select-none">
+                        <input type="checkbox" id="checkDelMediaPhysical" checked class="mt-1 rounded bg-gray-700 border-gray-600 text-red-600 focus:ring-red-600">
+                        <div><span class="font-bold text-white block text-sm">Delete from Disk</span><span class="text-xs text-gray-500 block mt-0.5">Permanently remove files.</span></div>
+                    </label>
+                    <div class="flex justify-end gap-3 mt-4">
+                        <button onclick="document.getElementById('deleteMediaModal').close()" class="px-4 py-2 text-sm text-gray-400 hover:text-white font-medium">Cancel</button>
+                        <button onclick="executeDeleteMedia()" id="btnExecDel" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-lg">Delete</button>
+                    </div>
+                </div>
+            </dialog>
+
+            <dialog id="renameMediaModal" class="bg-[#1e1e1e] text-white p-6 rounded-2xl border border-white/10 shadow-2xl backdrop:bg-black/80 w-full max-w-sm">
+                <div class="flex flex-col gap-4">
+                    <h3 class="font-bold text-lg">Rename Photo</h3>
+                    <input type="text" id="inputNewFileName" class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary">
+                    <div class="flex justify-end gap-3 mt-2">
+                        <button onclick="document.getElementById('renameMediaModal').close()" class="text-gray-400 hover:text-white text-sm">Cancel</button>
+                        <button onclick="executeRenameMedia()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold">Save</button>
+                    </div>
+                </div>
+            </dialog>
+
+        </section>
+
+        <script th:inline="javascript">
+            // --- KHAI BÁO BIẾN CHO VIEW NÀY ---
+            // [QUAN TRỌNG] Lấy ID của Album hiện tại thay vì Default Album
+            const currentAlbumId = [[${album.id}]];
+
+            const dropOverlay = document.getElementById('dropOverlay');
+            const duplicateDialog = document.getElementById('duplicateDialog');
+            const mediaMenu = document.getElementById('mediaContextMenu');
+            const detailsPanel = document.getElementById('detailsPanel');
+            let rightClickedFileId = null;
+            let isSelectionMode = false;
+            let dragCounter = 0;
+
+            // --- UPLOAD LOGIC (Đã cập nhật dùng currentAlbumId) ---
+            window.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                dragCounter++;
+                dropOverlay.classList.remove('hidden');
+                dropOverlay.style.pointerEvents = 'auto';
+            });
+            window.addEventListener('dragleave', (e) => {
+                dragCounter--;
+                if (dragCounter === 0) {
+                    dropOverlay.classList.add('hidden');
+                    dropOverlay.style.pointerEvents = 'none';
+                }
+            });
+            window.addEventListener('dragover', e => e.preventDefault());
+            window.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dragCounter = 0;
+                dropOverlay.classList.add('hidden');
+                dropOverlay.style.pointerEvents = 'none';
+                if (e.dataTransfer.files.length > 0)
+                    handleUploadQueue(e.dataTransfer.files);
+            });
+            document.getElementById('fileInput').addEventListener('change', (e) => {
+                if (e.target.files.length > 0)
+                    handleUploadQueue(e.target.files);
+            });
+
+            async function handleUploadQueue(fileList) {
+                const files = Array.from(fileList);
+                for (const file of files) {
+                    await uploadOneFile(file); }
+                window.location.reload();
+            }
+
+            function uploadOneFile(file, forceKeep = false) {
+                return new Promise((resolve) => {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('albumId', currentAlbumId); // Dùng Album hiện tại
+                    formData.append('forceKeep', forceKeep);
+
+                    const csrfMeta = document.querySelector('meta[name="_csrf"]');
+                    const csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+                    const headers = {};
+                    if (csrfMeta && csrfHeaderMeta)
+                        headers[csrfHeaderMeta.getAttribute('content')] = csrfMeta.getAttribute('content');
+
+                    fetch('/gallery/upload-check', {method: 'POST', headers: headers, body: formData})
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.status === 'SUCCESS')
+                                    resolve();
+                                else if (data.status === 'DUPLICATE') {
+                                    showDuplicateDialog(data, file).then(action => {
+                                        if (action === 'KEEP_BOTH')
+                                            uploadOneFile(file, true).then(resolve);
+                                        else {
+                                            fetch('/gallery/resolve-duplicate', {
+                                                method: 'POST',
+                                                headers: {...headers, 'Content-Type': 'application/x-www-form-urlencoded'},
+                                                body: new URLSearchParams({tempPath: data.tempPath, action: 'SKIP'})
+                                            }).then(resolve);
+                                        }
+                                    });
+                                } else
+                                    resolve();
+                            }).catch(() => resolve());
+                });
+            }
+
+            function showDuplicateDialog(data, newFileBlob) {
+                return new Promise((resolve) => {
+                    document.getElementById('dupNewName').textContent = data.newFileName;
+                    document.getElementById('dupExistingName').textContent = data.existing.name;
+                    document.getElementById('dupExistingImg').src = '/gallery/thumb/' + data.existing.id;
+                    duplicateDialog.showModal();
+
+                    const btnSkip = document.getElementById('btnSkip');
+                    const btnKeep = document.getElementById('btnKeepBoth');
+                    btnSkip.replaceWith(btnSkip.cloneNode(true));
+                    btnKeep.replaceWith(btnKeep.cloneNode(true));
+
+                    document.getElementById('btnSkip').addEventListener('click', () => {
+                        duplicateDialog.close();
+                        resolve('SKIP');
+                    });
+                    document.getElementById('btnKeepBoth').addEventListener('click', () => {
+                        duplicateDialog.close();
+                        resolve('KEEP_BOTH');
+                    });
+                });
+            }
+
+            // --- CONTEXT MENU & INTERACTION ---
+            function showMediaContextMenu(e, id) {
+                e.preventDefault();
+                if (isSelectionMode)
+                    return;
+                rightClickedFileId = id;
+                let x = e.clientX, y = e.clientY;
+                if (window.innerWidth - x < 240)
+                    x -= 240;
+                mediaMenu.style.left = `${x}px`;
+                mediaMenu.style.top = `${y}px`;
+                mediaMenu.classList.remove('hidden');
+            }
+
+            document.addEventListener('click', (e) => {
+                if (mediaMenu && !mediaMenu.contains(e.target))
+                    mediaMenu.classList.add('hidden');
+                if (detailsPanel && !detailsPanel.contains(e.target) && !detailsPanel.classList.contains('translate-x-full'))
+                    closeDetails();
+            });
+            document.addEventListener('scroll', () => mediaMenu.classList.add('hidden'));
+
+            // --- SELECTION LOGIC ---
+            function toggleSelectionMode() {
+                isSelectionMode = !isSelectionMode;
+                mediaMenu.classList.add('hidden');
+                const toolbar = document.getElementById('selectionToolbar');
+                const checkboxes = document.querySelectorAll('.selection-checkbox');
+                const zoomBtns = document.querySelectorAll('.hover-action');
+
+                if (isSelectionMode) {
+                    toolbar.classList.remove('hidden');
+                    checkboxes.forEach(el => el.classList.remove('hidden'));
+                    zoomBtns.forEach(el => el.classList.add('hidden'));
+                    if (rightClickedFileId)
+                        selectFile(rightClickedFileId, true);
+                } else {
+                    exitSelectionMode();
+                }
+            }
+
+            function handleFileClick(e, id) {
+                if (!isSelectionMode)
+                    return;
+                const card = document.getElementById('file-card-' + id);
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                selectFile(id, !checkbox.checked);
+            }
+
+            function selectFile(id, isSelected) {
+                const card = document.getElementById('file-card-' + id);
+                if (!card)
+                    return;
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                checkbox.checked = isSelected;
+                if (isSelected)
+                    card.classList.add('ring-4', 'ring-primary');
+                else
+                    card.classList.remove('ring-4', 'ring-primary');
+                updateSelectionCount();
+            }
+
+            function updateSelectionCount() {
+                const count = document.querySelectorAll('.file-item input:checked').length;
+                document.getElementById('selectedCount').innerText = count;
+                const btnDelete = document.getElementById('btnBatchDelete');
+                if (btnDelete)
+                    btnDelete.disabled = count === 0;
+            }
+
+            function exitSelectionMode() {
+                isSelectionMode = false;
+                rightClickedFileId = null;
+                document.getElementById('selectionToolbar').classList.add('hidden');
+                document.querySelectorAll('.selection-checkbox').forEach(el => {
+                    el.classList.add('hidden');
+                    el.querySelector('input').checked = false;
+                });
+                document.querySelectorAll('.file-item').forEach(el => el.classList.remove('ring-4', 'ring-primary'));
+                document.querySelectorAll('.hover-action').forEach(el => el.classList.remove('hidden'));
+                document.getElementById('selectedCount').innerText = '0';
+            }
+
+            function getSelectedIds() {
+                const ids = [];
+                document.querySelectorAll('.file-item input[type="checkbox"]:checked').forEach(cb => {
+                    const item = cb.closest('.file-item');
+                    if (item)
+                        ids.push(item.getAttribute('data-id'));
+                });
+                if (ids.length === 0 && rightClickedFileId)
+                    ids.push(rightClickedFileId);
+                return ids;
+            }
+
+            // --- OPERATIONS (Delete, Rename, Download, Details) ---
+            function confirmDeleteMedia() {
+                mediaMenu.classList.add('hidden');
+                document.getElementById('deleteMediaModal').showModal();
+            }
+
+            function executeDeleteMedia() {
+                const physical = document.getElementById('checkDelMediaPhysical').checked;
+                const btn = document.getElementById('btnExecDel');
+                btn.innerText = "Deleting...";
+                const ids = getSelectedIds();
+                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+                fetch('/gallery/media/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', [csrfHeader]: csrfToken},
+                    body: JSON.stringify({fileIds: ids, deletePhysical: physical})
+                }).then(res => {
+                    if (res.ok)
+                        window.location.reload();
+                    else
+                        alert("Delete failed");
+                }).finally(() => {
+                    btn.innerText = "Delete";
+                    document.getElementById('deleteMediaModal').close();
+                });
+            }
+
+            function openRenameModal() {
+                mediaMenu.classList.add('hidden');
+                if (!rightClickedFileId)
+                    return;
+                const card = document.getElementById('file-card-' + rightClickedFileId);
+                const currentName = card.getAttribute('data-name');
+                document.getElementById('inputNewFileName').value = currentName || "";
+                document.getElementById('renameMediaModal').showModal();
+            }
+
+            async function executeRenameMedia() {
+                const newName = document.getElementById('inputNewFileName').value;
+                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+                const formData = new FormData();
+                formData.append('fileId', rightClickedFileId);
+                formData.append('newName', newName);
+
+                try {
+                    const res = await fetch('/gallery/media/rename', {method: 'POST', headers: {[csrfHeader]: csrfToken}, body: formData});
+                    if (res.ok) {
+                        const finalName = await res.text();
+                        const card = document.getElementById('file-card-' + rightClickedFileId);
+                        if (card) {
+                            card.setAttribute('data-name', finalName);
+                            const textEl = card.querySelector('p');
+                            if (textEl)
+                                textEl.innerText = finalName;
+                        }
+                        document.getElementById('renameMediaModal').close();
+                    } else
+                        alert("Failed: " + await res.text());
+                } catch (e) {
+                    alert("Error");
+                }
+            }
+
+            function downloadSingleMedia() {
+                mediaMenu.classList.add('hidden');
+                if (!rightClickedFileId)
+                    return;
+                const link = document.createElement('a');
+                link.href = `/gallery/download/${rightClickedFileId}`;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            function viewMediaDetails(e) {
+                if (e)
+                    e.stopPropagation();
+                mediaMenu.classList.add('hidden');
+                detailsPanel.classList.remove('translate-x-full');
+                document.getElementById('detailName').innerText = "Loading...";
+                document.getElementById('metaContainer').innerHTML = 'Loading...';
+                document.getElementById('detailPreview').src = `/gallery/thumb/${rightClickedFileId}`;
+
+                fetch(`/gallery/api/details/${rightClickedFileId}`).then(res => res.json()).then(data => {
+                    document.getElementById('detailName').innerText = data.name;
+                    document.getElementById('detailSize').innerText = data.size;
+                    const meta = document.getElementById('metaContainer');
+                    meta.innerHTML = '';
+                    const addMeta = (label, val) => {
+                        if (val)
+                            meta.innerHTML += `<div class="flex justify-between py-2 border-b border-white/5"><span class="text-[#a79cba]">${label}</span><span class="text-white truncate pl-4">${val}</span></div>`;
+                    };
+                    addMeta("Camera", data.camera);
+                    addMeta("Lens", data.lens);
+                    addMeta("ISO", data.iso);
+                    addMeta("Aperture", data.aperture ? `f/${data.aperture}` : '');
+                    addMeta("Shutter", data.shutter ? `${data.shutter}s` : '');
+                    addMeta("Date", data.takenAt);
+                    addMeta("Resolution", data.width ? `${data.width} x ${data.height}` : '');
+                });
+            }
+
+            function closeDetails() {
+                detailsPanel.classList.add('translate-x-full');
+            }
+        </script>
+    </body>
+</html>

@@ -1,5 +1,6 @@
 package com.app.filecloud.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.domain.Persistable;
@@ -26,6 +27,7 @@ public class GalleryPhotoMetadata implements Persistable<String> {
     private GalleryPhoto photo;
 
     @Column(name = "taken_at")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime takenAt;
 
     @Column(name = "camera_make")
