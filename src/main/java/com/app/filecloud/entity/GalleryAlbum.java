@@ -2,7 +2,6 @@ package com.app.filecloud.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
-import static jakarta.persistence.GenerationType.UUID;
 import lombok.*;
 import org.springframework.data.domain.Persistable;
 
@@ -62,6 +61,7 @@ public class GalleryAlbum implements Persistable<String> {
     private LocalDateTime updatedAt;
 
     @Transient
+    @Builder.Default
     private List<GalleryPhoto> previewPhotos = new ArrayList<>();
 
     @Transient

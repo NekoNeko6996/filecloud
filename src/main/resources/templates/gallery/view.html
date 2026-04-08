@@ -4,44 +4,61 @@
     <head>
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.6/viewer.min.css">
+        <style>
+            /* [FIX] Ép Viewer luôn full màn hình, đè lên mọi thứ */
+            .viewer-container {
+                z-index: 99999 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+            }
+            .viewer-backdrop {
+                background-color: rgba(0, 0, 0, 0.95) !important;
+            }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.6/viewer.min.js"></script>
         <title th:text="${album.title}">Album View</title>
     </head>
     <body>
-
         <section class="flex flex-col h-full w-full relative">
+            <div class="flex items-center justify-between gap-4 p-6 pb-0 shrink-0 min-w-0">
 
-            <div class="px-6 py-4 flex justify-between items-center shrink-0 z-20 glass-header sticky top-0 border-b border-white/5">
-                <div class="flex items-center gap-4">
-                    <a href="/gallery/albums" 
-                       class="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-                        <span class="material-symbols-outlined">arrow_back</span>
-                    </a>
-                    <div>
-                        <h1 class="text-xl font-bold font-space text-white flex items-center gap-2">
-                            <span th:text="${album.title}">Album Title</span>
-                        </h1>
-                        <p class="text-[#a79cba] text-xs mt-0.5">
+                <div class="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                    <button onclick="toggleSidebar()" class="lg:hidden shrink-0 text-gray-400 hover:text-white transition-colors p-1">
+                        <span class="material-symbols-outlined text-2xl">menu</span>
+                    </button>
+
+                    <div class="flex-1 min-w-0">
+                        <h2 class="text-xl font-bold font-space text-white flex items-center gap-2 min-w-0">
+                            <span class="truncate" th:text="${album.title}">Album Title</span>
+                        </h2>
+                        <p class="text-[#a79cba] text-xs mt-0.5 truncate">
                             <span th:text="${#lists.size(photos)}">0</span> photos • 
                             Created <span th:text="${#temporals.format(album.createdAt, 'dd/MM/yyyy')}">Date</span>
                         </p>
                     </div>
                 </div>
 
-                <div class="flex gap-3">
+                <div class="z-30">
                     <button onclick="document.getElementById('fileInput').click()" 
-                            class="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-primary/20">
-                        <span class="material-symbols-outlined text-[20px]">add_photo_alternate</span>
-                        <span>Add Photos</span>
-                    </button>
-
-                    <button class="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-                        <span class="material-symbols-outlined">more_vert</span>
+                            class="bg-primary hover:bg-primary-dark text-white transition-all shadow-lg shadow-primary/20 flex items-center justify-center
+                            fixed bottom-6 right-6 w-14 h-14 rounded-full 
+                            md:static md:w-auto md:h-auto md:px-5 md:py-2 md:rounded-lg md:gap-2">
+                        <span class="material-symbols-outlined text-[24px] md:text-[20px]">add_photo_alternate</span> 
+                        <span class="hidden md:inline whitespace-nowrap">Upload Images</span>
                     </button>
                 </div>
             </div>
 
             <div class="flex-1 overflow-y-auto scrollbar-hide relative">
                 <div class="p-6 h-full">
+                    <a href="/gallery/albums" 
+                       class="mb-3 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+                        <span class="material-symbols-outlined">arrow_back</span> Back to albums
+                    </a>
                     <div th:if="${#lists.isEmpty(photos)}" 
                          onclick="document.getElementById('fileInput').click()"
                          class="flex flex-col items-center justify-center py-20 text-gray-500 border-2 border-dashed border-white/5 rounded-xl hover:bg-white/5 hover:border-primary/30 cursor-pointer transition-all group h-full">
@@ -63,7 +80,7 @@
                              th:style="${photo.width != null && photo.height != null} ? 'aspect-ratio: ' + ${photo.width} + '/' + ${photo.height} : ''"
                              class="file-item skeleton-loader break-inside-avoid relative group rounded-xl overflow-hidden bg-gray-800 animate-pulse border border-white/5 cursor-pointer transition-all duration-200 select-none mb-4">
 
-                             <div class="selection-checkbox absolute top-2 left-2 z-30 hidden">
+                            <div class="selection-checkbox absolute top-2 left-2 z-30 hidden">
                                 <input type="checkbox" class="w-5 h-5 rounded border-gray-500 text-primary focus:ring-0 cursor-pointer pointer-events-none">
                             </div>
 
@@ -74,7 +91,7 @@
                                  onerror="this.closest('.file-item').classList.remove('animate-pulse');">
 
                             <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10">
-                                <button onclick="event.stopPropagation(); openLightbox(this.closest('.file-item').getAttribute('data-id'))" 
+                                <button onclick="event.stopPropagation(); lb.open(this.closest('.file-item').getAttribute('data-id'))"
                                         class="flex items-center p-2 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-md hover-action transition-transform hover:scale-110">
                                     <span class="material-symbols-outlined">zoom_in</span>
                                 </button>
@@ -85,6 +102,7 @@
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
 
@@ -211,6 +229,38 @@
                     </div>
                 </div>
             </dialog>
+
+            <div id="hidden-gallery" class="invisible absolute top-0 left-0 h-0 w-0 overflow-hidden">
+                <img th:each="photo : ${photos}" 
+                     th:data-original-src="@{'/gallery/image/' + ${photo.id}}"
+                     th:src="@{'/gallery/thumb/' + ${photo.id}}"
+                     th:alt="${photo.originalFilename}"
+                     th:data-id="${photo.id}">
+            </div>
+
+            <div id="customLightbox" class="fixed inset-0 z-[99999] bg-black/95 hidden flex-col select-none backdrop-blur-sm">
+                <div class="flex justify-between items-center p-4 text-white bg-gradient-to-b from-black/80 to-transparent absolute top-0 w-full z-50">
+                    <div id="lbCounter" class="font-mono text-sm bg-black/50 px-3 py-1 rounded-full border border-white/10">1 / 1</div>
+                    <div class="flex gap-4">
+                        <button onclick="lb.rotate(-90)" class="p-2 hover:text-primary transition-colors hover:bg-white/10 rounded-full" title="Xoay trái"><span class="material-symbols-outlined">rotate_left</span></button>
+                        <button onclick="lb.rotate(90)" class="p-2 hover:text-primary transition-colors hover:bg-white/10 rounded-full" title="Xoay phải"><span class="material-symbols-outlined">rotate_right</span></button>
+                        <button onclick="lb.download()" class="p-2 hover:text-primary transition-colors hover:bg-white/10 rounded-full" title="Tải xuống"><span class="material-symbols-outlined">download</span></button>
+                        <div class="w-px h-6 bg-white/20 my-auto mx-2"></div>
+                        <button onclick="lb.close()" class="p-2 text-gray-300 hover:text-red-500 transition-colors hover:bg-red-500/10 rounded-full" title="Đóng"><span class="material-symbols-outlined">close</span></button>
+                    </div>
+                </div>
+
+                <button onclick="lb.prev()" class="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 p-2 rounded-full z-50 transition-all"><span class="material-symbols-outlined text-5xl">chevron_left</span></button>
+                <button onclick="lb.next()" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 p-2 rounded-full z-50 transition-all"><span class="material-symbols-outlined text-5xl">chevron_right</span></button>
+
+                <div id="lbLoader" class="absolute inset-0 flex items-center justify-center z-20 hidden pointer-events-none">
+                    <span class="material-symbols-outlined animate-spin text-white text-5xl drop-shadow-2xl font-bold">sync</span>
+                </div>
+
+                <div id="lbTrack" class="flex-1 w-full h-full flex items-center justify-center overflow-hidden relative cursor-grab">
+                    <img id="lbImage" src="" draggable="false" class="w-full h-full object-contain transition-transform duration-200 ease-out hidden" style="transform: translate(0px, 0px) scale(1) rotate(0deg);">
+                </div>
+            </div>
         </section>
 
         <script th:inline="javascript">
@@ -642,6 +692,235 @@
             function closeDetails() {
                 detailsPanel.classList.add('translate-x-full');
             }
+        </script>
+        <script th:inline="javascript">
+            // --- VIEWER JS INTEGRATION ---
+            let galleryViewer = null;
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const galleryElement = document.getElementById('hidden-gallery');
+
+                if (galleryElement) {
+                    galleryViewer = new Viewer(galleryElement, {
+                        url: 'data-original-src',
+                        backdrop: 'static',
+                        className: 'viewer-z-fix',
+                        // [FIX] Tắt transition để tránh lỗi tính toán vị trí ban đầu
+                        transition: false,
+                        toolbar: {
+                            zoomIn: 1, zoomOut: 1, oneToOne: 1, reset: 1,
+                            prev: 1, play: 1, next: 1,
+                            rotateLeft: 1, rotateRight: 1,
+                            flipHorizontal: 1, flipVertical: 1,
+                        },
+                        title: [true, (image) => `${image.alt} (${image.naturalWidth}x${image.naturalHeight})`],
+
+                        viewed(e) {
+                            // Chỉ log lỗi, không alert để tránh tắt viewer
+                            const img = e.detail.image;
+                            if (img.naturalWidth === 0) {
+                                console.warn("Viewer.js: Ảnh chưa load xong hoặc lỗi URL:", img.src);
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Hàm mở Lightbox
+            function openLightbox(photoId) {
+                if (!galleryViewer)
+                    return;
+
+                // Cập nhật lại galleryViewer (đôi khi DOM thay đổi làm mất đồng bộ)
+                galleryViewer.update();
+
+                const hiddenImages = document.querySelectorAll('#hidden-gallery img');
+                let targetIndex = 0;
+
+                for (let i = 0; i < hiddenImages.length; i++) {
+                    if (hiddenImages[i].getAttribute('data-id') === photoId) {
+                        targetIndex = i;
+                        break;
+                    }
+                }
+                galleryViewer.view(targetIndex);
+            }
+        </script>
+        <script th:inline="javascript">
+            const lb = {
+                images: [],
+                currentIndex: 0,
+                scale: 1, x: 0, y: 0, rotation: 0,
+                isDragging: false, startX: 0, startY: 0,
+
+                init() {
+                    // Lấy danh sách ID từ các file-item hiện có trên DOM
+                    const items = document.querySelectorAll('.file-item');
+                    this.images = Array.from(items).map(el => el.getAttribute('data-id'));
+                },
+
+                open(id) {
+                    this.init();
+                    if (this.images.length === 0)
+                        return;
+                    this.currentIndex = this.images.indexOf(id);
+                    if (this.currentIndex === -1)
+                        this.currentIndex = 0;
+
+                    document.getElementById('customLightbox').classList.remove('hidden');
+                    document.getElementById('customLightbox').classList.add('flex');
+                    document.body.style.overflow = 'hidden'; // Khóa cuộn trang
+                    this.loadImage();
+                },
+
+                close() {
+                    document.getElementById('customLightbox').classList.add('hidden');
+                    document.getElementById('customLightbox').classList.remove('flex');
+                    document.body.style.overflow = '';
+                    this.resetTransform();
+                    document.getElementById('lbImage').src = ''; // Clear memory
+                },
+
+                loadImage() {
+                    this.resetTransform();
+                    const id = this.images[this.currentIndex];
+                    const img = document.getElementById('lbImage');
+                    const loader = document.getElementById('lbLoader');
+
+                    document.getElementById('lbCounter').innerText = `${this.currentIndex + 1} / ${this.images.length}`;
+
+                    // 1. Gắn Thumbnail ngay lập tức (tận dụng cache trình duyệt)
+                    img.src = `/gallery/thumb/${id}`;
+                    img.classList.remove('hidden');
+
+                    // Làm mờ thumbnail để báo hiệu đang tải ảnh gốc
+                    img.style.filter = 'blur(8px)';
+                    img.style.transition = 'filter 0.3s ease-out, transform 0.2s ease-out';
+                    loader.classList.remove('hidden');
+
+                    // 2. Tải ngầm ảnh gốc chất lượng cao
+                    const highResImg = new Image();
+                    highResImg.src = `/gallery/image/${id}`;
+
+                    highResImg.onload = () => {
+                        // Kiểm tra xem user có đang ở đúng ảnh này không (tránh lỗi khi bấm next/prev quá nhanh)
+                        if (this.images[this.currentIndex] === id) {
+                            img.src = highResImg.src;
+                            img.style.filter = 'blur(0px)'; // Xóa mờ mượt mà
+                            loader.classList.add('hidden');
+
+                            // Xóa style filter sau khi transition xong để không ảnh hưởng hiệu năng
+                            setTimeout(() => {
+                                if (this.images[this.currentIndex] === id) {
+                                    img.style.filter = '';
+                                }
+                            }, 300);
+                        }
+                    };
+
+                    highResImg.onerror = () => {
+                        if (this.images[this.currentIndex] === id) {
+                            img.style.filter = ''; // Bỏ mờ nếu tải lỗi để user vẫn xem được thumbnail
+                            loader.classList.add('hidden');
+                        }
+                    };
+                },
+
+                prev() {
+                    this.currentIndex = (this.currentIndex - 1 + this.images.length) % this.images.length;
+                    this.loadImage();
+                },
+
+                next() {
+                    this.currentIndex = (this.currentIndex + 1) % this.images.length;
+                    this.loadImage();
+                },
+
+                download() {
+                    const id = this.images[this.currentIndex];
+                    window.open(`/gallery/download/${id}`, '_blank');
+                },
+
+                rotate(deg) {
+                    this.rotation += deg;
+                    this.applyTransform();
+                },
+
+                resetTransform() {
+                    this.scale = 1;
+                    this.x = 0;
+                    this.y = 0;
+                    this.rotation = 0;
+                    this.applyTransform();
+                },
+
+                applyTransform() {
+                    const img = document.getElementById('lbImage');
+                    // Tắt transition khi đang drag để mượt hơn
+                    img.style.transition = this.isDragging ? 'none' : 'transform 0.2s ease-out';
+                    img.style.transform = `translate(${this.x}px, ${this.y}px) scale(${this.scale}) rotate(${this.rotation}deg)`;
+                }
+            };
+
+            // --- SỰ KIỆN CHUỘT & PHÍM CHO LIGHTBOX ---
+            const track = document.getElementById('lbTrack');
+
+            // Zoom (Cuộn chuột)
+            track.addEventListener('wheel', e => {
+                e.preventDefault();
+                const zoomStep = 0.3;
+                if (e.deltaY < 0) {
+                    lb.scale = Math.min(lb.scale + zoomStep, 5); // Max zoom 5x
+                } else {
+                    lb.scale = Math.max(lb.scale - zoomStep, 0.5); // Min zoom 0.5x
+                    // Nếu thu nhỏ về <= 1, reset vị trí X, Y về trung tâm
+                    if (lb.scale <= 1) {
+                        lb.x = 0;
+                        lb.y = 0;
+                    }
+                }
+                lb.applyTransform();
+            });
+
+            // Pan (Kéo thả khi zoom)
+            track.addEventListener('mousedown', e => {
+                if (lb.scale <= 1)
+                    return; // Chỉ cho phép kéo khi đã zoom
+                lb.isDragging = true;
+                lb.startX = e.clientX - lb.x;
+                lb.startY = e.clientY - lb.y;
+                track.style.cursor = 'grabbing';
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (lb.isDragging) {
+                    lb.isDragging = false;
+                    track.style.cursor = 'grab';
+                    lb.applyTransform(); // Bật lại transition
+                }
+            });
+
+            window.addEventListener('mousemove', e => {
+                if (!lb.isDragging)
+                    return;
+                lb.x = e.clientX - lb.startX;
+                lb.y = e.clientY - lb.startY;
+                lb.applyTransform();
+            });
+
+            // Phím tắt bàn phím
+            window.addEventListener('keydown', e => {
+                const lbEl = document.getElementById('customLightbox');
+                if (lbEl.classList.contains('hidden'))
+                    return;
+
+                if (e.key === 'ArrowRight')
+                    lb.next();
+                if (e.key === 'ArrowLeft')
+                    lb.prev();
+                if (e.key === 'Escape')
+                    lb.close();
+            });
         </script>
     </body>
 </html>

@@ -15,6 +15,7 @@ import java.util.List;
     TagController.class,                // Tag
     MangaController.class,              // Manga
     MovieController.class,              // Movie
+    GalleryController.class,
     // Thêm các Controller quản lý khác nếu có (VD: AdminController, TagController...)
     // KHÔNG thêm VideoPageController nếu trang xem video không dùng chung Sidebar này
 })

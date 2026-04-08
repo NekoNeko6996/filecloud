@@ -250,4 +250,33 @@ public class GalleryController {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }
+
+    @GetMapping("/image/{photoId}")
+    @ResponseBody
+    public ResponseEntity<Resource> getFullImage(@PathVariable String photoId) {
+        try {
+            GalleryPhoto photo = photoRepository.findById(photoId)
+                    .orElseThrow(() -> new RuntimeException("Photo not found"));
+
+            StorageVolume volume = volumeRepository.findById(photo.getVolumeId())
+                    .orElseThrow(() -> new RuntimeException("Volume offline"));
+
+            Path volumeRoot = Paths.get(volume.getMountPoint());
+            Path originalPath = volumeRoot.resolve(photo.getStoragePath());
+
+            if (!Files.exists(originalPath)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Resource resource = new UrlResource(originalPath.toUri());
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(photo.getMimeType() != null ? photo.getMimeType() : "image/jpeg"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + photo.getOriginalFilename() + "\"")
+                    .body(resource);
+
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }
