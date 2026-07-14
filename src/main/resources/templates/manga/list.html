@@ -63,6 +63,18 @@
                                 <span class="text-4xl font-bold text-white/20">M</span>
                             </div>
 
+                            <!-- Manga Reading Progress Badge -->
+                            <div th:if="${historyMap != null and historyMap.containsKey(m.id)}" class="absolute top-2 left-2 z-10">
+                                <a th:href="@{/manga/read/{id}(id=${historyMap.get(m.id).id})}"
+                                   target="_blank"
+                                   onclick="event.stopPropagation()"
+                                   class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide text-white bg-primary/95 border border-primary/20 shadow-sm hover:bg-primary transition-all backdrop-blur-md flex items-center gap-1"
+                                   th:title="'Đọc tiếp: ' + ${historyMap.get(m.id).chapterName}">
+                                    <span class="material-symbols-outlined text-[12px]">play_circle</span>
+                                    <span th:text="${historyMap.get(m.id).chapterName}">Chap 1</span>
+                                </a>
+                            </div>
+
                             <div class="absolute top-2 right-2">
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide text-white border border-white/10 shadow-sm backdrop-blur-md"
                                       th:classappend="${m.status.name() == 'ONGOING' ? 'bg-green-600/90' : (m.status.name() == 'COMPLETED' ? 'bg-blue-600/90' : 'bg-gray-600/90')}"

@@ -57,6 +57,26 @@
                                     ACTION
                                 </span>
                             </div>
+
+                            <!-- Reading History / Continue Reading -->
+                            <div th:if="${lastReadChapter != null}" class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20 mt-3 animate-in fade-in slide-in-from-top-4 duration-500">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/20 text-primary shrink-0">
+                                        <span class="material-symbols-outlined text-[24px]">history</span>
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] text-[#a79cba] uppercase font-bold tracking-wider">Đọc gần nhất</p>
+                                        <p class="text-white font-bold text-sm mt-0.5" th:text="${lastReadChapter.chapterName}">Chapter Name</p>
+                                    </div>
+                                </div>
+                                <a th:href="@{/manga/read/{id}(id=${lastReadChapter.id})}" 
+                                   target="_blank"
+                                   class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] transition-all shrink-0">
+                                    <span class="material-symbols-outlined text-[18px]">play_circle</span>
+                                    <span>Đọc tiếp</span>
+                                </a>
+                            </div>
+
                             <p class="text-gray-400 leading-relaxed text-sm md:text-base whitespace-pre-line text-justify md:text-left" th:text="${manga.description}">Desc</p>
                         </div>
                     </div>

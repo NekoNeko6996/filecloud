@@ -13,6 +13,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import com.app.filecloud.dto.MangaUploadDTO;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,6 +47,8 @@ public class MangaController {
     private final MangaPageRepository pageRepository;
     private final MangaAuthorRepository authorRepository;
     private final TagRepository tagRepository;
+    private final MangaProgressRepository progressRepository;
+    private final UserRepository userRepository;
 
     @Value("${app.storage.root:uploads}")
     private String rootUploadDir;
@@ -117,6 +121,19 @@ public class MangaController {
         model.addAttribute("keyword", keyword);
         model.addAttribute("selectedTagId", tagId);
         model.addAttribute("selectedSort", sort);
+
+        // Fetch and map reading history for the current user
+        User currentUser = getCurrentUser();
+        if (currentUser != null) {
+            List<MangaProgress> progressList = progressRepository.findByUserId(currentUser.getId());
+            Map<String, MangaChapter> historyMap = progressList.stream()
+                    .collect(Collectors.toMap(
+                            p -> p.getManga().getId(),
+                            MangaProgress::getChapter,
+                            (c1, c2) -> c1
+                    ));
+            model.addAttribute("historyMap", historyMap);
+        }
 
         return "manga/list";
     }
@@ -514,6 +531,14 @@ public class MangaController {
         model.addAttribute("manga", manga);
         model.addAttribute("chapters", chapters);
         model.addAttribute("previewMap", previewMap);
+
+        // Get last read chapter for the current user
+        User currentUser = getCurrentUser();
+        if (currentUser != null) {
+            progressRepository.findByUserIdAndMangaId(currentUser.getId(), id)
+                    .ifPresent(progress -> model.addAttribute("lastReadChapter", progress.getChapter()));
+        }
+
         return "manga/detail";
     }
 
@@ -538,11 +563,24 @@ public class MangaController {
         }
     }
 
-    // 5. Màn hình Đọc (Xem ảnh trong chapter)
     @GetMapping("/read/{chapterId}")
     public String readChapter(@PathVariable String chapterId, Model model) {
         MangaChapter currentChapter = chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new IllegalArgumentException("Chapter not found"));
+
+        // Save or update reading progress for logged in user
+        User currentUser = getCurrentUser();
+        if (currentUser != null) {
+            MangaSeries manga = currentChapter.getManga();
+            MangaProgress progress = progressRepository.findByUserIdAndMangaId(currentUser.getId(), manga.getId())
+                    .orElseGet(() -> MangaProgress.builder()
+                            .user(currentUser)
+                            .manga(manga)
+                            .build());
+            progress.setChapter(currentChapter);
+            progress.setReadAt(java.time.LocalDateTime.now());
+            progressRepository.save(progress);
+        }
 
         // 1. Lấy danh sách chapter của truyện này và sort đúng thứ tự
         List<MangaChapter> allChapters = chapterRepository
@@ -1061,5 +1099,13 @@ public class MangaController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(e.getMessage());
         }
+    }
+
+    private User getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            return userRepository.findByUsername(auth.getName()).orElse(null);
+        }
+        return null;
     }
 }
