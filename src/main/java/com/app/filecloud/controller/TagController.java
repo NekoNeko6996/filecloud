@@ -103,4 +103,33 @@ public class TagController {
         String slug = NONLATIN.matcher(normalized).replaceAll("");
         return slug.toLowerCase(Locale.ENGLISH);
     }
+
+    @PostMapping("/api/create")
+    @ResponseBody
+    public ResponseEntity<?> createTagApi(
+            @RequestParam("name") String name,
+            @RequestParam(value = "slug", required = false) String slug,
+            @RequestParam(value = "colorHex", required = false) String colorHex,
+            @RequestParam(value = "description", required = false) String description) {
+        try {
+            if (slug == null || slug.trim().isEmpty()) {
+                slug = toSlug(name);
+            }
+            if (tagRepository.existsBySlug(slug)) {
+                return ResponseEntity.badRequest().body("Tag with slug '" + slug + "' already exists!");
+            }
+
+            Tag tag = Tag.builder()
+                    .name(name)
+                    .slug(slug)
+                    .colorHex(colorHex)
+                    .description(description)
+                    .build();
+
+            Tag saved = tagRepository.save(tag);
+            return ResponseEntity.ok(saved);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
 }

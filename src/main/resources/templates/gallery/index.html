@@ -4,6 +4,21 @@
     <head>
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.6/viewer.min.css">
+        <style>
+            /* [FIX] Ép Viewer luôn full màn hình, đè lên mọi thứ */
+            .viewer-container {
+                z-index: 99999 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+            }
+            .viewer-backdrop {
+                background-color: rgba(0, 0, 0, 0.95) !important;
+            }
+        </style>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.6/viewer.min.js"></script>
         <title th:text="${title}">MediaVault</title>
     </head>
@@ -243,9 +258,15 @@
                                 class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold">
                             Save
                         </button>
-                    </div>
-                </div>
-            </dialog>
+            </div>
+            
+            <div id="hidden-gallery" class="invisible absolute top-0 left-0 h-0 w-0 overflow-hidden">
+                <img th:each="photo : ${photos}" 
+                     th:data-original-src="@{'/gallery/image/' + ${photo.id}}"
+                     th:src="@{'/gallery/thumb/' + ${photo.id}}"
+                     th:alt="${photo.originalFilename}"
+                     th:data-id="${photo.id}">
+            </div>
         </section>
 
         <script th:inline="javascript">
@@ -772,6 +793,56 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+            }
+
+            // --- VIEWER JS INTEGRATION ---
+            let galleryViewer = null;
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const galleryElement = document.getElementById('hidden-gallery');
+
+                if (galleryElement) {
+                    galleryViewer = new Viewer(galleryElement, {
+                        url: 'data-original-src',
+                        backdrop: 'static',
+                        className: 'viewer-z-fix',
+                        transition: false,
+                        toolbar: {
+                            zoomIn: 1, zoomOut: 1, oneToOne: 1, reset: 1,
+                            prev: 1, play: 1, next: 1,
+                            rotateLeft: 1, rotateRight: 1,
+                            flipHorizontal: 1, flipVertical: 1,
+                        },
+                        title: [true, (image) => `${image.alt} (${image.naturalWidth}x${image.naturalHeight})`],
+
+                        viewed(e) {
+                            const img = e.detail.image;
+                            if (img.naturalWidth === 0) {
+                                console.warn("Viewer.js: Ảnh chưa load xong hoặc lỗi URL:", img.src);
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Hàm mở Lightbox
+            function openLightbox(photoId) {
+                if (!galleryViewer)
+                    return;
+
+                // Cập nhật lại galleryViewer (đôi khi DOM thay đổi làm mất đồng bộ)
+                galleryViewer.update();
+
+                const hiddenImages = document.querySelectorAll('#hidden-gallery img');
+                let targetIndex = 0;
+
+                for (let i = 0; i < hiddenImages.length; i++) {
+                    if (hiddenImages[i].getAttribute('data-id') === photoId) {
+                        targetIndex = i;
+                        break;
+                    }
+                }
+                galleryViewer.view(targetIndex);
             }
         </script>
     </body>
