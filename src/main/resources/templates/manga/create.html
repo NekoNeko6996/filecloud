@@ -111,21 +111,36 @@
                     </div>
 
                     <div class="bg-surface p-6 rounded-xl border border-white/10 shadow-lg">
-                        <div class="flex items-center justify-between mb-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                             <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                                <span class="material-symbols-outlined">label</span> Tags/Genres
+                                <span class="material-symbols-outlined text-primary">label</span> Tags/Genres
                             </h2>
-                            <div class="relative w-48 sm:w-64">
-                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-sm">search</span>
-                                <input type="text" id="tagSearchInput" 
-                                       class="w-full bg-background/50 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary/50 outline-none transition-all placeholder-gray-600"
-                                       placeholder="Filter tags...">
+                            <div class="flex items-center gap-2">
+                                <div class="relative w-40 sm:w-48">
+                                    <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-sm">search</span>
+                                    <input type="text" id="tagSearchInput" 
+                                           class="w-full bg-background/50 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary/50 outline-none transition-all placeholder-gray-600"
+                                           placeholder="Filter tags...">
+                                </div>
+                                <button type="button" onclick="document.getElementById('inlineTagModal').showModal()"
+                                        class="bg-primary/20 hover:bg-primary/40 text-primary hover:text-white border border-primary/30 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-1 transition-all">
+                                    <span class="material-symbols-outlined text-[18px]">add</span>
+                                    <span>New Tag</span>
+                                </button>
                             </div>
+                        </div>
+
+                        <!-- Selected Tags Display List -->
+                        <div id="selectedTagsDisplay" class="flex flex-wrap gap-2 mb-4 p-3 bg-background/50 border border-white/5 rounded-xl min-h-[46px] items-center">
+                            <span class="text-xs text-gray-500 select-none" id="noTagsSelectedLabel">No tags selected</span>
                         </div>
 
                         <div id="tagGrid" class="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto scrollbar-thin p-1">
                             <label th:each="tag : ${allTags}" 
-                                   class="tag-item flex items-center space-x-3 p-3 rounded-lg border border-white/10 bg-background/30 hover:bg-surface-hover cursor-pointer transition-all group select-none">
+                                   th:data-description="${tag.description != null && !tag.description.isEmpty() ? tag.description : 'No description available'}"
+                                   onmouseenter="showTagTooltip(event, this)"
+                                   onmouseleave="hideTagTooltip()"
+                                   class="tag-item flex items-center space-x-3 p-3 rounded-lg border border-white/10 bg-background/30 hover:bg-surface-hover cursor-pointer transition-all group select-none relative">
                                 <input type="checkbox" name="tagIds" th:value="${tag.id}"
                                        class="w-5 h-5 rounded border-gray-500 text-primary focus:ring-primary bg-background/50 shrink-0">
                                 <span class="tag-name text-sm text-gray-300 group-hover:text-white transition-colors truncate" th:text="${tag.name}">Tag Name</span>
@@ -199,6 +214,55 @@
             </form>
         </div>
 
+        <!-- Inline Tag Modal -->
+        <dialog id="inlineTagModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:backdrop-blur-sm backdrop:bg-black/80 w-full max-w-md">
+            <form id="inlineTagForm" class="flex flex-col gap-4">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-bold text-xl">Create New Tag</h3>
+                    <button type="button" onclick="document.getElementById('inlineTagModal').close()" class="text-gray-400 hover:text-white">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-4 gap-4">
+                    <div class="col-span-3">
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold tracking-wide">Name <span class="text-red-500">*</span></label>
+                        <input type="text" id="inlineTagName" required placeholder="e.g. Action"
+                               class="w-full bg-black/30 border border-white/10 rounded px-4 py-2 text-white focus:outline-none focus:border-primary">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block uppercase font-bold tracking-wide">Color</label>
+                        <input type="color" id="inlineTagColor" value="#833cf6"
+                               class="w-full h-[42px] bg-black/30 border border-white/10 rounded cursor-pointer p-1">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block uppercase font-bold tracking-wide">Slug (Optional)</label>
+                    <input type="text" id="inlineTagSlug" placeholder="Auto-generated if empty"
+                           class="w-full bg-black/30 border border-white/10 rounded px-4 py-2 text-white focus:outline-none focus:border-primary font-mono text-sm">
+                </div>
+
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block uppercase font-bold tracking-wide">Description</label>
+                    <textarea id="inlineTagDesc" rows="3" placeholder="Description..."
+                              class="w-full bg-black/30 border border-white/10 rounded px-4 py-2 text-white focus:outline-none focus:border-primary"></textarea>
+                </div>
+
+                <div class="flex gap-3 justify-end mt-4 pt-4 border-t border-white/5">
+                    <button type="button" onclick="document.getElementById('inlineTagModal').close()" class="px-4 py-2 text-sm text-gray-400 hover:text-white font-medium">Cancel</button>
+                    <button type="submit" class="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px]">save</span>
+                        <span>Save Tag</span>
+                    </button>
+                </div>
+            </form>
+        </dialog>
+
+        <!-- Tooltip element for tags -->
+        <div id="tagTooltip" class="hidden absolute z-[9999] max-w-xs bg-[#1a1625] border border-white/10 text-[#e0def2] text-xs rounded-lg p-3 shadow-2xl pointer-events-none transition-opacity duration-150 ease-out select-none backdrop-blur-md">
+        </div>
+
         <script th:inline="javascript">
             const csrfToken = document.getElementById('csrfToken').value;
             const csrfHeader = 'X-CSRF-TOKEN';
@@ -214,7 +278,8 @@
 
                 tagItems.forEach(item => {
                     const name = item.querySelector('.tag-name').textContent.toLowerCase();
-                    if (name.includes(term)) {
+                    const desc = (item.getAttribute('data-description') || '').toLowerCase();
+                    if (name.includes(term) || desc.includes(term)) {
                         item.classList.remove('hidden');
                         visibleCount++;
                     } else {
@@ -492,6 +557,166 @@
                     alert('An error occurred.');
                     btnSubmit.disabled = false;
                     btnSubmit.innerHTML = '<span class="material-symbols-outlined text-2xl">rocket_launch</span> Create Manga';
+                }
+            });
+
+            // --- SELECTED TAGS DISPLAY ---
+            const selectedTagsDisplay = document.getElementById('selectedTagsDisplay');
+            const noTagsSelectedLabel = document.getElementById('noTagsSelectedLabel');
+
+            function updateSelectedTagsDisplay() {
+                const checkedBoxes = Array.from(document.querySelectorAll('input[name="tagIds"]:checked'));
+                selectedTagsDisplay.innerHTML = '';
+                
+                if (checkedBoxes.length === 0) {
+                    selectedTagsDisplay.appendChild(noTagsSelectedLabel);
+                    noTagsSelectedLabel.classList.remove('hidden');
+                    return;
+                }
+                
+                noTagsSelectedLabel.classList.add('hidden');
+                
+                checkedBoxes.forEach(cb => {
+                    const tagItem = cb.closest('.tag-item');
+                    const tagName = tagItem.querySelector('.tag-name').textContent;
+                    const tagId = cb.value;
+                    
+                    const pill = document.createElement('div');
+                    pill.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-primary bg-primary/10 border border-primary/20 select-none';
+                    pill.innerHTML = `
+                        <span>${tagName}</span>
+                        <button type="button" onclick="removeTagSelection('${tagId}')" class="text-primary/70 hover:text-red-400 transition-colors flex items-center focus:outline-none">
+                            <span class="material-symbols-outlined text-[14px]">close</span>
+                        </button>
+                    `;
+                    selectedTagsDisplay.appendChild(pill);
+                });
+            }
+
+            window.removeTagSelection = function(tagId) {
+                const checkbox = document.querySelector(`input[name="tagIds"][value="${tagId}"]`);
+                if (checkbox) {
+                    checkbox.checked = false;
+                    updateSelectedTagsDisplay();
+                }
+            };
+
+            // Bind change events to existing checkboxes
+            document.querySelectorAll('input[name="tagIds"]').forEach(cb => {
+                cb.addEventListener('change', updateSelectedTagsDisplay);
+            });
+
+            // Initialize display on load
+            document.addEventListener('DOMContentLoaded', () => {
+                updateSelectedTagsDisplay();
+            });
+
+            // --- TOOLTIP LOGIC ---
+            const tooltip = document.getElementById('tagTooltip');
+
+            window.showTagTooltip = function(e, el) {
+                const desc = el.getAttribute('data-description');
+                tooltip.textContent = desc;
+                tooltip.classList.remove('hidden');
+                tooltip.classList.add('opacity-100');
+                
+                const rect = el.getBoundingClientRect();
+                const tooltipHeight = tooltip.offsetHeight;
+                const tooltipWidth = tooltip.offsetWidth;
+                
+                let top = rect.top + window.scrollY - tooltipHeight - 8;
+                let left = rect.left + window.scrollX + (rect.width - tooltipWidth) / 2;
+                
+                if (rect.top - tooltipHeight - 8 < 0) {
+                    top = rect.bottom + window.scrollY + 8;
+                }
+                if (left < 10) left = 10;
+                if (left + tooltipWidth > window.innerWidth - 10) {
+                    left = window.innerWidth - tooltipWidth - 10;
+                }
+                
+                tooltip.style.left = `${left}px`;
+                tooltip.style.top = `${top}px`;
+            };
+
+            window.hideTagTooltip = function() {
+                tooltip.classList.add('hidden');
+                tooltip.classList.remove('opacity-100');
+            };
+
+            // --- INLINE TAG CREATION ---
+            const inlineTagModal = document.getElementById('inlineTagModal');
+            const inlineTagForm = document.getElementById('inlineTagForm');
+
+            inlineTagForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                
+                const name = document.getElementById('inlineTagName').value.trim();
+                const colorHex = document.getElementById('inlineTagColor').value;
+                const slug = document.getElementById('inlineTagSlug').value.trim();
+                const description = document.getElementById('inlineTagDesc').value.trim();
+
+                if (!name) {
+                    alert("Tag name is required!");
+                    return;
+                }
+
+                const submitBtn = inlineTagForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[16px]">sync</span> Saving...';
+
+                try {
+                    const formData = new URLSearchParams();
+                    formData.append('name', name);
+                    formData.append('colorHex', colorHex);
+                    formData.append('slug', slug);
+                    formData.append('description', description);
+
+                    const response = await fetch('/admin/tags/api/create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            [csrfHeader]: csrfToken
+                        },
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        const newTag = await response.json();
+                        const tagGrid = document.getElementById('tagGrid');
+                        
+                        document.getElementById('noTagsFoundMsg').classList.add('hidden');
+                        
+                        const label = document.createElement('label');
+                        label.className = 'tag-item flex items-center space-x-3 p-3 rounded-lg border border-white/10 bg-background/30 hover:bg-surface-hover cursor-pointer transition-all group select-none relative';
+                        label.setAttribute('data-description', newTag.description || 'No description available');
+                        label.addEventListener('mouseenter', (e) => showTagTooltip(e, label));
+                        label.addEventListener('mouseleave', hideTagTooltip);
+                        
+                        label.innerHTML = `
+                            <input type="checkbox" name="tagIds" value="${newTag.id}" checked
+                                   class="w-5 h-5 rounded border-gray-500 text-primary focus:ring-primary bg-background/50 shrink-0">
+                            <span class="tag-name text-sm text-gray-300 group-hover:text-white transition-colors truncate">${newTag.name}</span>
+                        `;
+                        
+                        const checkbox = label.querySelector('input[type="checkbox"]');
+                        checkbox.addEventListener('change', updateSelectedTagsDisplay);
+                        
+                        tagGrid.insertBefore(label, tagGrid.firstChild);
+                        
+                        inlineTagForm.reset();
+                        inlineTagModal.close();
+                        updateSelectedTagsDisplay();
+                    } else {
+                        const errorMsg = await response.text();
+                        alert('Create tag failed: ' + errorMsg);
+                    }
+                } catch (err) {
+                    console.error('Error saving tag:', err);
+                    alert('An error occurred while saving the tag.');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<span class="material-symbols-outlined text-[16px]">save</span><span>Save Tag</span>';
                 }
             });
         </script>
