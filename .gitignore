@@ -37,3 +37,4 @@ uploads/
 .vscode/
 filecloud.bat
 MySQL
+rebuild.bat
