@@ -5,7 +5,7 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
         <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
 
-            <header class="glass-header h-16 flex items-center justify-between px-4 md:px-6 shrink-0 z-10 sticky top-0 gap-4">
+            <header class="h-16 flex items-center justify-between px-4 md:px-6 shrink-0 z-20 sticky top-0 gap-4 bg-gradient-to-b from-black/80 to-transparent backdrop-blur-[2px]">
                 <div class="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
                     <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white transition-colors p-1">
                         <span class="material-symbols-outlined text-2xl">menu</span>
@@ -26,9 +26,17 @@
                 </div>
             </header>
 
-            <div class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth custom-scrollbar" onclick="hideChapterContextMenu()">
-                <div class="max-w-5xl mx-auto">
-                    <div class="flex flex-col md:flex-row gap-6 md:gap-8 mb-8 md:mb-10">
+            <div class="flex-1 overflow-y-auto scroll-smooth custom-scrollbar relative" onclick="hideChapterContextMenu()">
+                <!-- Blurred Background Backdrop -->
+                <div th:if="${manga.coverPath != null}" class="absolute top-0 left-0 right-0 h-[280px] md:h-[420px] overflow-hidden pointer-events-none rounded-b-[2rem] md:rounded-b-[3rem] z-0 -mt-16">
+                    <img th:src="@{/manga/cover/{id}/thumb(id=${manga.id})}" 
+                         loading="lazy"
+                         class="w-full h-full object-cover blur-3xl opacity-35 scale-105">
+                    <div class="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/30 to-black/35"></div>
+                </div>
+
+                <div class="max-w-5xl mx-auto relative z-10 p-4 md:p-8">
+                    <div class="flex flex-col md:flex-row gap-6 md:gap-8 mb-8 md:mb-10 pt-10 md:pt-12">
                         <div class="w-full md:w-64 shrink-0 mx-auto md:mx-0 max-w-[200px] md:max-w-none">
                             <div class="aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group bg-gray-800">
                                 <img th:if="${manga.coverPath != null}" 
@@ -69,11 +77,29 @@
                                         <p class="text-white font-bold text-sm mt-0.5" th:text="${lastReadChapter.chapterName}">Chapter Name</p>
                                     </div>
                                 </div>
-                                <a th:href="@{/manga/read/{id}(id=${lastReadChapter.id})}" 
+                                <div class="flex gap-2 shrink-0 justify-center sm:justify-start">
+                                    <a th:if="${not #lists.isEmpty(chapters)}" 
+                                       th:href="@{/manga/read/{id}(id=${chapters[0].id})}" 
+                                       target="_blank"
+                                       class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white font-bold text-sm transition-all">
+                                        <span class="material-symbols-outlined text-[18px]">first_page</span>
+                                        <span>Đọc từ đầu</span>
+                                    </a>
+                                    <a th:href="@{/manga/read/{id}(id=${lastReadChapter.id})}" 
+                                       target="_blank"
+                                       class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] transition-all">
+                                        <span class="material-symbols-outlined text-[18px]">play_circle</span>
+                                        <span>Đọc tiếp</span>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div th:unless="${lastReadChapter != null}" th:if="${not #lists.isEmpty(chapters)}" class="mt-3 flex justify-center md:justify-start">
+                                <a th:href="@{/manga/read/{id}(id=${chapters[0].id})}" 
                                    target="_blank"
-                                   class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] transition-all shrink-0">
-                                    <span class="material-symbols-outlined text-[18px]">play_circle</span>
-                                    <span>Đọc tiếp</span>
+                                   class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] transition-all">
+                                    <span class="material-symbols-outlined text-[18px]">menu_book</span>
+                                    <span>Bắt đầu đọc (Từ đầu)</span>
                                 </a>
                             </div>
 

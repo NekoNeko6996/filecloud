@@ -50,30 +50,57 @@
                 </a>
                 <div class="flex flex-col min-w-0">
                     <h1 class="text-xs text-gray-400 font-bold truncate uppercase" th:text="${chapter.manga.title}">TITLE</h1>
-                    <span class="text-sm font-bold text-white truncate" th:text="${chapter.chapterName}">Chapter</span>
+                    <span id="headerChapterName" class="text-sm font-bold text-white truncate" th:text="${chapter.chapterName}">Chapter</span>
                 </div>
             </div>
 
-            <button onclick="toggleViewMode()" class="flex justify-center items-center p-2 aspect-[1/1] w-[47px] rounded-full hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Switch View Mode">
-                <span id="viewModeIcon" class="material-symbols-outlined">auto_stories</span> 
-            </button>
-        </header>
+            <div class="flex items-center gap-1 md:gap-2">
+                <!-- Zoom controls -->
+                <div class="flex items-center bg-white/5 rounded-full border border-white/10 px-1 py-0.5 mr-1 md:mr-2">
+                    <button onclick="zoom('out')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors" title="Thu nhỏ">
+                        <span class="material-symbols-outlined text-[18px]">zoom_out</span>
+                    </button>
+                    <button onclick="zoom('reset')" id="zoomIndicator" class="px-1 text-xs font-bold text-gray-300 hover:text-white transition-colors min-w-[40px] text-center" title="Reset thu phóng">
+                        100%
+                    </button>
+                    <button onclick="zoom('in')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors" title="Phóng to">
+                        <span class="material-symbols-outlined text-[18px]">zoom_in</span>
+                    </button>
+                </div>
 
+                <!-- Toggle Seamless Mode Button -->
+                <button id="btnSeamless" onclick="toggleSeamlessMode()" 
+                        class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors" 
+                        title="Xem liền mạch (Tự động tải chương tiếp theo)">
+                    <span class="material-symbols-outlined">view_stream</span>
+                </button>
+
+                <button onclick="toggleViewMode()" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-300 hover:text-white transition-colors" title="Switch View Mode">
+                    <span id="viewModeIcon" class="material-symbols-outlined">auto_stories</span> 
+                </button>
+            </div>
+        </header>
+ 
         <main id="readerContainer" onclick="toggleInterface()"
               class="flex-1 w-full h-full pt-14 pb-0 outline-none transition-all duration-300
               flex flex-col items-center overflow-y-auto scroll-smooth custom-scrollbar"> 
             <div th:each="page, iterStat : ${pages}" 
                  th:id="'page-' + ${iterStat.index}"
                  class="manga-page relative group transition-all duration-300 w-full max-w-3xl"
-                 th:data-index="${iterStat.index}">
-
+                 th:data-index="${iterStat.index}"
+                 th:data-chapter-id="${chapter.id}"
+                 th:data-chapter-name="${chapter.chapterName}"
+                 th:data-page-index="${iterStat.index}"
+                 th:data-total-pages="${pages.size()}">
+ 
                 <img th:src="@{/manga/image/{id}/thumb(id=${page.id})}" 
+                     th:data-thumb="@{/manga/image/{id}/thumb(id=${page.id})}" 
                      th:data-src="@{/manga/image/{id}(id=${page.id})}"
                      loading="lazy"
                      class="lazy-load w-full h-auto block select-none bg-[#121212] mx-auto object-contain transition-all duration-700 filter blur-sm data-[loaded=true]:blur-0"
                      th:classappend="${iterStat.index > 0} ? 'mt-0' : ''">
             </div>
-
+ 
             <div id="verticalNav" class="w-full max-w-3xl p-10 flex flex-col items-center gap-6 mt-6 pb-24 border-t border-white/10 text-center">
                 <p class="text-gray-400 text-sm">End of Chapter</p>
                 <div class="flex gap-4">
@@ -82,25 +109,25 @@
                 </div>
             </div>
         </main>
-
+ 
         <div id="readerControls" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md transition-all duration-300">
             <div class="bg-[#1e1e1e]/95 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl p-1.5 flex items-center justify-between gap-1">
-
+ 
                 <button id="btnPrevControl" onclick="navigate('prev')" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors shrink-0">
                     <span class="material-symbols-outlined">chevron_left</span>
                 </button>
-
+ 
                 <button onclick="document.getElementById('chapterModal').showModal()" 
                         class="flex-1 flex flex-col items-center justify-center h-full px-2 border-x border-white/5 hover:bg-white/5 rounded transition-colors group">
                     <div class="flex items-center gap-1 text-xs font-bold text-white group-hover:text-primary transition-colors">
                         <span class="material-symbols-outlined text-[16px]">format_list_bulleted</span>
-                        <span class="truncate max-w-[120px]" th:text="${chapter.chapterName}">Chapter 1</span>
+                        <span id="controlChapterName" class="truncate max-w-[120px]" th:text="${chapter.chapterName}">Chapter 1</span>
                     </div>
                     <div class="text-[10px] text-gray-500 font-mono">
-                        <span id="pageIndicator" class="text-primary font-bold">1</span> / <span th:text="${pages.size()}">20</span>
+                        <span id="pageIndicator" class="text-primary font-bold">1</span> / <span id="controlTotalPages" th:text="${pages.size()}">20</span>
                     </div>
                 </button>
-
+ 
                 <button id="btnNextControl" onclick="navigate('next')" class="w-10 h-10 flex items-center justify-center rounded-full bg-primary hover:bg-primary-dark text-white shadow-lg transition-all shrink-0 active:scale-95">
                     <span class="material-symbols-outlined">chevron_right</span>
                 </button>
@@ -155,6 +182,237 @@
             const icon = document.getElementById('viewModeIcon');
             const pages = document.querySelectorAll('.manga-page');
             const verticalNav = document.getElementById('verticalNav');
+
+            // --- SEAMLESS READING STATE ---
+            window.currentChapterId = /*[[${chapter.id}]]*/ '';
+            const loadedChapterIds = new Set([window.currentChapterId]);
+            let chapterUrls = [];
+            let seamlessModeEnabled = localStorage.getItem('mangaSeamlessMode') === 'true';
+            let isFetchingNextChapter = false;
+
+            // --- ZOOM STATE & ACTIONS ---
+            let zoomLevel = parseInt(localStorage.getItem('mangaZoomLevel')) || 100;
+
+            function zoom(action) {
+                if (action === 'in') {
+                    zoomLevel = Math.min(200, zoomLevel + 10);
+                } else if (action === 'out') {
+                    zoomLevel = Math.max(50, zoomLevel - 10);
+                } else if (action === 'reset') {
+                    zoomLevel = 100;
+                }
+                localStorage.setItem('mangaZoomLevel', zoomLevel);
+                applyZoom();
+            }
+
+            function applyZoom() {
+                const indicator = document.getElementById('zoomIndicator');
+                if (indicator) indicator.innerText = `${zoomLevel}%`;
+
+                const factor = zoomLevel / 100;
+                
+                const allPages = document.querySelectorAll('.manga-page');
+                allPages.forEach(p => {
+                    if (currentMode === 'vertical') {
+                        p.style.maxWidth = `${768 * factor}px`;
+                        const img = p.querySelector('img');
+                        if (img) {
+                            img.style.transform = '';
+                            img.style.transition = '';
+                        }
+                    } else {
+                        p.style.maxWidth = ''; // Reset
+                        const img = p.querySelector('img');
+                        if (img) {
+                            if (!p.classList.contains('hidden')) {
+                                img.style.transform = `scale(${factor})`;
+                                img.style.transition = 'transform 0.25s ease';
+                            } else {
+                                img.style.transform = '';
+                                img.style.transition = '';
+                            }
+                        }
+                    }
+                });
+            }
+
+            function toggleSeamlessMode() {
+                seamlessModeEnabled = !seamlessModeEnabled;
+                localStorage.setItem('mangaSeamlessMode', seamlessModeEnabled ? 'true' : 'false');
+                applySeamlessMode();
+            }
+
+            function applySeamlessMode() {
+                const btn = document.getElementById('btnSeamless');
+                if (btn) {
+                    if (seamlessModeEnabled) {
+                        btn.className = "w-10 h-10 flex items-center justify-center rounded-full bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30 transition-colors";
+                        btn.title = "Xem liền mạch: BẬT";
+                        const currentIdx = chapterUrls.findIndex(url => url.endsWith(window.currentChapterId));
+                        if (currentIdx !== -1 && currentIdx + 1 < chapterUrls.length) {
+                            verticalNav.classList.add('hidden');
+                        }
+                    } else {
+                        btn.className = "w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors";
+                        btn.title = "Xem liền mạch (Tự động tải chương tiếp theo)";
+                        verticalNav.classList.remove('hidden');
+                    }
+                }
+            }
+
+            async function triggerLoadNextChapter() {
+                if (isFetchingNextChapter || !seamlessModeEnabled || currentMode !== 'vertical') return;
+                
+                const currentIdx = chapterUrls.findIndex(url => url.endsWith(window.currentChapterId));
+                if (currentIdx === -1 || currentIdx + 1 >= chapterUrls.length) {
+                    return;
+                }
+                
+                const nextUrl = chapterUrls[currentIdx + 1];
+                const nextChapterId = nextUrl.split('/').pop();
+                
+                if (loadedChapterIds.has(nextChapterId)) return;
+                
+                isFetchingNextChapter = true;
+                
+                const loader = document.createElement('div');
+                loader.id = 'seamless-loader';
+                loader.className = 'w-full max-w-3xl p-6 text-center text-gray-500 text-sm flex flex-col items-center gap-2 mt-4';
+                loader.innerHTML = `
+                    <span class="material-symbols-outlined animate-spin">sync</span>
+                    <span>Đang tự động tải chương tiếp theo...</span>
+                `;
+                container.insertBefore(loader, verticalNav);
+                
+                try {
+                    const res = await fetch(`/manga/chapter/${nextChapterId}/details`);
+                    if (!res.ok) throw new Error("Failed to load details");
+                    
+                    const data = await res.json();
+                    loader.remove();
+                    
+                    appendChapterPages(data);
+                    loadedChapterIds.add(nextChapterId);
+                } catch (e) {
+                    console.error(e);
+                    if (loader) {
+                        loader.innerHTML = `
+                            <span class="text-red-500 font-bold">Lỗi tải chương tiếp theo!</span>
+                            <button onclick="triggerLoadNextChapter()" class="text-primary hover:underline text-xs mt-1">Thử lại</button>
+                        `;
+                    }
+                } finally {
+                    isFetchingNextChapter = false;
+                }
+            }
+
+            function appendChapterPages(data) {
+                const divider = document.createElement('div');
+                divider.className = 'w-full max-w-3xl py-6 my-4 border-y border-white/10 text-center bg-white/5 rounded-lg';
+                divider.innerHTML = `
+                    <h3 class="text-lg font-bold text-primary">${data.name}</h3>
+                    <p class="text-xs text-gray-500 mt-1 font-mono">${data.pages.length} trang</p>
+                `;
+                container.insertBefore(divider, verticalNav);
+
+                const startIdx = document.querySelectorAll('.manga-page').length;
+
+                data.pages.forEach((page, i) => {
+                    const pageDiv = document.createElement('div');
+                    pageDiv.id = `page-${startIdx + i}`;
+                    pageDiv.className = 'manga-page relative group transition-all duration-300 w-full max-w-3xl';
+                    pageDiv.setAttribute('data-index', startIdx + i);
+                    pageDiv.setAttribute('data-chapter-id', data.id);
+                    pageDiv.setAttribute('data-chapter-name', data.name);
+                    pageDiv.setAttribute('data-page-index', i);
+                    pageDiv.setAttribute('data-total-pages', data.pages.length);
+
+                    const img = document.createElement('img');
+                    img.src = `/manga/image/${page.id}/thumb`;
+                    img.setAttribute('data-thumb', `/manga/image/${page.id}/thumb`);
+                    img.setAttribute('data-src', `/manga/image/${page.id}`);
+                    img.setAttribute('loading', 'lazy');
+                    img.className = 'lazy-load w-full h-auto block select-none bg-[#121212] mx-auto object-contain transition-all duration-700 filter blur-sm data-[loaded=true]:blur-0';
+                    
+                    pageDiv.appendChild(img);
+                    container.insertBefore(pageDiv, verticalNav);
+
+                    if (window.lazyObserver) {
+                        window.lazyObserver.observe(img);
+                    }
+                });
+
+                enableObserver();
+                applyZoom();
+                updateVerticalNav(data.id);
+            }
+
+            function updateVerticalNav(currentChapId) {
+                const currentIdx = chapterUrls.findIndex(url => url.endsWith(currentChapId));
+                if (currentIdx === -1) return;
+
+                const prevButton = verticalNav.querySelector('a:first-of-type');
+                const nextButton = verticalNav.querySelector('a:last-of-type');
+
+                if (currentIdx > 0) {
+                    if (prevButton) {
+                        prevButton.setAttribute('href', chapterUrls[currentIdx - 1]);
+                        prevButton.classList.remove('hidden');
+                    }
+                } else {
+                    if (prevButton) prevButton.classList.add('hidden');
+                }
+
+                if (currentIdx + 1 < chapterUrls.length) {
+                    if (nextButton) {
+                        nextButton.setAttribute('href', chapterUrls[currentIdx + 1]);
+                        nextButton.classList.remove('hidden');
+                        if (seamlessModeEnabled) {
+                            verticalNav.classList.add('hidden');
+                        } else {
+                            verticalNav.classList.remove('hidden');
+                        }
+                    }
+                } else {
+                    if (nextButton) nextButton.classList.add('hidden');
+                    verticalNav.classList.remove('hidden');
+                    const textP = verticalNav.querySelector('p');
+                    if (textP) textP.innerText = 'Đã hết chương cuối cùng';
+                }
+            }
+
+            function updateChapterListHighlight(chapterId) {
+                const items = document.querySelectorAll('#chapterListContainer a');
+                items.forEach(item => {
+                    const href = item.getAttribute('href');
+                    if (href && href.endsWith(chapterId)) {
+                        item.className = "chapter-item block px-4 py-3 rounded bg-primary/10 border-l-2 border-primary text-primary font-bold transition-colors";
+                        if (!item.querySelector('.material-symbols-outlined')) {
+                            const checkSpan = document.createElement('span');
+                            checkSpan.className = 'material-symbols-outlined text-[16px]';
+                            checkSpan.innerText = 'check';
+                            const flexDiv = item.querySelector('div');
+                            if (flexDiv) flexDiv.appendChild(checkSpan);
+                        }
+                    } else {
+                        item.className = "chapter-item block px-4 py-3 rounded hover:bg-white/5 transition-colors border-l-2 border-transparent hover:border-primary text-gray-300 font-normal";
+                        const checkIcon = item.querySelector('.material-symbols-outlined');
+                        if (checkIcon) checkIcon.remove();
+                    }
+                });
+            }
+
+            container.addEventListener('scroll', () => {
+                if (currentMode !== 'vertical' || !seamlessModeEnabled) return;
+
+                const scrollHeight = container.scrollHeight;
+                const scrollTop = container.scrollTop;
+                const clientHeight = container.clientHeight;
+
+                if (scrollHeight - scrollTop - clientHeight < 1000) {
+                    triggerLoadNextChapter();
+                }
+            });
 
             // --- ADVANCED QUEUE LAZY LOAD (Single Thread + Priority) ---
 
@@ -247,6 +505,13 @@
 
             // 3. Observer: Chỉ nhiệm vụ cập nhật danh sách Viewport
             document.addEventListener('DOMContentLoaded', () => {
+                // Khởi tạo danh sách các chapter URLs
+                const chapterElements = document.querySelectorAll('#chapterListContainer a');
+                chapterUrls = Array.from(chapterElements).map(el => el.getAttribute('href'));
+
+                // Áp dụng trạng thái xem liền mạch ban đầu
+                applySeamlessMode();
+
                 const lazyImages = document.querySelectorAll('img.lazy-load');
                 const scrollContainer = document.getElementById('readerContainer');
 
@@ -264,21 +529,36 @@
                             }
                         } else {
                             // ẢNH RA KHỎI KHUNG HÌNH:
+                            // CẦN HỦY TẢI (UNLOAD): Giải phóng RAM/GPU bằng cách chuyển về ảnh thumb nhẹ
+                            if (currentMode === 'vertical' && img.getAttribute('data-loaded') === 'true') {
+                                const thumbUrl = img.getAttribute('data-thumb');
+                                if (thumbUrl) {
+                                    const fullSrc = img.src;
+                                    img.setAttribute('data-src', fullSrc);
+                                    img.src = thumbUrl;
+                                    img.classList.add('blur-sm');
+                                    img.removeAttribute('data-loaded');
+                                    img.removeAttribute('data-loading');
+                                }
+                            }
                             // Xóa khỏi danh sách ưu tiên.
-                            // (Nếu ảnh này chưa kịp tải, nó sẽ bị đẩy xuống độ ưu tiên thấp - Background)
                             viewportImages.delete(img);
                         }
                     });
                 }, {
                     root: scrollContainer,
-                    rootMargin: "50px 0px", // Margin nhỏ để xác định chính xác ảnh đang xem
+                    rootMargin: "1200px 0px", // Margin rộng để tải trước mượt mà và tự động giải phóng bộ nhớ từ xa
                     threshold: 0.01
                 });
 
+                window.lazyObserver = observer;
                 lazyImages.forEach(img => observer.observe(img));
 
                 // Kích hoạt lần đầu (để bắt đầu tải background nếu viewport trống)
                 setTimeout(processQueue, 500);
+
+                // Áp dụng mức thu phóng ban đầu
+                applyZoom();
             });
 
             // --- VIEW MODES ---
@@ -335,6 +615,7 @@
 
                     renderBookSpread();
                 }
+                applyZoom();
             }
 
             // --- BOOK MODE LOGIC ---
@@ -377,6 +658,8 @@
                     pageIndicator.innerText = `${currentIndex + 1}-${currentIndex + 2}`;
                 else
                     pageIndicator.innerText = `${currentIndex + 1}`;
+
+                applyZoom();
             }
 
             // --- NAVIGATION LOGIC (Unified) ---
@@ -430,14 +713,42 @@
                 window.pageObserver = new IntersectionObserver((entries) => {
                     entries.forEach(entry => {
                         if (entry.isIntersecting) {
-                            const idx = parseInt(entry.target.getAttribute('data-index'));
-                            pageIndicator.innerText = idx + 1; // Display 1-based
+                            const target = entry.target;
+                            const idx = parseInt(target.getAttribute('data-index'));
                             currentIndex = idx; // Sync index for switching mode
+                            
+                            // Lấy thông tin chapter từ page
+                            const chapterId = target.getAttribute('data-chapter-id');
+                            const chapterName = target.getAttribute('data-chapter-name');
+                            const pageIndex = parseInt(target.getAttribute('data-page-index'));
+                            const totalPages = parseInt(target.getAttribute('data-total-pages'));
+                            
+                            // Cập nhật giao diện
+                            if (pageIndicator) pageIndicator.innerText = pageIndex + 1;
+                            if (document.getElementById('controlTotalPages')) {
+                                document.getElementById('controlTotalPages').innerText = totalPages;
+                            }
+                            if (document.getElementById('controlChapterName')) {
+                                document.getElementById('controlChapterName').innerText = chapterName;
+                            }
+                            if (document.getElementById('headerChapterName')) {
+                                document.getElementById('headerChapterName').innerText = chapterName;
+                            }
+                            
+                            // Cập nhật URL nếu chuyển sang chapter khác
+                            if (chapterId && window.currentChapterId !== chapterId) {
+                                window.currentChapterId = chapterId;
+                                window.history.replaceState(null, '', `/manga/read/${chapterId}`);
+                                
+                                // Cập nhật highlight trong chapter list
+                                updateChapterListHighlight(chapterId);
+                            }
                         }
                     });
                 }, {root: container, threshold: 0.1, rootMargin: "-40% 0px -40% 0px"});
 
-                pages.forEach(p => window.pageObserver.observe(p));
+                const allPages = document.querySelectorAll('.manga-page');
+                allPages.forEach(p => window.pageObserver.observe(p));
             }
 
             // --- UTILS ---
