@@ -54,7 +54,20 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1 md:gap-2">
+                <!-- Zoom controls -->
+                <div class="flex items-center bg-white/5 rounded-full border border-white/10 px-1 py-0.5 mr-1 md:mr-2">
+                    <button onclick="zoom('out')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors" title="Thu nhỏ">
+                        <span class="material-symbols-outlined text-[18px]">zoom_out</span>
+                    </button>
+                    <button onclick="zoom('reset')" id="zoomIndicator" class="px-1 text-xs font-bold text-gray-300 hover:text-white transition-colors min-w-[40px] text-center" title="Reset thu phóng">
+                        100%
+                    </button>
+                    <button onclick="zoom('in')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors" title="Phóng to">
+                        <span class="material-symbols-outlined text-[18px]">zoom_in</span>
+                    </button>
+                </div>
+
                 <!-- Toggle Seamless Mode Button -->
                 <button id="btnSeamless" onclick="toggleSeamlessMode()" 
                         class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors" 
@@ -177,6 +190,52 @@
             let seamlessModeEnabled = localStorage.getItem('mangaSeamlessMode') === 'true';
             let isFetchingNextChapter = false;
 
+            // --- ZOOM STATE & ACTIONS ---
+            let zoomLevel = parseInt(localStorage.getItem('mangaZoomLevel')) || 100;
+
+            function zoom(action) {
+                if (action === 'in') {
+                    zoomLevel = Math.min(200, zoomLevel + 10);
+                } else if (action === 'out') {
+                    zoomLevel = Math.max(50, zoomLevel - 10);
+                } else if (action === 'reset') {
+                    zoomLevel = 100;
+                }
+                localStorage.setItem('mangaZoomLevel', zoomLevel);
+                applyZoom();
+            }
+
+            function applyZoom() {
+                const indicator = document.getElementById('zoomIndicator');
+                if (indicator) indicator.innerText = `${zoomLevel}%`;
+
+                const factor = zoomLevel / 100;
+                
+                const allPages = document.querySelectorAll('.manga-page');
+                allPages.forEach(p => {
+                    if (currentMode === 'vertical') {
+                        p.style.maxWidth = `${768 * factor}px`;
+                        const img = p.querySelector('img');
+                        if (img) {
+                            img.style.transform = '';
+                            img.style.transition = '';
+                        }
+                    } else {
+                        p.style.maxWidth = ''; // Reset
+                        const img = p.querySelector('img');
+                        if (img) {
+                            if (!p.classList.contains('hidden')) {
+                                img.style.transform = `scale(${factor})`;
+                                img.style.transition = 'transform 0.25s ease';
+                            } else {
+                                img.style.transform = '';
+                                img.style.transition = '';
+                            }
+                        }
+                    }
+                });
+            }
+
             function toggleSeamlessMode() {
                 seamlessModeEnabled = !seamlessModeEnabled;
                 localStorage.setItem('mangaSeamlessMode', seamlessModeEnabled ? 'true' : 'false');
@@ -284,6 +343,7 @@
                 });
 
                 enableObserver();
+                applyZoom();
                 updateVerticalNav(data.id);
             }
 
@@ -496,6 +556,9 @@
 
                 // Kích hoạt lần đầu (để bắt đầu tải background nếu viewport trống)
                 setTimeout(processQueue, 500);
+
+                // Áp dụng mức thu phóng ban đầu
+                applyZoom();
             });
 
             // --- VIEW MODES ---
@@ -552,6 +615,7 @@
 
                     renderBookSpread();
                 }
+                applyZoom();
             }
 
             // --- BOOK MODE LOGIC ---
@@ -594,6 +658,8 @@
                     pageIndicator.innerText = `${currentIndex + 1}-${currentIndex + 2}`;
                 else
                     pageIndicator.innerText = `${currentIndex + 1}`;
+
+                applyZoom();
             }
 
             // --- NAVIGATION LOGIC (Unified) ---
