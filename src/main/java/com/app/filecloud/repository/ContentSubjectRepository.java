@@ -28,5 +28,13 @@ public interface ContentSubjectRepository extends JpaRepository<ContentSubject, 
             "LOWER(s.mainName) IN :names OR " +
             "LOWER(s.aliasName1) IN :names OR " +
             "LOWER(s.aliasName2) IN :names")
-    Optional<ContentSubject> findFirstByAnyName(@Param("names") List<String> names);
+    List<ContentSubject> findAllByAnyName(@Param("names") List<String> names);
+
+    default Optional<ContentSubject> findFirstByAnyName(List<String> names) {
+        if (names == null || names.isEmpty()) {
+            return Optional.empty();
+        }
+        List<ContentSubject> list = findAllByAnyName(names);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
 }

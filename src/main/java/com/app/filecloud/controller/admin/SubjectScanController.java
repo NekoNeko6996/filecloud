@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -20,6 +21,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Controller
 @RequestMapping("/admin/scan-subjects")
 @RequiredArgsConstructor
+@Slf4j
 public class SubjectScanController {
 
     private final MediaScanService mediaScanService;
@@ -45,7 +47,7 @@ public class SubjectScanController {
             try {
                 mediaScanService.importWithMapping(paths, userId);
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error("Error executing import: ", e);
             }
         }).start();
 
@@ -54,11 +56,16 @@ public class SubjectScanController {
 
     @PostMapping("/preview")
     @ResponseBody
-    public ResponseEntity<List<SubjectScanResult>> preview(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> preview(@RequestBody Map<String, String> payload) {
+        String path = payload != null ? payload.get("path") : null;
         try {
-            return ResponseEntity.ok(mediaScanService.scanDirectory(payload.get("path")));
+            return ResponseEntity.ok(mediaScanService.scanDirectory(path));
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid preview path {}: {}", path, e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+            log.error("Error scanning preview directory path {}: ", path, e);
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 
