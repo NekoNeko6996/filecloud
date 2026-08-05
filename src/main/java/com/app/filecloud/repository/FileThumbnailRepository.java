@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface FileThumbnailRepository extends JpaRepository<FileThumbnail, String>{
     Optional<FileThumbnail> findByFileIdAndType(String fileId, FileThumbnail.ThumbType type);
+    java.util.List<FileThumbnail> findByFileId(String fileId);
 }
+

@@ -40,18 +40,27 @@
             <div class="flex-1 overflow-y-auto p-4 sm:p-8 scroll-smooth custom-scrollbar">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                     <a th:each="sub : ${subjects}" 
-                       class="group relative h-40 rounded-xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20 bg-[#1e1e1e]"
+                       th:id="'subject-card-' + ${sub.id}"
+                       class="subject-card-wrapper subject-item group relative h-40 rounded-xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all shadow-lg hover:shadow-primary/20 bg-[#1e1e1e] select-none block"
                        th:href="@{/subjects/{id}(id=${sub.id})}"
                        th:data-id="${sub.id}"
                        th:data-name="${sub.mainName}"
+                       onclick="handleSubjectClick(event, this.getAttribute('data-id'))"
                        oncontextmenu="showContextMenu(event, this.getAttribute('data-id'), this.getAttribute('data-name'))">
 
-                        <div class="absolute inset-0 z-0">
+                        <!-- Selection Checkbox (Top Left - Hidden by default, visible only in Selection Mode) -->
+                        <div class="selection-checkbox absolute top-3 left-3 z-30 hidden" onclick="event.stopPropagation()">
+                            <input type="checkbox" th:value="${sub.id}" th:data-id="${sub.id}"
+                                   class="w-5 h-5 rounded border-gray-500 text-primary focus:ring-0 cursor-pointer"
+                                   onclick="event.stopPropagation()" onchange="updateSelectionCount()">
+                        </div>
+
+                        <div class="absolute inset-0 z-0 pointer-events-none">
                             <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover opacity-60 blur-sm scale-110 transition-transform duration-700">
                             <div class="absolute inset-0 bg-gradient-to-r from-[#171022] via-[#171022]/80 to-transparent"></div>
                         </div>
 
-                        <div class="relative z-10 h-full flex items-center p-4 gap-4">
+                        <div class="relative z-10 h-full flex items-center p-4 gap-4 pointer-events-none">
                             <div class="shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 border-white/10 shadow-2xl bg-black/50 group-hover:border-primary/50 transition-colors">
                                 <img th:if="${sub.avatarUrl != null}" th:src="${sub.avatarUrl}" class="w-full h-full object-cover" 
                                      onerror="this.src='https://ui-avatars.com/api/?name=User&background=random'">
@@ -69,7 +78,7 @@
                                              th:src="${link.platform.iconUrl}" 
                                              class="w-4 h-4 rounded-full object-contain"
                                              th:title="${link.platform.name}">
-                                        <span th:if="${#lists.isEmpty(sub.socialLinks)}" class="text-[10px] text-white italic ">No links</span>
+                                        <span th:if="${#lists.isEmpty(sub.socialLinks)}" class="text-[10px] text-white italic">No links</span>
                                     </div>
                                 </div>
 
@@ -112,6 +121,25 @@
                 </button>
             </div>
 
+            <!-- Floating Selection Toolbar (Matching subject-profile.html) -->
+            <div id="selectionToolbar"
+                 class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#1e1e1e] border border-white/10 rounded-full shadow-2xl px-6 py-3 flex items-center gap-6 animate-bounce-up">
+                <span class="text-white font-bold text-sm">
+                    <span id="selectedCount" class="text-primary">0</span> Selected
+                </span>
+                <div class="h-4 w-px bg-white/20"></div>
+                <button onclick="confirmDeleteSelectedSubjects()"
+                        class="text-red-400 hover:text-red-300 flex items-center gap-1 text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                        id="btnBatchDelete" disabled>
+                    <span class="material-symbols-outlined text-[18px]">delete</span> Delete
+                </button>
+                <button onclick="exitSelectionMode()"
+                        class="text-gray-400 hover:text-white flex items-center gap-1 text-sm font-medium">
+                    Cancel
+                </button>
+            </div>
+
+            <!-- Filter & Sort Dialog -->
             <dialog id="filterModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-sm">
                 <form action="/subjects" method="get" class="flex flex-col gap-6">
                     <div class="flex justify-between items-center pb-2 border-b border-white/10">
@@ -169,6 +197,7 @@
                 </form>
             </dialog>
 
+            <!-- Create Subject Modal -->
             <dialog id="createSubjectModal" class="bg-[#1e1e1e] text-white p-6 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/50 overflow-hidden">
                 <form th:action="@{/subjects/create}" method="post" class="flex flex-col gap-4 w-80">
                     <h3 class="font-bold text-lg">New Subject</h3>
@@ -183,11 +212,12 @@
                 </form>
             </dialog>
 
+            <!-- Delete Confirmation Modal (Matching subject-profile.html) -->
             <dialog id="deleteModal" class="bg-[#1e1e1e] text-white p-0 rounded-xl border border-gray-700 shadow-2xl backdrop:bg-black/80 w-full max-w-md">
                 <div class="p-6">
                     <div class="flex items-center gap-4 mb-4 text-red-500">
                         <span class="material-symbols-outlined text-4xl">warning</span>
-                        <h3 class="text-xl font-bold text-white">Delete Subject?</h3>
+                        <h3 class="text-xl font-bold text-white">Delete Subject(s)?</h3>
                     </div>
 
                     <p class="text-gray-300 mb-4">
@@ -242,10 +272,16 @@
                 </div>
             </dialog>
 
+            <!-- Context Menu (Matching subject-profile.html) -->
             <div id="subjectContextMenu" class="hidden fixed z-50 w-48 bg-[#1e1e1e] border border-gray-700 rounded-lg shadow-2xl overflow-hidden p-2">
                 <button id="ctxInfoBtn" class="w-full text-left px-4 py-2.5 text-sm rounded text-gray-300 hover:bg-white/10 hover:text-white flex items-center gap-2 transition-colors">
                     <span class="material-symbols-outlined text-[18px]">info</span>
                     Information
+                </button>
+
+                <button id="ctxSelectBtn" class="w-full text-left px-4 py-2.5 text-sm rounded text-gray-300 hover:bg-white/10 hover:text-white flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">checklist</span>
+                    Select Items
                 </button>
 
                 <div class="h-px bg-white/10 my-1 mx-2"></div>
@@ -256,40 +292,39 @@
                 </button>
             </div>
         </section>
-        <script>
-            // --- CONTEXT MENU LOGIC ---
+
+        <script th:inline="javascript">
+            // --- CONTEXT MENU & SELECTION LOGIC (MATCHING SUBJECT-PROFILE) ---
             const contextMenu = document.getElementById('subjectContextMenu');
             const ctxInfoBtn = document.getElementById('ctxInfoBtn');
+            const ctxSelectBtn = document.getElementById('ctxSelectBtn');
             const ctxDeleteBtn = document.getElementById('ctxDeleteBtn');
 
             let activeSubjectId = null;
             let activeSubjectName = null;
+            let isSelectionMode = false;
+            let pendingDeleteIds = [];
 
-            // Hàm được gọi khi chuột phải vào thẻ Subject
             function showContextMenu(event, id, name) {
-                event.preventDefault(); // Ngăn menu mặc định của trình duyệt
-                event.stopPropagation(); // Ngăn sự kiện click chuyển trang của thẻ cha
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (isSelectionMode) return;
 
                 activeSubjectId = id;
                 activeSubjectName = name;
 
-                // Tính toán vị trí menu để không bị tràn màn hình
                 let x = event.clientX;
                 let y = event.clientY;
 
-                // Nếu menu gần mép phải -> hiện sang trái
-                if (x + 200 > window.innerWidth)
-                    x -= 200;
-                // Nếu menu gần mép dưới -> hiện lên trên
-                if (y + 100 > window.innerHeight)
-                    y -= 100;
+                if (x + 200 > window.innerWidth) x -= 200;
+                if (y + 120 > window.innerHeight) y -= 120;
 
                 contextMenu.style.left = `${x}px`;
                 contextMenu.style.top = `${y}px`;
                 contextMenu.classList.remove('hidden');
             }
 
-            // Xử lý khi click "Information"
             ctxInfoBtn.onclick = function () {
                 if (activeSubjectId) {
                     window.location.href = `/subjects/${activeSubjectId}`;
@@ -297,37 +332,95 @@
                 hideContextMenu();
             };
 
-            // Xử lý khi click "Delete" -> Gọi lại logic xóa cũ
+            ctxSelectBtn.onclick = function () {
+                toggleSelectionMode();
+                hideContextMenu();
+            };
+
             ctxDeleteBtn.onclick = function () {
                 if (activeSubjectId) {
-                    // Gọi hàm prepareDelete (được tách ra từ hàm deleteSubject cũ)
-                    prepareDeleteModal(activeSubjectId, activeSubjectName);
+                    pendingDeleteIds = [parseInt(activeSubjectId)];
+                    prepareSingleDeleteModal(activeSubjectId, activeSubjectName);
                 }
                 hideContextMenu();
             };
 
-            // Ẩn menu khi click bất kỳ đâu
             document.addEventListener('click', hideContextMenu);
-            document.addEventListener('scroll', hideContextMenu); // Ẩn khi cuộn chuột
+            document.addEventListener('scroll', hideContextMenu);
 
             function hideContextMenu() {
-                contextMenu.classList.add('hidden');
+                if (contextMenu) contextMenu.classList.add('hidden');
             }
 
-            // --- DELETE LOGIC (Sửa lại một chút để tái sử dụng) ---
-            let currentDeleteId = null;
+            // --- SELECTION MODE LOGIC ---
+            function toggleSelectionMode() {
+                isSelectionMode = true;
+                hideContextMenu();
 
-            // Hàm này thay thế cho deleteSubject(event, id) cũ
-            async function prepareDeleteModal(id, name) {
-                currentDeleteId = id;
+                document.querySelectorAll('.selection-checkbox').forEach(el => el.classList.remove('hidden'));
+                document.getElementById('selectionToolbar').classList.remove('hidden');
 
+                if (activeSubjectId) {
+                    const card = document.getElementById('subject-card-' + activeSubjectId);
+                    if (card) {
+                        const cb = card.querySelector('input[type="checkbox"]');
+                        if (cb) cb.checked = true;
+                    }
+                }
+                updateSelectionCount();
+            }
+
+            function exitSelectionMode() {
+                isSelectionMode = false;
+                activeSubjectId = null;
+
+                document.getElementById('selectionToolbar').classList.add('hidden');
+                document.querySelectorAll('.selection-checkbox').forEach(el => {
+                    el.classList.add('hidden');
+                    const cb = el.querySelector('input');
+                    if (cb) cb.checked = false;
+                });
+
+                document.querySelectorAll('.subject-item').forEach(el => el.classList.remove('ring-2', 'ring-primary'));
+            }
+
+            function handleSubjectClick(e, subjectId) {
+                if (isSelectionMode) {
+                    e.preventDefault();
+                    const card = document.getElementById('subject-card-' + subjectId);
+                    if (card) {
+                        const cb = card.querySelector('input[type="checkbox"]');
+                        if (cb) cb.checked = !cb.checked;
+                    }
+                    updateSelectionCount();
+                }
+            }
+
+            function updateSelectionCount() {
+                const checkedCbs = document.querySelectorAll('.selection-checkbox input:checked');
+                const count = checkedCbs.length;
+                document.getElementById('selectedCount').innerText = count;
+                document.getElementById('btnBatchDelete').disabled = count === 0;
+
+                document.querySelectorAll('.subject-item').forEach(el => {
+                    const cb = el.querySelector('input[type="checkbox"]');
+                    if (cb && cb.checked) {
+                        el.classList.add('ring-2', 'ring-primary');
+                    } else {
+                        el.classList.remove('ring-2', 'ring-primary');
+                    }
+                });
+            }
+
+            // --- DELETE PREVIEW & EXECUTION ---
+            async function prepareSingleDeleteModal(id, name) {
+                pendingDeleteIds = [parseInt(id)];
                 const modal = document.getElementById('deleteModal');
                 const btn = document.getElementById('btnConfirmDelete');
 
-                // Reset UI
                 document.getElementById('checkDeletePhysical').checked = false;
                 toggleDeleteWarning();
-                // Dùng tên được truyền vào hoặc placeholder nếu đang load
+
                 document.getElementById('delSubjectName').innerText = name || "Loading...";
                 document.getElementById('delFileCount').innerText = "...";
                 document.getElementById('delTagCount').innerText = "...";
@@ -336,7 +429,6 @@
 
                 modal.showModal();
 
-                // Fetch Preview Data
                 try {
                     const res = await fetch(`/subjects/${id}/delete-preview`);
                     if (res.ok) {
@@ -347,7 +439,66 @@
                         document.getElementById('delTotalSize').innerText = data.totalSize;
                         btn.disabled = false;
                     } else {
-                        alert("Error fetching subject info");
+                        alert("Error fetching subject delete info");
+                        modal.close();
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Connection error");
+                    modal.close();
+                }
+            }
+
+            function confirmDeleteSelectedSubjects() {
+                const checkedCbs = document.querySelectorAll('.selection-checkbox input:checked');
+                if (checkedCbs.length === 0) return;
+
+                pendingDeleteIds = Array.from(checkedCbs).map(cb => parseInt(cb.getAttribute('data-id')));
+                
+                if (pendingDeleteIds.length === 1) {
+                    const card = document.getElementById('subject-card-' + pendingDeleteIds[0]);
+                    const name = card ? card.getAttribute('data-name') : 'Subject';
+                    prepareSingleDeleteModal(pendingDeleteIds[0], name);
+                } else {
+                    prepareBatchDeleteModal(pendingDeleteIds);
+                }
+            }
+
+            async function prepareBatchDeleteModal(ids) {
+                const modal = document.getElementById('deleteModal');
+                const btn = document.getElementById('btnConfirmDelete');
+
+                document.getElementById('checkDeletePhysical').checked = false;
+                toggleDeleteWarning();
+
+                document.getElementById('delSubjectName').innerText = `${ids.length} Selected Subjects`;
+                document.getElementById('delFileCount').innerText = "...";
+                document.getElementById('delTagCount').innerText = "...";
+                document.getElementById('delTotalSize').innerText = "...";
+                btn.disabled = true;
+
+                modal.showModal();
+
+                try {
+                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                    const res = await fetch('/subjects/batch-preview', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: JSON.stringify(ids)
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        document.getElementById('delSubjectName').innerText = `${data.subjectCount} Selected Subjects`;
+                        document.getElementById('delFileCount').innerText = data.fileCount;
+                        document.getElementById('delTagCount').innerText = data.tagCount || 0;
+                        document.getElementById('delTotalSize').innerText = data.totalSize;
+                        btn.disabled = false;
+                    } else {
+                        alert("Error fetching batch delete info");
                         modal.close();
                     }
                 } catch (e) {
@@ -368,13 +519,12 @@
             }
 
             async function confirmDeleteAction() {
-                if (!currentDeleteId)
-                    return;
+                if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
 
                 const deletePhysical = document.getElementById('checkDeletePhysical').checked;
 
                 if (deletePhysical) {
-                    if (!confirm("ARE YOU SURE? This will permanently delete files from your storage volume.")) {
+                    if (!confirm("ARE YOU SURE? This will permanently delete physical files from your storage volume.")) {
                         return;
                     }
                 }
@@ -383,20 +533,35 @@
                 btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Deleting...';
                 btn.disabled = true;
 
+                const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+
                 try {
-                    const formData = new FormData();
-                    formData.append('id', currentDeleteId);
-                    formData.append('deletePhysical', deletePhysical);
+                    let res;
+                    if (pendingDeleteIds.length === 1) {
+                        const formData = new FormData();
+                        formData.append('id', pendingDeleteIds[0]);
+                        formData.append('deletePhysical', deletePhysical);
 
-                    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
-
-                    const res = await fetch('/subjects/delete', {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': csrfToken
-                        },
-                        body: formData
-                    });
+                        res = await fetch('/subjects/delete', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': csrfToken
+                            },
+                            body: formData
+                        });
+                    } else {
+                        res = await fetch('/subjects/delete-batch', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken
+                            },
+                            body: JSON.stringify({
+                                ids: pendingDeleteIds,
+                                deletePhysical: deletePhysical
+                            })
+                        });
+                    }
 
                     if (res.ok) {
                         window.location.reload();
@@ -409,6 +574,7 @@
                 } catch (e) {
                     alert("Error sending delete request");
                     btn.disabled = false;
+                    btn.innerHTML = 'Confirm Delete';
                 }
             }
         </script>

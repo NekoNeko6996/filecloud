@@ -24,6 +24,8 @@ public interface FileNodeRepository extends JpaRepository<FileNode, String> {
 
     Optional<FileNode> findByVolumeIdAndRelativePath(Integer volumeId, String relativePath);
 
+    List<FileNode> findByVolumeId(Integer volumeId);
+
     @Query("SELECT f FROM FileNode f JOIN FileSubject fs ON f.id = fs.fileId WHERE fs.subjectId = :subjectId ORDER BY f.createdAt DESC")
     List<FileNode> findBySubjectId(Integer subjectId);
 
