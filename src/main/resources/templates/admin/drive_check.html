@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('Quét Dữ Liệu Ghost Ổ Cứng', 'config', ~{::section}, ~{::script})}">
+    <body>
+
+        <section class="flex-1 flex flex-col relative overflow-hidden bg-background-dark">
+            <!-- Header -->
+            <header class="glass-header h-16 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0 border-b border-white/5">
+                <div class="flex items-center gap-4">
+                    <a th:href="@{/admin/config}" class="text-gray-400 hover:text-white transition-colors flex items-center gap-1 text-sm font-medium">
+                        <span class="material-symbols-outlined text-lg">arrow_back</span> System Config
+                    </a>
+                    <span class="text-gray-600">/</span>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span class="material-symbols-outlined text-purple-400">disc_full</span> Quét Dữ Liệu Ghost Ổ Cứng
+                    </h2>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-6 sm:p-8 scroll-smooth">
+                <div class="max-w-6xl mx-auto space-y-6">
+
+                    <!-- Drive Selection Card -->
+                    <div class="bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-purple-400">hard_drive</span>
+                                    Chọn Ổ Cứng Cần Kiểm Tra
+                                </h3>
+                                <p class="text-xs text-gray-400">
+                                    Hệ thống sẽ đối chiếu dữ liệu trong CSDL của ổ cứng này với file thực tế trên đĩa vật lý để tìm ra các bản ghi ghost.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                            <div class="relative flex-1">
+                                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">storage</span>
+                                <select id="volumeSelect" class="w-full bg-[#171022] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm appearance-none cursor-pointer">
+                                    <option value="" disabled selected>-- Chọn ổ cứng từ CSDL --</option>
+                                    <option th:each="vol : ${volumes}" 
+                                            th:value="${vol.id}"
+                                            th:data-mount="${vol.mountPoint}"
+                                            th:data-status="${vol.status}"
+                                            th:text="${vol.label + ' (' + vol.mountPoint + ') - Serial: ' + vol.uuid}">
+                                        Drive Label (F:\)
+                                    </option>
+                                </select>
+                            </div>
+
+                            <button type="button" id="btnStartScan" onclick="runGhostScan()" disabled
+                                    class="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-500/20 whitespace-nowrap">
+                                <span class="material-symbols-outlined text-[20px]" id="scanBtnIcon">search</span>
+                                <span id="scanBtnText">Bắt Đầu Quét</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="scanLoading" class="hidden bg-[#1e1e1e] border border-white/5 rounded-2xl p-12 text-center shadow-xl">
+                        <span class="material-symbols-outlined animate-spin text-5xl text-purple-400 mb-4">progress_activity</span>
+                        <h4 class="text-lg font-bold text-white mb-1">Đang kiểm tra dữ liệu trên ổ cứng...</h4>
+                        <p class="text-xs text-gray-400">Quá trình này có thể mất vài giây tùy thuộc vào số lượng tập tin trong CSDL.</p>
+                    </div>
+
+                    <!-- Summary Dashboard -->
+                    <div id="summaryCards" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="bg-[#1e1e1e] border border-white/5 rounded-2xl p-5 shadow-xl">
+                            <div class="flex items-center gap-3">
+                                <div class="size-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-blue-400">database</span>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-400 font-medium">Tổng File CSDL Trên Ổ</p>
+                                    <h4 class="text-2xl font-bold text-white" id="statTotalDbFiles">0</h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#1e1e1e] border border-white/5 rounded-2xl p-5 shadow-xl">
+                            <div class="flex items-center gap-3">
+                                <div class="size-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-red-400">ghost</span>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-400 font-medium">Tập Tin Ghost Phát Hiện</p>
+                                    <h4 class="text-2xl font-bold text-red-400" id="statGhostCount">0</h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#1e1e1e] border border-white/5 rounded-2xl p-5 shadow-xl">
+                            <div class="flex items-center gap-3">
+                                <div class="size-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-yellow-400">hard_drive</span>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-400 font-medium">Dung Lượng Rác CSDL</p>
+                                    <h4 class="text-2xl font-bold text-yellow-400" id="statGhostSize">0 MB</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Clean Result Notice -->
+                    <div id="cleanNotice" class="hidden bg-green-500/10 border border-green-500/20 rounded-2xl p-8 text-center">
+                        <span class="material-symbols-outlined text-5xl text-green-400 mb-2">verified</span>
+                        <h4 class="text-lg font-bold text-green-400 mb-1">Dữ liệu hoàn toàn khớp!</h4>
+                        <p class="text-xs text-gray-300">Không tìm thấy tập tin ghost nào. Tất cả các bản ghi trong CSDL của ổ cứng này đều tồn tại trên đĩa vật lý.</p>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div id="resultSection" class="hidden bg-[#1e1e1e] border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
+                        <!-- Toolbar with 3 View Modes -->
+                        <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 pb-4 border-b border-white/5">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="text-sm font-bold text-white">Kết quả phân tích Ghost</span>
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30" id="badgeGhostCount">0</span>
+                                
+                                <!-- 3 View Mode Selector Tabs -->
+                                <div class="flex items-center bg-[#171022] p-1 rounded-xl border border-white/10">
+                                    <button type="button" id="btnViewTree" onclick="setViewMode('tree')" 
+                                            class="px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all bg-purple-600 text-white">
+                                        <span class="material-symbols-outlined text-sm">account_tree</span> Cây Thư Mục
+                                    </button>
+                                    <button type="button" id="btnViewExplorer" onclick="setViewMode('explorer')" 
+                                            class="px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all text-gray-400 hover:text-white">
+                                        <span class="material-symbols-outlined text-sm">folder_zip</span> Thư Mục Explorer
+                                    </button>
+                                    <button type="button" id="btnViewTable" onclick="setViewMode('table')" 
+                                            class="px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all text-gray-400 hover:text-white">
+                                        <span class="material-symbols-outlined text-sm">format_list_bulleted</span> Danh Sách Phẳng
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div class="relative min-w-[200px]">
+                                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">search</span>
+                                    <input type="text" id="filterInput" onkeyup="filterGhostItems()" placeholder="Tìm tên/đường dẫn..." 
+                                           class="w-full bg-[#171022] border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-gray-500 outline-none focus:border-primary">
+                                </div>
+
+                                <button type="button" onclick="confirmBatchDeleteSelected()" id="btnDeleteSelected" disabled
+                                        class="px-4 py-2 bg-red-600/80 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all">
+                                    <span class="material-symbols-outlined text-sm">delete</span>
+                                    Xóa Mục Chọn (<span id="selectedCountText">0</span>)
+                                </button>
+
+                                <button type="button" onclick="confirmDeleteAllGhost()" 
+                                        class="px-4 py-2 bg-red-900/60 hover:bg-red-800 text-red-200 border border-red-700/50 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all">
+                                    <span class="material-symbols-outlined text-sm">delete_sweep</span>
+                                    Xóa Tất Cả Ghost
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 1. TREE VIEW CONTAINER (Default: Subfolders collapsed) -->
+                        <div id="treeViewContainer" class="space-y-1 custom-scrollbar">
+                            <div class="flex items-center justify-between py-2 px-3 bg-white/5 rounded-xl text-xs font-bold text-gray-400 border border-white/5 mb-2">
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" id="selectAllTreeCheckbox" onchange="toggleSelectAllTree(this)" 
+                                           class="rounded bg-[#171022] border-white/20 text-purple-600 focus:ring-0 cursor-pointer">
+                                    <span>CẤU TRÚC THƯ MỤC CSDL (MẶC ĐỊNH THU GỌN)</span>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <button type="button" onclick="expandAllTree()" class="text-xs text-purple-400 hover:underline">Mở Tất Cả</button>
+                                    <button type="button" onclick="collapseAllTree()" class="text-xs text-gray-400 hover:underline">Thu Gọn Tất Cả</button>
+                                </div>
+                            </div>
+                            <div id="treeNodesRoot" class="space-y-1 font-mono text-xs">
+                                <!-- Tree rendered dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- 2. FOLDER EXPLORER VIEW CONTAINER (File Explorer Style) -->
+                        <div id="explorerViewContainer" class="hidden space-y-4">
+                            <div class="text-xs text-gray-400 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-yellow-400 text-base">info</span>
+                                <span>Nhấn vào thư mục bất kỳ để mở Modal danh sách các tập tin ghost media bên trong.</span>
+                            </div>
+                            <div id="explorerFolderGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                <!-- Folder Cards rendered dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- 3. TABLE VIEW CONTAINER -->
+                        <div id="tableViewContainer" class="hidden overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-left text-xs text-gray-300">
+                                <thead>
+                                    <tr class="border-b border-white/10 text-gray-400 uppercase font-bold text-[11px]">
+                                        <th class="py-3 px-3 w-10 text-center">
+                                            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllTable(this)" 
+                                                   class="rounded bg-[#171022] border-white/20 text-purple-600 focus:ring-0 cursor-pointer">
+                                        </th>
+                                        <th class="py-3 px-3 w-28">Loại</th>
+                                        <th class="py-3 px-3">Tên File / Đường Dẫn Tương Đối</th>
+                                        <th class="py-3 px-3 w-32">Dung Lượng</th>
+                                        <th class="py-3 px-3 w-24 text-right">Thao Tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ghostTableBody" class="divide-y divide-white/5 font-mono">
+                                    <!-- Table rendered dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- FOLDER MEDIA CONTENT MODAL (File Explorer Detail Modal) -->
+            <div id="folderMediaModal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
+                <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" onclick="closeFolderMediaModal()"></div>
+                <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
+                    <div class="bg-[#1e1e1e] border border-white/10 rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+                        
+                        <!-- Modal Header -->
+                        <div class="px-6 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between shrink-0">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="size-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
+                                    <span class="material-symbols-outlined text-yellow-400 text-2xl">folder</span>
+                                </div>
+                                <div class="min-w-0">
+                                    <h3 class="text-base font-bold text-white truncate" id="modalFolderName">Tên Thư Mục</h3>
+                                    <p class="text-xs text-gray-400 truncate" id="modalFolderPath">Đường dẫn thư mục</p>
+                                </div>
+                            </div>
+
+                            <button type="button" onclick="closeFolderMediaModal()" class="text-gray-400 hover:text-white transition-colors">
+                                <span class="material-symbols-outlined text-2xl">close</span>
+                            </button>
+                        </div>
+
+                        <!-- Modal Toolbar -->
+                        <div class="px-6 py-3 border-b border-white/5 bg-black/20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+                            <div class="flex items-center gap-3">
+                                <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30" id="modalFolderGhostBadge">
+                                    0 tập tin ghost
+                                </span>
+                                <label class="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                                    <input type="checkbox" id="modalSelectAllCb" onchange="toggleSelectAllModal(this)" 
+                                           class="rounded bg-[#171022] border-white/20 text-purple-600 focus:ring-0">
+                                    <span>Chọn tất cả trong thư mục này</span>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="deleteModalSelectedItems()" id="btnModalDeleteSelected" disabled
+                                        class="px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl flex items-center gap-1 transition-all">
+                                    <span class="material-symbols-outlined text-sm">delete</span>
+                                    Xóa Mục Chọn (<span id="modalSelectedCount">0</span>)
+                                </button>
+
+                                <button type="button" onclick="deleteEntireFolderGhostItems()" 
+                                        class="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 text-red-200 border border-red-700/50 text-xs font-bold rounded-xl flex items-center gap-1 transition-all">
+                                    <span class="material-symbols-outlined text-sm">delete_sweep</span>
+                                    Xóa Toàn Bộ Rác Thư Mục
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Modal Body (Media List) -->
+                        <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs text-gray-300">
+                                    <thead>
+                                        <tr class="border-b border-white/10 text-gray-400 uppercase font-bold text-[11px]">
+                                            <th class="py-2.5 px-3 w-10 text-center"></th>
+                                            <th class="py-2.5 px-3 w-28">Loại</th>
+                                            <th class="py-2.5 px-3">Tên File Media</th>
+                                            <th class="py-2.5 px-3 w-28">Dung Lượng</th>
+                                            <th class="py-2.5 px-3 w-20 text-right">Thao Tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="modalFolderMediaTableBody" class="divide-y divide-white/5 font-mono">
+                                        <!-- Rendered dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Modal Footer -->
+                        <div class="px-6 py-3 border-t border-white/5 bg-black/20 flex items-center justify-end shrink-0">
+                            <button type="button" onclick="closeFolderMediaModal()" 
+                                    class="px-5 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all">
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delete Confirmation Modal -->
+            <div id="deleteModal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true">
+                <div class="fixed inset-0 bg-black/80 backdrop-blur-sm"></div>
+                <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
+                    <div class="bg-[#1e1e1e] border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+                        <div class="flex items-center gap-3 text-red-400">
+                            <div class="size-10 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+                                <span class="material-symbols-outlined text-xl">warning</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white">Xác Nhận Xóa Dữ Liệu Ghost</h3>
+                        </div>
+
+                        <p class="text-sm text-gray-300" id="modalMessage">
+                            Bạn có chắc chắn muốn xóa các bản ghi ghost đã chọn khỏi CSDL?
+                        </p>
+
+                        <div class="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-300">
+                            <span class="font-bold">Đảm bảo sạch rác:</span> Hệ thống sẽ xóa triệt để bản ghi CSDL và tự động quét dọn toàn bộ Thumbnail vật lý, Temp frames, Exif Metadata, Tags liên quan.
+                        </div>
+
+                        <div class="flex items-center justify-end gap-3 pt-2">
+                            <button type="button" onclick="closeDeleteModal()" 
+                                    class="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-bold rounded-xl transition-all">
+                                Hủy Bỏ
+                            </button>
+                            <button type="button" id="btnConfirmDeleteAction" onclick="executeDelete()" 
+                                    class="px-5 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all">
+                                <span class="material-symbols-outlined text-sm">delete</span>
+                                Đồng Ý Xóa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <script th:inline="javascript">
+            let currentScanResult = null;
+            let pendingDeleteItems = [];
+            let currentViewMode = 'tree';
+            let currentOpenFolderPath = '';
+
+            const volumeSelect = document.getElementById('volumeSelect');
+            const btnStartScan = document.getElementById('btnStartScan');
+
+            volumeSelect.addEventListener('change', function () {
+                btnStartScan.disabled = !this.value;
+            });
+
+            // PATH NORMALIZATION HELPER TO PREVENT MATCHING BUGS
+            function cleanPath(p) {
+                if (!p) return '';
+                let res = p.replace(/\\/g, '/');
+                while (res.startsWith('/')) {
+                    res = res.substring(1);
+                }
+                while (res.endsWith('/')) {
+                    res = res.substring(0, res.length - 1);
+                }
+                return res;
+            }
+
+            function getItemsInFolder(folderPath) {
+                if (!currentScanResult || !currentScanResult.ghostItems) return [];
+                const normFolderPath = cleanPath(folderPath);
+                return currentScanResult.ghostItems.filter(item => {
+                    if (!normFolderPath) return true; // root
+                    const itemPath = cleanPath(item.relativePath);
+                    return itemPath === normFolderPath || itemPath.startsWith(normFolderPath + '/');
+                });
+            }
+
+            function setViewMode(mode) {
+                currentViewMode = mode;
+                const btnTree = document.getElementById('btnViewTree');
+                const btnExplorer = document.getElementById('btnViewExplorer');
+                const btnTable = document.getElementById('btnViewTable');
+
+                const treeContainer = document.getElementById('treeViewContainer');
+                const explorerContainer = document.getElementById('explorerViewContainer');
+                const tableContainer = document.getElementById('tableViewContainer');
+
+                [btnTree, btnExplorer, btnTable].forEach(btn => {
+                    btn.className = 'px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all text-gray-400 hover:text-white';
+                });
+                [treeContainer, explorerContainer, tableContainer].forEach(c => c.classList.add('hidden'));
+
+                if (mode === 'tree') {
+                    btnTree.className = 'px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all bg-purple-600 text-white';
+                    treeContainer.classList.remove('hidden');
+                } else if (mode === 'explorer') {
+                    btnExplorer.className = 'px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all bg-purple-600 text-white';
+                    explorerContainer.classList.remove('hidden');
+                } else {
+                    btnTable.className = 'px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all bg-purple-600 text-white';
+                    tableContainer.classList.remove('hidden');
+                }
+            }
+
+            function runGhostScan() {
+                const volumeId = volumeSelect.value;
+                if (!volumeId) return;
+
+                document.getElementById('scanLoading').classList.remove('hidden');
+                document.getElementById('summaryCards').classList.add('hidden');
+                document.getElementById('resultSection').classList.add('hidden');
+                document.getElementById('cleanNotice').classList.add('hidden');
+                btnStartScan.disabled = true;
+
+                fetch(`/admin/drive-check/api/scan?volumeId=${volumeId}`)
+                    .then(res => {
+                        if (!res.ok) throw new Error('Không thể lấy dữ liệu quét');
+                        return res.json();
+                    })
+                    .then(data => {
+                        currentScanResult = data;
+                        renderScanResult(data);
+                    })
+                    .catch(err => {
+                        alert('Lỗi khi quét ổ cứng: ' + err.message);
+                    })
+                    .finally(() => {
+                        document.getElementById('scanLoading').classList.add('hidden');
+                        btnStartScan.disabled = false;
+                    });
+            }
+
+            function renderScanResult(data) {
+                document.getElementById('statTotalDbFiles').innerText = data.totalDbFiles;
+                document.getElementById('statGhostCount').innerText = data.ghostCount;
+                document.getElementById('statGhostSize').innerText = data.formattedGhostSize;
+                document.getElementById('badgeGhostCount').innerText = data.ghostCount;
+                document.getElementById('summaryCards').classList.remove('hidden');
+
+                if (!data.ghostItems || data.ghostItems.length === 0) {
+                    document.getElementById('cleanNotice').classList.remove('hidden');
+                    return;
+                }
+
+                document.getElementById('resultSection').classList.remove('hidden');
+                renderGhostTree(data.ghostTree);
+                renderFolderExplorer(data.ghostTree, data.ghostItems);
+                renderGhostTable(data.ghostItems);
+                updateSelectedState();
+            }
+
+            /* --- 1. RENDER DIRECTORY TREE VIEW (COLLAPSED BY DEFAULT) --- */
+            function renderGhostTree(treeNodes) {
+                const container = document.getElementById('treeNodesRoot');
+                container.innerHTML = buildTreeHtml(treeNodes, 0);
+            }
+
+            function buildTreeHtml(nodes, level) {
+                if (!nodes || nodes.length === 0) return '';
+                let html = '';
+
+                nodes.forEach(node => {
+                    const indentPx = level * 20;
+                    if (node.nodeType === 'FOLDER') {
+                        const folderId = 'folder_' + node.id.replace(/[^a-zA-Z0-9]/g, '_');
+                        html += `
+                            <div class="tree-folder-wrapper ghost-tree-item" data-name="${escapeHtml(node.name)}" data-path="${escapeHtml(node.relativePath)}">
+                                <div class="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5" style="margin-left: ${indentPx}px">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <button type="button" onclick="toggleFolderToggle('${folderId}', this)" class="text-gray-400 hover:text-white transition-transform">
+                                            <span class="material-symbols-outlined text-lg toggle-icon">chevron_right</span>
+                                        </button>
+                                        <input type="checkbox" class="folder-checkbox rounded bg-[#171022] border-white/20 text-purple-600 focus:ring-0 cursor-pointer"
+                                               onchange="toggleFolderCheckboxes('${folderId}', this)">
+                                        <span class="material-symbols-outlined text-yellow-400 text-lg">folder</span>
+                                        <span class="text-white font-bold text-sm truncate" title="${escapeHtml(node.relativePath)}">${escapeHtml(node.name)}</span>
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                            ${node.ghostCount} file (${node.formattedSize})
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <button type="button" onclick="openFolderMediaModal('${escapeJs(node.relativePath)}', '${escapeJs(node.name)}')"
+                                                class="px-2 py-1 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 rounded-lg text-xs font-bold flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-xs">open_in_new</span> Xem File
+                                        </button>
+                                        <button type="button" onclick="deleteFolderGhostItems('${escapeJs(node.relativePath)}', '${escapeJs(node.name)}')" 
+                                                class="px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-xs font-bold flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-xs">delete_sweep</span> Xóa Rác
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="${folderId}" class="folder-children space-y-1 hidden">
+                                    ${buildTreeHtml(node.children, level + 1)}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        const badgeClass = node.itemType === 'FILE_NODE' 
+                            ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' 
+                            : 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+                        const badgeLabel = node.itemType === 'FILE_NODE' ? 'File Node' : 'Gallery';
+                        const fileIcon = (node.mimeType && node.mimeType.startsWith('video/')) ? 'movie' 
+                                       : ((node.mimeType && node.mimeType.startsWith('image/')) ? 'image' : 'description');
+
+                        html += `
+                            <div class="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition-colors ghost-tree-item ghost-file-item" 
+                                 style="margin-left: ${indentPx + 24}px"
+                                 data-name="${escapeHtml(node.name)}" data-path="${escapeHtml(node.relativePath)}">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <input type="checkbox" class="item-checkbox rounded bg-[#171022] border-white/20 text-purple-600 focus:ring-0 cursor-pointer"
+                                           data-id="${node.id}" data-type="${node.itemType}" onchange="updateSelectedState()">
+                                    <span class="material-symbols-outlined text-gray-400 text-base">${fileIcon}</span>
+                                    <div class="flex flex-col min-w-0">
+                                        <span class="text-white text-xs font-medium truncate" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
+                                        <span class="text-[10px] text-gray-500 truncate" title="${escapeHtml(node.relativePath)}">${escapeHtml(node.relativePath)}</span>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}">
+                                        ${badgeLabel}
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-4 shrink-0">
+                                    <span class="text-gray-400 text-xs font-mono">${node.formattedSize}</span>
+                                    <button type="button" onclick="singleDelete('${node.id}', '${node.itemType}', '${escapeJs(node.name)}')" 
+                                            class="px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-xs font-bold flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-xs">delete</span> Xóa
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+
+                return html;
+            }
+
+            function toggleFolderToggle(folderId, btn) {
+                const el = document.getElementById(folderId);
+                const icon = btn.querySelector('.toggle-icon');
+                if (el.classList.contains('hidden')) {
+                    el.classList.remove('hidden');
+                    icon.innerText = 'expand_more';
+                } else {
+                    el.classList.add('hidden');
+                    icon.innerText = 'chevron_right';
+                }
+            }
+
+            function expandAllTree() {
+                document.querySelectorAll('.folder-children').forEach(el => el.classList.remove('hidden'));
+                document.querySelectorAll('.toggle-icon').forEach(icon => icon.innerText = 'expand_more');
+            }
+
+            function collapseAllTree() {
+                document.querySelectorAll('.folder-children').forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.toggle-icon').forEach(icon => icon.innerText = 'chevron_right');
+            }
+
+            /* --- 2. RENDER FOLDER EXPLORER VIEW (FILE EXPLORER STYLE) --- */
+            function renderFolderExplorer(treeNodes, flatItems) {
+                const grid = document.getElementById('explorerFolderGrid');
+                const folderList = [];
+
+                function collectFolders(nodes) {
+                    if (!nodes) return;
+                    nodes.forEach(n => {
+                        if (n.nodeType === 'FOLDER') {
+                            folderList.push(n);
+                            collectFolders(n.children);
+                        }
+                    });
+                }
+                collectFolders(treeNodes);
+
+                if (folderList.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full py-8 text-center text-gray-400 text-xs">
+                            Không có thư mục con nào. Tất cả tập tin ghost nằm ở gốc thư mục.
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '';
+                folderList.forEach(folder => {
+                    html += `
+                        <div class="bg-[#171022] hover:bg-[#231834] border border-white/10 hover:border-purple-500/40 rounded-2xl p-4 transition-all group cursor-pointer shadow-lg flex flex-col justify-between explorer-folder-card"
+                             data-name="${escapeHtml(folder.name)}" data-path="${escapeHtml(folder.relativePath)}"
+                             onclick="openFolderMediaModal('${escapeJs(folder.relativePath)}', '${escapeJs(folder.name)}')">
+                            <div class="flex items-start justify-between gap-2 mb-3">
+                                <div class="size-12 rounded-xl bg-purple-500/10 group-hover:bg-purple-500/20 border border-purple-500/20 flex items-center justify-center shrink-0 transition-all">
+                                    <span class="material-symbols-outlined text-yellow-400 text-2xl group-hover:scale-110 transition-transform">folder</span>
+                                </div>
+                                <div class="flex items-center gap-1" onclick="event.stopPropagation()">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                        ${folder.ghostCount} file
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 class="text-white font-bold text-sm truncate mb-1 group-hover:text-purple-300 transition-colors" title="${escapeHtml(folder.name)}">${escapeHtml(folder.name)}</h4>
+                                <p class="text-[11px] text-gray-500 truncate mb-3" title="${escapeHtml(folder.relativePath)}">${escapeHtml(folder.relativePath || '/')}</p>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
+                                <span class="text-gray-400 font-mono text-[11px]">${folder.formattedSize}</span>
+                                <button type="button" onclick="event.stopPropagation(); openFolderMediaModal('${escapeJs(folder.relativePath)}', '${escapeJs(folder.name)}')"
+                                        class="px-2 py-1 bg-purple-600/30 hover:bg-purple-600 text-purple-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors">
+                                    <span>Mở Xem</span>
+                                    <span class="material-symbols-outlined text-xs">open_in_new</span>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                grid.innerHTML = html;
+            }
+
+            /* --- 3. FOLDER MEDIA MODAL LOGIC (FIXED PATH NORMALIZATION) --- */
+            function openFolderMediaModal(folderPath, folderName) {
+                currentOpenFolderPath = folderPath;
+                document.getElementById('modalFolderName').innerText = '📁 ' + (folderName || 'Thư Mục');
+                document.getElementById('modalFolderPath').innerText = folderPath || '/';
+
+                const folderItems = getItemsInFolder(folderPath);
+
+                document.getElementById('modalFolderGhostBadge').innerText = `${folderItems.length} tập tin ghost`;
+
+                const tbody = document.getElementById('modalFolderMediaTableBody');
+                if (folderItems.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-gray-400 text-xs">
+                                Không tìm thấy tập tin media ghost nào trong thư mục này.
+                            </td>
+                        </tr>
+                    `;
+                    document.getElementById('modalSelectAllCb').checked = false;
+                    updateModalSelectedState();
+                    document.getElementById('folderMediaModal').classList.remove('hidden');
+                    return;
+                }
+
+                let html = '';
+                folderItems.forEach(item => {
+                    const badgeClass = item.itemType === 'FILE_NODE' 
+                        ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' 
+                        : 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+                    const badgeLabel = item.itemType === 'FILE_NODE' ? 'File Node' : 'Gallery';
+                    const fileIcon = (item.mimeType && item.mimeType.startsWith('video/')) ? 'movie' 
+                                   : ((item.mimeType && item.mimeType.startsWith('image/')) ? 'image' : 'description');
+
+                    html += `
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="py-2.5 px-3 text-center">
+                                <input type="checkbox" class="modal-item-cb rounded bg-[#171022] border-white/20 text-purple-600 focus:ring-0 cursor-pointer"
+                                       data-id="${item.id}" data-type="${item.itemType}" onchange="updateModalSelectedState()">
+                            </td>
+                            <td class="py-2.5 px-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}">
+                                    ${badgeLabel}
+                                </span>
+                            </td>
+                            <td class="py-2.5 px-3 min-w-0">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="material-symbols-outlined text-gray-400 text-base shrink-0">${fileIcon}</span>
+                                    <div class="min-w-0">
+                                        <div class="text-white font-bold truncate max-w-sm" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                                        <div class="text-[10px] text-gray-500 truncate max-w-sm" title="${escapeHtml(item.relativePath)}">${escapeHtml(item.relativePath)}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3 text-gray-400">
+                                ${item.formattedSize}
+                            </td>
+                            <td class="py-2.5 px-3 text-right">
+                                <button type="button" onclick="singleDelete('${item.id}', '${item.itemType}', '${escapeJs(item.name)}')" 
+                                        class="px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-xs font-bold flex items-center gap-1 ml-auto">
+                                    <span class="material-symbols-outlined text-xs">delete</span> Xóa
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                tbody.innerHTML = html;
+                document.getElementById('modalSelectAllCb').checked = false;
+                updateModalSelectedState();
+                document.getElementById('folderMediaModal').classList.remove('hidden');
+            }
+
+            function closeFolderMediaModal() {
+                document.getElementById('folderMediaModal').classList.add('hidden');
+            }
+
+            function toggleSelectAllModal(master) {
+                const cbs = document.querySelectorAll('.modal-item-cb');
+                cbs.forEach(cb => cb.checked = master.checked);
+                updateModalSelectedState();
+            }
+
+            function updateModalSelectedState() {
+                const checked = document.querySelectorAll('.modal-item-cb:checked');
+                const btn = document.getElementById('btnModalDeleteSelected');
+                const txt = document.getElementById('modalSelectedCount');
+                txt.innerText = checked.length;
+                btn.disabled = checked.length === 0;
+            }
+
+            function deleteModalSelectedItems() {
+                const checked = document.querySelectorAll('.modal-item-cb:checked');
+                if (checked.length === 0) return;
+
+                pendingDeleteItems = [];
+                checked.forEach(cb => {
+                    pendingDeleteItems.push({
+                        id: cb.getAttribute('data-id'),
+                        itemType: cb.getAttribute('data-type')
+                    });
+                });
+
+                document.getElementById('modalMessage').innerHTML = `
+                    Bạn có chắc chắn muốn xóa <strong>${pendingDeleteItems.length}</strong> bản ghi ghost đã chọn trong thư mục này khỏi CSDL?
+                `;
+                openDeleteModal();
+            }
+
+            function deleteEntireFolderGhostItems() {
+                const folderItems = getItemsInFolder(currentOpenFolderPath);
+                if (folderItems.length === 0) return;
+
+                pendingDeleteItems = folderItems.map(item => ({
+                    id: item.id,
+                    itemType: item.itemType
+                }));
+
+                document.getElementById('modalMessage').innerHTML = `
+                    Bạn có chắc chắn muốn xóa <strong>TẤT CẢ ${pendingDeleteItems.length}</strong> bản ghi ghost trong thư mục này khỏi CSDL?
+                `;
+                openDeleteModal();
+            }
+
+            function deleteFolderGhostItems(folderPath, folderName) {
+                const folderItems = getItemsInFolder(folderPath);
+
+                if (folderItems.length === 0) {
+                    alert('Không có file ghost nào trong thư mục này.');
+                    return;
+                }
+
+                pendingDeleteItems = folderItems.map(item => ({
+                    id: item.id,
+                    itemType: item.itemType
+                }));
+
+                document.getElementById('modalMessage').innerHTML = `
+                    Bạn có chắc chắn muốn xóa <strong>TẤT CẢ ${pendingDeleteItems.length}</strong> bản ghi ghost trong thư mục <strong>"${escapeHtml(folderName)}"</strong> khỏi CSDL?
+                `;
+                openDeleteModal();
+            }
+
+            /* --- 4. FLAT TABLE VIEW --- */
+            function renderGhostTable(items) {
+                const tbody = document.getElementById('ghostTableBody');
+                let html = '';
+
+                items.forEach((item) => {
+                    const badgeClass = item.itemType === 'FILE_NODE' 
+                        ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' 
+                        : 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+                    const badgeLabel = item.itemType === 'FILE_NODE' ? 'File Node' : 'Gallery';
+
+                    html += `
+                        <tr class="hover:bg-white/5 transition-colors ghost-row" data-name="${escapeHtml(item.name)}" data-path="${escapeHtml(item.relativePath)}">
+                            <td class="py-3 px-3 text-center">
+                                <input type="checkbox" class="item-checkbox rounded bg-[#171022] border-white/20 text-purple-600 focus:ring-0 cursor-pointer" 
+                                       data-id="${item.id}" data-type="${item.itemType}" onchange="updateSelectedState()">
+                            </td>
+                            <td class="py-3 px-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}">
+                                    ${badgeLabel}
+                                </span>
+                            </td>
+                            <td class="py-3 px-3 min-w-0">
+                                <div class="text-white font-bold truncate max-w-md" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                                <div class="text-[11px] text-gray-500 truncate max-w-md" title="${escapeHtml(item.relativePath)}">${escapeHtml(item.relativePath)}</div>
+                            </td>
+                            <td class="py-3 px-3 text-gray-400">
+                                <div>${item.formattedSize}</div>
+                                <div class="text-[10px] text-gray-600">${item.mimeType || 'unknown'}</div>
+                            </td>
+                            <td class="py-3 px-3 text-right">
+                                <button type="button" onclick="singleDelete('${item.id}', '${item.itemType}', '${escapeJs(item.name)}')" 
+                                        class="px-2.5 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg transition-colors text-xs font-bold inline-flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-xs">delete</span> Xóa
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                tbody.innerHTML = html;
+            }
+
+            function toggleFolderCheckboxes(folderId, master) {
+                const folderEl = document.getElementById(folderId);
+                if (!folderEl) return;
+                const checkboxes = folderEl.querySelectorAll('.item-checkbox, .folder-checkbox');
+                checkboxes.forEach(cb => cb.checked = master.checked);
+                updateSelectedState();
+            }
+
+            function toggleSelectAllTree(master) {
+                const treeContainer = document.getElementById('treeViewContainer');
+                const checkboxes = treeContainer.querySelectorAll('.item-checkbox, .folder-checkbox');
+                checkboxes.forEach(cb => cb.checked = master.checked);
+                updateSelectedState();
+            }
+
+            function toggleSelectAllTable(master) {
+                const tableContainer = document.getElementById('tableViewContainer');
+                const checkboxes = tableContainer.querySelectorAll('.item-checkbox');
+                checkboxes.forEach(cb => cb.checked = master.checked);
+                updateSelectedState();
+            }
+
+            function updateSelectedState() {
+                const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+                const btnDeleteSelected = document.getElementById('btnDeleteSelected');
+                const selectedCountText = document.getElementById('selectedCountText');
+
+                selectedCountText.innerText = checkedBoxes.length;
+                btnDeleteSelected.disabled = checkedBoxes.length === 0;
+            }
+
+            function filterGhostItems() {
+                const query = document.getElementById('filterInput').value.toLowerCase().trim();
+                
+                // Filter Tree
+                document.querySelectorAll('.ghost-tree-item').forEach(item => {
+                    const name = item.getAttribute('data-name')?.toLowerCase() || '';
+                    const path = item.getAttribute('data-path')?.toLowerCase() || '';
+                    if (name.includes(query) || path.includes(query)) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+
+                // Filter Explorer Cards
+                document.querySelectorAll('.explorer-folder-card').forEach(card => {
+                    const name = card.getAttribute('data-name')?.toLowerCase() || '';
+                    const path = card.getAttribute('data-path')?.toLowerCase() || '';
+                    if (name.includes(query) || path.includes(query)) {
+                        card.style.display = '';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+
+                // Filter Table Rows
+                document.querySelectorAll('.ghost-row').forEach(row => {
+                    const name = row.getAttribute('data-name')?.toLowerCase() || '';
+                    const path = row.getAttribute('data-path')?.toLowerCase() || '';
+                    if (name.includes(query) || path.includes(query)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+
+            function singleDelete(id, type, name) {
+                pendingDeleteItems = [{ id: id, itemType: type }];
+                document.getElementById('modalMessage').innerHTML = `
+                    Bạn có chắc chắn muốn xóa bản ghi ghost <strong>"${escapeHtml(name)}"</strong> khỏi CSDL?
+                `;
+                openDeleteModal();
+            }
+
+            function confirmBatchDeleteSelected() {
+                const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+                if (checkedBoxes.length === 0) return;
+
+                pendingDeleteItems = [];
+                const addedSet = new Set();
+                checkedBoxes.forEach(cb => {
+                    const id = cb.getAttribute('data-id');
+                    const type = cb.getAttribute('data-type');
+                    if (id && type && !addedSet.has(id)) {
+                        addedSet.add(id);
+                        pendingDeleteItems.push({ id: id, itemType: type });
+                    }
+                });
+
+                document.getElementById('modalMessage').innerHTML = `
+                    Bạn có chắc chắn muốn xóa <strong>${pendingDeleteItems.length}</strong> bản ghi ghost đã chọn khỏi CSDL?
+                `;
+                openDeleteModal();
+            }
+
+            function confirmDeleteAllGhost() {
+                if (!currentScanResult || !currentScanResult.ghostItems || currentScanResult.ghostItems.length === 0) return;
+
+                pendingDeleteItems = currentScanResult.ghostItems.map(item => ({
+                    id: item.id,
+                    itemType: item.itemType
+                }));
+
+                document.getElementById('modalMessage').innerHTML = `
+                    Bạn có chắc chắn muốn xóa <strong>TẤT CẢ ${pendingDeleteItems.length}</strong> bản ghi ghost trên ổ cứng này khỏi CSDL?
+                `;
+                openDeleteModal();
+            }
+
+            function openDeleteModal() {
+                document.getElementById('deleteModal').classList.remove('hidden');
+            }
+
+            function closeDeleteModal() {
+                document.getElementById('deleteModal').classList.add('hidden');
+            }
+
+            function executeDelete() {
+                if (pendingDeleteItems.length === 0) return;
+
+                const csrfToken = document.querySelector("meta[name='_csrf']")?.getAttribute("content");
+                const csrfHeader = document.querySelector("meta[name='_csrf_header']")?.getAttribute("content");
+
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                if (csrfToken && csrfHeader) {
+                    headers[csrfHeader] = csrfToken;
+                }
+
+                const btnConfirm = document.getElementById('btnConfirmDeleteAction');
+                btnConfirm.disabled = true;
+                btnConfirm.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">progress_activity</span> Đang dọn dẹp...';
+
+                fetch('/admin/drive-check/api/delete', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ items: pendingDeleteItems })
+                })
+                .then(res => res.json())
+                .then(resData => {
+                    if (resData.success) {
+                        closeDeleteModal();
+                        closeFolderMediaModal();
+                        runGhostScan();
+                    } else {
+                        alert('Xóa thất bại: ' + resData.message);
+                    }
+                })
+                .catch(err => {
+                    alert('Lỗi kết nối khi xóa: ' + err.message);
+                })
+                .finally(() => {
+                    btnConfirm.disabled = false;
+                    btnConfirm.innerHTML = '<span class="material-symbols-outlined text-sm">delete</span> Đồng Ý Xóa';
+                });
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return str.replace(/&/g, "&amp;")
+                          .replace(/</g, "&lt;")
+                          .replace(/>/g, "&gt;")
+                          .replace(/"/g, "&quot;")
+                          .replace(/'/g, "&#039;");
+            }
+
+            function escapeJs(str) {
+                if (!str) return '';
+                return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            }
+        </script>
+    </body>
+</html>

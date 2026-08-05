@@ -404,64 +404,114 @@ public class SubjectController {
     public ResponseEntity<String> deleteSubject(@RequestParam("id") Integer id,
             @RequestParam(value = "deletePhysical", defaultValue = "false") boolean deletePhysical) {
         try {
-            ContentSubject subject = subjectRepository.findById(id)
-                    .orElseThrow(() -> new IllegalArgumentException("Subject not found"));
-
-            // Lấy danh sách file
-            List<FileNode> files = fileNodeRepository.findBySubjectId(id);
-
-            // 1. VÒNG LẶP CHỈ ĐỂ XÓA FILE VẬT LÝ (KHÔNG THAO TÁC DB Ở ĐÂY)
-            for (FileNode file : files) {
-                // Xóa file vật lý trên ổ cứng
-                if (deletePhysical) {
-                    StorageVolume vol = storageVolumeService.getVolumeById(file.getVolumeId());
-                    if (vol != null) {
-                        try {
-                            Path physicalPath = Paths.get(vol.getMountPoint(), file.getRelativePath());
-                            Files.deleteIfExists(physicalPath);
-                        } catch (Exception e) {
-                            /* Ignore lỗi file hệ thống */ }
-                    }
-                }
-
-                // Xóa Thumbnail rác
-                try {
-                    Path thumbDir = Paths.get(rootUploadDir, ".cache", "thumbnails");
-                    Files.deleteIfExists(thumbDir.resolve(file.getId() + "_small.jpg"));
-                    Files.deleteIfExists(thumbDir.resolve(file.getId() + "_medium.jpg"));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-
-            // 2. XÓA DỮ LIỆU DB BẰNG BATCH (QUAN TRỌNG)
-            // Thay vì delete từng cái gây lỗi Hibernate, ta xóa 1 lần.
-            // DB sẽ tự động xóa MediaMetadata, FileTag, FileSubject nhờ ON DELETE CASCADE
-            if (!files.isEmpty()) {
-                fileNodeRepository.deleteAllInBatch(files);
-            }
-
-            // 3. Xóa Avatar Subject
-            if (subject.getAvatarUrl() != null && subject.getAvatarUrl().startsWith("/avatars/")) {
-                try {
-                    String relativeAvatarPath = subject.getAvatarUrl().startsWith("/")
-                            ? subject.getAvatarUrl().substring(1)
-                            : subject.getAvatarUrl();
-                    Files.deleteIfExists(Paths.get(rootUploadDir, relativeAvatarPath));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-
-            // 4. Xóa Subject
-            subjectRepository.delete(subject);
-
+            deleteSingleSubjectInternal(id, deletePhysical);
             return ResponseEntity.ok("Deleted successfully");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("Error deleting: " + e.getMessage());
         }
     }
+
+    @PostMapping("/delete-batch")
+    @ResponseBody
+    @Transactional
+    public ResponseEntity<String> deleteSubjectsBatch(@RequestBody Map<String, Object> payload) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Integer> ids = (List<Integer>) payload.get("ids");
+            boolean deletePhysical = Boolean.TRUE.equals(payload.get("deletePhysical"));
+
+            if (ids == null || ids.isEmpty()) {
+                return ResponseEntity.badRequest().body("No subject IDs provided");
+            }
+
+            for (Integer id : ids) {
+                deleteSingleSubjectInternal(id, deletePhysical);
+            }
+
+            return ResponseEntity.ok("Deleted " + ids.size() + " subjects successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error deleting subjects: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/batch-preview")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getBatchDeletePreview(@RequestBody List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        long totalFiles = 0;
+        long totalSize = 0;
+        long totalTags = 0;
+
+        for (Integer id : ids) {
+            List<FileNode> files = fileNodeRepository.findBySubjectId(id);
+            totalFiles += files.size();
+            totalSize += files.stream().mapToLong(FileNode::getSize).sum();
+            if (!files.isEmpty()) {
+                List<String> fileIds = files.stream().map(FileNode::getId).toList();
+                totalTags += fileTagRepository.countByFileIdIn(fileIds);
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("subjectCount", ids.size());
+        response.put("fileCount", totalFiles);
+        response.put("totalSize", formatSize(totalSize));
+        response.put("tagCount", totalTags);
+
+        return ResponseEntity.ok(response);
+    }
+
+    private void deleteSingleSubjectInternal(Integer id, boolean deletePhysical) {
+        ContentSubject subject = subjectRepository.findById(id).orElse(null);
+        if (subject == null) return;
+
+        List<FileNode> files = fileNodeRepository.findBySubjectId(id);
+
+        for (FileNode file : files) {
+            if (deletePhysical) {
+                StorageVolume vol = storageVolumeService.getVolumeById(file.getVolumeId());
+                if (vol != null) {
+                    try {
+                        Path physicalPath = Paths.get(vol.getMountPoint(), file.getRelativePath());
+                        Files.deleteIfExists(physicalPath);
+                    } catch (Exception e) {
+                        /* Ignore */
+                    }
+                }
+            }
+
+            try {
+                Path thumbDir = Paths.get(rootUploadDir, ".cache", "thumbnails");
+                Files.deleteIfExists(thumbDir.resolve(file.getId() + "_small.jpg"));
+                Files.deleteIfExists(thumbDir.resolve(file.getId() + "_medium.jpg"));
+            } catch (Exception e) {
+                /* Ignore */
+            }
+        }
+
+        if (!files.isEmpty()) {
+            fileNodeRepository.deleteAllInBatch(files);
+        }
+
+        if (subject.getAvatarUrl() != null && subject.getAvatarUrl().startsWith("/avatars/")) {
+            try {
+                String relativeAvatarPath = subject.getAvatarUrl().startsWith("/")
+                        ? subject.getAvatarUrl().substring(1)
+                        : subject.getAvatarUrl();
+                Files.deleteIfExists(Paths.get(rootUploadDir, relativeAvatarPath));
+            } catch (Exception e) {
+                /* Ignore */
+            }
+        }
+
+        subjectRepository.delete(subject);
+    }
+
 
     @GetMapping("/{id}/socials")
     @ResponseBody
