@@ -58,39 +58,57 @@ public class MediaScanService {
 
     // 1. HÀM QUÉT PREVIEW
     public List<SubjectScanResult> scanDirectory(String rootPathStr) throws IOException {
+        if (rootPathStr == null || rootPathStr.trim().isEmpty()) {
+            throw new IllegalArgumentException("Đường dẫn không được để trống!");
+        }
+
         List<SubjectScanResult> results = new ArrayList<>();
         Path rootPath = Paths.get(rootPathStr);
 
         if (!Files.exists(rootPath) || !Files.isDirectory(rootPath)) {
-            throw new IllegalArgumentException("Đường dẫn không hợp lệ!");
+            throw new IllegalArgumentException("Đường dẫn không hợp lệ hoặc không tồn tại!");
         }
 
         try (Stream<Path> stream = Files.list(rootPath)) {
-            stream.filter(Files::isDirectory).forEach(folder -> {
-                String folderName = folder.getFileName().toString();
+            stream.filter(folder -> {
+                try {
+                    return Files.isDirectory(folder);
+                } catch (Exception e) {
+                    log.warn("Không thể kiểm tra thư mục {}: {}", folder, e.getMessage());
+                    return false;
+                }
+            }).forEach(folder -> {
+                try {
+                    String folderName = folder.getFileName().toString();
 
-                // Phân tích tên: [Name][Alias]
-                List<String> names = parseNames(folderName);
+                    // Phân tích tên: [Name][Alias]
+                    List<String> names = parseNames(folderName);
 
-                if (!names.isEmpty()) {
-                    String mainName = names.get(0);
-                    List<String> aliases = names.subList(1, names.size());
+                    if (!names.isEmpty()) {
+                        String mainName = names.get(0);
+                        List<String> aliases = names.subList(1, names.size());
 
-                    // Đếm file video bên trong
-                    int count = countMediaFiles(folder);
+                        // Đếm file video bên trong
+                        int count = countMediaFiles(folder);
 
-                    // Kiểm tra DB xem Subject tồn tại chưa
-                    List<String> lowerNames = names.stream().map(String::toLowerCase).toList();
-                    boolean exists = subjectRepository.findFirstByAnyName(lowerNames).isPresent();
+                        // Kiểm tra DB xem Subject tồn tại chưa
+                        List<String> lowerNames = names.stream()
+                                .filter(n -> n != null && !n.isBlank())
+                                .map(String::toLowerCase)
+                                .toList();
+                        boolean exists = !lowerNames.isEmpty() && subjectRepository.findFirstByAnyName(lowerNames).isPresent();
 
-                    results.add(SubjectScanResult.builder()
-                            .folderName(folderName)
-                            .fullPath(folder.toAbsolutePath().toString())
-                            .parsedMainName(mainName)
-                            .parsedAliases(aliases)
-                            .mediaCount(count)
-                            .existsInDb(exists)
-                            .build());
+                        results.add(SubjectScanResult.builder()
+                                .folderName(folderName)
+                                .fullPath(folder.toAbsolutePath().toString())
+                                .parsedMainName(mainName)
+                                .parsedAliases(aliases)
+                                .mediaCount(count)
+                                .existsInDb(exists)
+                                .build());
+                    }
+                } catch (Exception e) {
+                    log.error("Lỗi khi quét thư mục con {}: ", folder, e);
                 }
             });
         }
@@ -289,10 +307,16 @@ public class MediaScanService {
 
     // --- HELPER ---
     private List<String> parseNames(String folderName) {
+        if (folderName == null || folderName.isBlank()) {
+            return List.of();
+        }
         List<String> matches = new ArrayList<>();
         Matcher m = BRACKET_PATTERN.matcher(folderName);
         while (m.find()) {
-            matches.add(m.group(1).trim());
+            String val = m.group(1).trim();
+            if (!val.isEmpty()) {
+                matches.add(val);
+            }
         }
         // Nếu không có ngoặc vuông, lấy nguyên tên folder
         if (matches.isEmpty() && !folderName.startsWith(".")) {

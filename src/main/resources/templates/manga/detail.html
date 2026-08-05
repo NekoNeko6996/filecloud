@@ -113,6 +113,12 @@
                             <span class="text-sm text-gray-500 font-normal ml-2" th:text="'(' + ${chapters.size()} + ')'"></span>
                         </h3>
                         <div class="flex gap-2">
+                            <!-- Toggle View Mode Button -->
+                            <button id="btnToggleViewMode" onclick="toggleChaptersViewMode()" class="flex items-center gap-2 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white text-sm font-bold border border-white/10 transition-colors" title="Đổi chế độ xem">
+                                <span id="chapterViewModeIcon" class="material-symbols-outlined text-[18px]">grid_view</span>
+                                <span id="chapterViewModeText" class="hidden sm:inline">Chế độ thẻ</span>
+                            </button>
+
                             <button id="btnToggleSort" onclick="toggleSortMode()" class="flex items-center gap-2 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white text-sm font-bold border border-white/10 transition-colors">
                                 <span class="material-symbols-outlined text-[18px]">swap_vert</span> <span class="hidden sm:inline">Sort</span>
                             </button>
@@ -127,7 +133,7 @@
                         </div>
                     </div>
 
-                    <div id="chapterListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3 relative"> 
+                    <div id="chapterListContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 relative"> 
                         <div th:each="chap : ${chapters}" 
                              class="relative group bg-[#2e2839] rounded-lg border border-white/5 hover:bg-[#362f42] hover:border-primary/50 transition-all"
                              th:data-id="${chap.id}">
@@ -137,13 +143,24 @@
                                th:data-preview-id="${previewMap.get(chap.id)}"
                                target="_blank"
                                oncontextmenu="handleRightClick(event, this.parentElement.querySelector('.btn-more-options'))"
-                               class="chapter-item flex items-center justify-between p-4 pr-12 rounded-lg cursor-pointer h-full">
+                               class="chapter-item flex items-center p-3 md:p-4 pr-12 rounded-lg cursor-pointer h-full gap-3">
 
-                                <div class="flex items-center gap-3 overflow-hidden">
-                                    <span class="material-symbols-outlined text-gray-500 group-hover:text-primary shrink-0">folder_open</span>
-                                    <span class="text-white font-medium group-hover:text-primary transition-colors truncate" th:text="${chap.chapterName}">Chap 1</span>
+                                <!-- Dynamic Preview Image (shown in Card Mode) -->
+                                <div class="chapter-card-preview hidden w-16 md:w-20 aspect-[2/3] rounded overflow-hidden shrink-0 bg-gray-800 border border-white/10 relative group-hover:border-primary/50 transition-colors duration-300">
+                                    <img th:if="${previewMap.get(chap.id) != null}"
+                                         th:src="@{/manga/image/{id}/thumb(id=${previewMap.get(chap.id)})}"
+                                         loading="lazy"
+                                         class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                         alt="Preview">
+                                    <div th:unless="${previewMap.get(chap.id) != null}" class="w-full h-full flex items-center justify-center text-white/20 text-[10px] bg-[#121212] font-bold">M</div>
                                 </div>
-                                <span class="text-xs text-gray-500 font-mono shrink-0 ml-2" th:text="${#temporals.format(chap.createdAt, 'dd/MM/yyyy')}">Date</span>
+
+                                <span class="material-symbols-outlined text-gray-500 group-hover:text-primary shrink-0 chapter-folder-icon">folder_open</span>
+
+                                <div class="flex flex-col items-start gap-1 min-w-0 flex-1">
+                                    <span class="text-white font-medium group-hover:text-primary transition-colors truncate w-full text-left" th:text="${chap.chapterName}">Chap 1</span>
+                                    <span class="text-[10px] text-gray-500 font-mono" th:text="${#temporals.format(chap.createdAt, 'dd/MM/yyyy')}">Date</span>
+                                </div>
                             </a>
 
                             <button class="btn-more-options flex items-center absolute right-1 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors z-10"
@@ -623,10 +640,11 @@
             const previewPopup = document.getElementById('chapterPreviewPopup');
             const previewImg = document.getElementById('previewImage');
             const previewLoading = document.getElementById('previewLoading');
+            window.enableHoverPreview = true;
 
             function showPreview(el) {
-                // Không hiện preview nếu là màn hình nhỏ (Mobile/Tablet dọc)
-                if (isSorting) return;
+                // Không hiện preview nếu là màn hình nhỏ (Mobile/Tablet dọc) hoặc đang tắt hover preview
+                if (isSorting || !window.enableHoverPreview) return;
                 if (window.innerWidth < 768)
                     return;
 
@@ -645,7 +663,7 @@
             }
 
             function movePreview(e) {
-                if (isSorting) return;
+                if (isSorting || !window.enableHoverPreview) return;
                 if (window.innerWidth < 768 || previewPopup.classList.contains('hidden'))
                     return;
 
@@ -662,9 +680,45 @@
                 previewPopup.style.left = `${left}px`;
             }
 
+            // --- CHAPTER LIST VIEW MODE ---
+            let chaptersViewMode = localStorage.getItem('mangaChaptersViewMode') || 'hover'; // 'hover' | 'card'
+
+            function toggleChaptersViewMode() {
+                chaptersViewMode = chaptersViewMode === 'hover' ? 'card' : 'hover';
+                localStorage.setItem('mangaChaptersViewMode', chaptersViewMode);
+                applyChaptersViewMode();
+            }
+
+            function applyChaptersViewMode() {
+                const btnIcon = document.getElementById('chapterViewModeIcon');
+                const btnText = document.getElementById('chapterViewModeText');
+                const previews = document.querySelectorAll('.chapter-card-preview');
+                const folderIcons = document.querySelectorAll('.chapter-folder-icon');
+
+                if (chaptersViewMode === 'card') {
+                    if (btnIcon) btnIcon.innerText = 'view_list';
+                    if (btnText) btnText.innerText = 'Danh sách';
+
+                    previews.forEach(el => el.classList.remove('hidden'));
+                    folderIcons.forEach(el => el.classList.add('hidden'));
+                    window.enableHoverPreview = false;
+                } else {
+                    if (btnIcon) btnIcon.innerText = 'grid_view';
+                    if (btnText) btnText.innerText = 'Chế độ thẻ';
+
+                    previews.forEach(el => el.classList.add('hidden'));
+                    folderIcons.forEach(el => el.classList.remove('hidden'));
+                    window.enableHoverPreview = true;
+                }
+            }
+
             function hidePreview() {
-                previewPopup.classList.add('hidden');
-                previewImg.src = '';
+                if (previewPopup) {
+                    previewPopup.classList.add('hidden');
+                }
+                if (previewImg) {
+                    previewImg.src = '';
+                }
             }
 
             function handleRightClick(e, el) {
@@ -981,6 +1035,7 @@
             }
 
             document.addEventListener("DOMContentLoaded", () => {
+                applyChaptersViewMode();
                 const chapterItems = document.querySelectorAll('.chapter-item');
 
                 chapterItems.forEach(item => {
